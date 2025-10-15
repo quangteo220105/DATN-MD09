@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import { BASE_URL } from '../../config/apiConfig'; // thêm dòng này ở đầu file
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,7 +34,7 @@ const LoginScreen = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://192.168.1.2:3000/api/auth/login', {
+      const response = await axios.post(`${BASE_URL}/auth/login`, {
         email,
         password,
       });

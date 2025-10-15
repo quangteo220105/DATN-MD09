@@ -45,4 +45,10 @@ app.use(function (err, req, res, next) {
   });
 });
 
+// ✅ Mặc định route chính trả về JSON để tránh lỗi view engine
+app.get("/", (req, res) => {
+  res.json({ message: "API server đang chạy!" });
+});
+
+
 module.exports = app;

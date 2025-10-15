@@ -1,0 +1,33 @@
+.login-container {
+    display: flex;
+    height: 100vh;
+}
+
+.login-left {
+    flex: 1;
+}
+
+.login-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.login-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-box {
+    width: 80%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-title {
+    margin-bottom: 24px;
+    font-size: 24px;
+    font-weight: bold;
+}

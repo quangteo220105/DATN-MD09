@@ -3,6 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } fro
 import axios from "axios";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { BASE_URL } from '../../config/apiConfig';
+
 
 const ForgotPasswordScreen = () => {
     const router = useRouter();
@@ -20,7 +22,7 @@ const ForgotPasswordScreen = () => {
 
         setLoading(true);
         try {
-            const res = await axios.post("http://192.168.1.2:3000/api/auth/forgot-password", {
+            const res = await axios.post(`${BASE_URL}/auth/forgot-password`, {
                 email: email.trim(),
             });
 
@@ -48,7 +50,7 @@ const ForgotPasswordScreen = () => {
 
         setLoading(true);
         try {
-            const res = await axios.post("http://192.168.1.2:3000/api/auth/reset-password", {
+            const res = await axios.post(`${BASE_URL}/auth/reset-password`, {
                 email: email.trim(),
                 resetCode: resetCode.trim(),
                 newPassword: newPassword.trim(),

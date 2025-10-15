@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import { BASE_URL } from '../../config/apiConfig';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^(0|\+84)\d{9}$/;
@@ -45,7 +46,7 @@ const RegisterScreen = () => {
         setLoading(true);
 
         try {
-            const response = await axios.post('http://192.168.1.2:3000/api/auth/register', {
+            const response = await axios.post(`${BASE_URL}/auth/register`, {
                 name,
                 phone,
                 email,

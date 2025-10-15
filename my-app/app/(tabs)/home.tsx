@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import { BASE_URL } from '../../config/apiConfig';
 
 const { width } = Dimensions.get('window');
 const ITEM_MARGIN = 12;
@@ -66,7 +67,7 @@ export default function HomeScreen() {
         const fetchCategories = async () => {
             try {
                 setLoading(true);
-                const res = await axios.get('http://192.168.1.2:3000/api/categories');
+                const res = await axios.get(`${BASE_URL}/categories`);
                 const data = res.data.map((c: any) => c.name);
                 setCategories(['Tất cả', ...data]);
             } catch (error: any) {
@@ -88,7 +89,7 @@ export default function HomeScreen() {
         const fetchBanners = async () => {
             try {
                 setLoadingBanner(true);
-                const res = await axios.get('http://192.168.1.2:3000/api/banners');
+                const res = await axios.get(`${BASE_URL}/banners`);
                 setBanners(res.data);
             } catch (error: any) {
                 console.log('Lỗi lấy banner:', error.message);
