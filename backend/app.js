@@ -9,6 +9,9 @@ var indexRouter = require('./routes/index');
 var authRouter = require('./routes/authRoutes'); // 👈 Thêm router đăng ký / đăng nhập
 var categoryRoutes = require("./routes/categoryRoutes");
 var bannerRoutes = require("./routes/bannerRoutes");
+var adminRoutes = require("./routes/adminRoutes");
+var shoesRoutes = require("./routes/shoesRoutes"); // 👈 router sản phẩm
+
 var database = require('./config/db');
 
 var app = express();
@@ -25,12 +28,21 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ✅ Định nghĩa routes
+//Tài khoản Admin
+app.use("/admin", adminRoutes);
 app.use('/', indexRouter);
 app.use('/api/auth', authRouter); // /api/auth/register, /api/auth/login
 // 🧩 Routes danh mục
 app.use("/api/categories", categoryRoutes);
 //Banner
 app.use("/api/banners", bannerRoutes);
+//Sản phẩm
+// 🛍️ Routes sản phẩm giày
+app.use("/api/products", shoesRoutes);
+app.use('/images', express.static(path.join(__dirname, 'public/images'))); // public/images → /images
+app.use('/uploads', express.static('uploads'));
+
+
 
 // ✅ Bắt lỗi 404
 app.use(function (req, res, next) {
