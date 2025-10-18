@@ -3,10 +3,12 @@ import {
     DashboardOutlined,
     ShopOutlined,
     AppstoreOutlined,
+    PictureOutlined, // 🆕 icon banner
 } from "@ant-design/icons";
 import Dashboard from "./Dashboard";
 import Product from "./Product";
 import Categories from "./Categories";
+import Banners from "./Banners"; // 🆕 import màn hình banner
 
 export default function AdminLayout({ onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -19,6 +21,8 @@ export default function AdminLayout({ onLogout }) {
                 return <Product />;
             case "categories":
                 return <Categories />;
+            case "banners":
+                return <Banners />; // 🆕 thêm Banner
             default:
                 return <Dashboard />;
         }
@@ -78,6 +82,20 @@ export default function AdminLayout({ onLogout }) {
                     title="Categories"
                 >
                     <AppstoreOutlined />
+                </div>
+
+                {/* 🆕 Banners */}
+                <div
+                    style={{
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        color: activeTab === "banners" ? "#ff8000" : "#fff",
+                        fontSize: 24,
+                    }}
+                    onClick={() => setActiveTab("banners")}
+                    title="Banners"
+                >
+                    <PictureOutlined />
                 </div>
             </div>
 

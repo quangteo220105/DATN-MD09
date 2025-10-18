@@ -40,9 +40,7 @@ app.use("/api/banners", bannerRoutes);
 // 🛍️ Routes sản phẩm giày
 app.use("/api/products", shoesRoutes);
 app.use('/images', express.static(path.join(__dirname, 'public/images'))); // public/images → /images
-app.use('/uploads', express.static('uploads'));
-
-
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ✅ Bắt lỗi 404
 app.use(function (req, res, next) {

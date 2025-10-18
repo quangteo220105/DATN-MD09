@@ -1,77 +1,51 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
-    TouchableOpacity,
     TextInput,
     Image,
     FlatList,
     Dimensions,
+    TouchableOpacity,
     ActivityIndicator,
-    ScrollView
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
-import { BASE_URL } from '../../config/apiConfig';
+    RefreshControl,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
+import { BASE_URL } from "../../config/apiConfig";
 
-const { width } = Dimensions.get('window');
-const ITEM_MARGIN = 12;
-const ITEM_WIDTH = (width - 32 - ITEM_MARGIN) / 2;
+const { width } = Dimensions.get("window");
+const ITEM_MARGIN = 8; // khoảng cách giữa 2 cột
+const ITEM_PADDING = 20; // khoảng cách từ mép màn hình (tăng từ 16 lên 20)
+const ITEM_WIDTH = (width - ITEM_PADDING * 2 - ITEM_MARGIN) / 2; // width mỗi item
 
-const PRODUCTS = [
-    {
-        id: '1',
-        name: 'K-Swiss Vista Trainer',
-        price: 85.0,
-        rating: 4.5,
-        sold: 8374,
-        image: require('../../assets/images/logo.png.png'),
-    },
-    {
-        id: '2',
-        name: 'RS-X Women Sneaker',
-        price: 110.0,
-        rating: 4.7,
-        sold: 7483,
-        image: require('../../assets/images/logo.png.png'),
-    },
-    {
-        id: '3',
-        name: 'White Classic',
-        price: 72.0,
-        rating: 4.3,
-        sold: 2291,
-        image: require('../../assets/images/logo.png.png'),
-    },
-    {
-        id: '4',
-        name: 'Sport Runner',
-        price: 99.0,
-        rating: 4.6,
-        sold: 4120,
-        image: require('../../assets/images/logo.png.png'),
-    },
-];
+type BannerType = { _id: string; image: string };
 
 export default function HomeScreen() {
-    const [query, setQuery] = useState('');
-    const [brand, setBrand] = useState('Tất cả');
-    const [favorites, setFavorites] = useState(new Set());
-    const [categories, setCategories] = useState<string[]>(['Tất cả']);
+    const [query, setQuery] = useState("");
+    const [brand, setBrand] = useState("Tất cả");
+    const [favorites, setFavorites] = useState(new Set<string>());
+    const [categories, setCategories] = useState([{ name: "Tất cả", id: "all" }]);
     const [loading, setLoading] = useState(false);
+    const [loadingBanner, setLoadingBanner] = useState(false);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [banners, setBanners] = useState<BannerType[]>([]);
+    const [products, setProducts] = useState<any[]>([]);
+    const bannerRef = useRef<FlatList>(null);
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-    // 🧩 Lấy danh mục
+    // Lấy danh mục
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 setLoading(true);
                 const res = await axios.get(`${BASE_URL}/categories`);
-                const data = res.data.map((c: any) => c.name);
-                setCategories(['Tất cả', ...data]);
-            } catch (error: any) {
-                console.log('Lỗi lấy danh mục:', error.message);
+                const data = res.data.map((c: any, i: number) => ({ name: c.name, id: c._id }));
+                setCategories([{ name: "Tất cả", id: "all" }, ...data]);
+            } catch (error) {
+                console.log("Lỗi lấy danh mục:", (error as Error).message);
             } finally {
                 setLoading(false);
             }
@@ -79,51 +53,82 @@ export default function HomeScreen() {
         fetchCategories();
     }, []);
 
-    // 🧩 Lấy banner từ MongoDB
-    const [banners, setBanners] = useState<any[]>([]);
-    const [loadingBanner, setLoadingBanner] = useState(false);
-    const scrollRef = React.useRef<any>(null);
-    const [currentIndex, setCurrentIndex] = useState(0);
+    // Lấy banner
+    const fetchBanners = async () => {
+        try {
+            setLoadingBanner(true);
+            const res = await axios.get(`${BASE_URL}/banners`);
+            const formatted: BannerType[] = res.data.map((b: any) => ({
+                _id: b._id,
+                image: `${BASE_URL.replace("/api", "")}${b.image}`,
+            }));
+            setBanners(formatted);
+        } catch (error) {
+            console.log("Lỗi lấy banner:", (error as Error).message);
+        } finally {
+            setLoadingBanner(false);
+        }
+    };
+
+    // Lấy sản phẩm
+    const fetchProducts = async () => {
+        try {
+            setLoadingProducts(true);
+            const res = await axios.get(`${BASE_URL}/products`);
+            setProducts(res.data);
+        } catch (error) {
+            console.log("Lỗi lấy sản phẩm:", (error as Error).message);
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchBanners = async () => {
-            try {
-                setLoadingBanner(true);
-                const res = await axios.get(`${BASE_URL}/banners`);
-                setBanners(res.data);
-            } catch (error: any) {
-                console.log('Lỗi lấy banner:', error.message);
-            } finally {
-                setLoadingBanner(false);
-            }
-        };
         fetchBanners();
+        fetchProducts();
     }, []);
 
+    // Pull to refresh
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await Promise.all([fetchBanners(), fetchProducts()]);
+        setRefreshing(false);
+    };
+
+    // Auto slide banner
     useEffect(() => {
         if (banners.length === 0) return;
+
         const interval = setInterval(() => {
-            const nextIndex = (currentIndex + 1) % banners.length;
-            setCurrentIndex(nextIndex);
-            scrollRef.current?.scrollTo({
-                x: nextIndex * (width - 32 + 10), // +10 = khoảng cách giữa banner
-                animated: true,
+            setCurrentIndex((prev) => {
+                const next = (prev + 1) % banners.length;
+                bannerRef.current?.scrollToOffset({
+                    offset: next * width,
+                    animated: true,
+                });
+                return next;
             });
-        }, 3000); // ⏱ đổi slide mỗi 3 giây
+        }, 4000);
 
         return () => clearInterval(interval);
-    }, [currentIndex, banners]);
+    }, [banners]);
 
-    // 🔍 Lọc sản phẩm
+    // Lọc sản phẩm theo search & brand
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
-        return PRODUCTS.filter((p) => {
-            if (brand !== 'Tất cả' && !p.name.toLowerCase().includes(brand.toLowerCase()))
-                return false;
+        const selectedCategory = categories.find(c => c.name === brand);
+
+        return products.filter((p) => {
+            // Lọc theo danh mục
+            if (brand !== "Tất cả" && selectedCategory && selectedCategory.id !== "all") {
+                if (p.categoryId !== selectedCategory.id) return false;
+            }
+
+            // Lọc theo tìm kiếm
             if (!q) return true;
             return p.name.toLowerCase().includes(q);
         });
-    }, [query, brand]);
+    }, [query, brand, products, categories]);
 
     const toggleFav = (id: string) => {
         setFavorites((prev) => {
@@ -134,263 +139,260 @@ export default function HomeScreen() {
         });
     };
 
-    const renderProduct = ({ item }: any) => (
-        <View style={styles.card}>
-            <View style={styles.imageWrap}>
-                <Image source={item.image} style={styles.productImage} />
-                <TouchableOpacity
-                    style={styles.heartBtn}
-                    onPress={() => toggleFav(item.id)}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons
-                        name={favorites.has(item.id) ? 'heart' : 'heart-outline'}
-                        size={18}
-                        color={favorites.has(item.id) ? '#ff4d4f' : '#222'}
+    const renderProduct = ({ item, index }: any) => {
+        const mainVariant = item.variants[0];
+        const totalStock = item.variants.reduce((sum: number, v: any) => sum + v.stock, 0);
+
+        return (
+            <View style={styles.card}>
+                <View style={styles.imageWrap}>
+                    <Image
+                        source={{ uri: `${BASE_URL.replace("/api", "")}${mainVariant.image}` }}
+                        style={styles.productImage}
+                        resizeMode="cover"
                     />
-                </TouchableOpacity>
+                </View>
+                <View style={styles.productInfo}>
+                    <Text numberOfLines={2} style={styles.productName}>{item.name}</Text>
+                    <Text style={styles.soldText}>Số lượng còn {totalStock}</Text>
+                    <Text style={styles.price}>{mainVariant.currentPrice.toLocaleString('vi-VN')} VND</Text>
+                </View>
             </View>
+        );
+    };
 
-            <Text numberOfLines={1} style={styles.productName}>
-                {item.name}
-            </Text>
 
-            <View style={styles.row}>
-                <Ionicons name="star" size={14} color="#f2c94c" />
-                <Text style={styles.ratingText}>{item.rating}</Text>
-                <Text style={styles.soldText}> · {item.sold.toLocaleString()} sold</Text>
+    const renderBanner = () => (
+        <View>
+            <FlatList
+                ref={bannerRef}
+                data={banners}
+                horizontal
+                pagingEnabled
+                snapToAlignment="center"
+                snapToInterval={width}
+                decelerationRate="fast"
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, index) => item._id ? item._id : index.toString()}
+                onScroll={(e) => {
+                    const index = Math.round(e.nativeEvent.contentOffset.x / width);
+                    setCurrentIndex(index);
+                }}
+                renderItem={({ item }) => (
+                    <View style={{ width }}>
+                        <Image
+                            source={{ uri: item.image }}
+                            style={{ width: "100%", height: width * 0.5, borderRadius: 12 }}
+                            resizeMode="cover"
+                        />
+                    </View>
+                )}
+            />
+            {/* Indicator */}
+            <View style={styles.indicatorWrap}>
+                {banners.map((_, i) => (
+                    <View key={i} style={[styles.indicator, { opacity: i === currentIndex ? 1 : 0.3 }]} />
+                ))}
             </View>
-
-            <Text style={styles.price}>${item.price.toFixed(2)}</Text>
         </View>
     );
 
     return (
-        <SafeAreaView style={styles.safe}>
-            <View style={styles.container}>
-                {/* Header */}
-                <View style={styles.headerRow}>
-                    <View style={styles.headerLeft}>
-                        <Image source={require('../../assets/images/logo.png.png')} style={styles.avatar} />
-                        <View style={{ marginLeft: 10 }}>
-                            <Text style={styles.greetSmall}>Good Morning 👋</Text>
-                            <Text style={styles.greetName}>Andrew Ainsley</Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity style={styles.bellBtn}>
-                        <Ionicons name="notifications-outline" size={22} color="#222" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Search */}
-                <View style={styles.searchRow}>
-                    <View style={styles.searchBox}>
-                        <Ionicons name="search" size={18} color="#888" style={{ marginRight: 8 }} />
-                        <TextInput
-                            placeholder="Tìm kiếm"
-                            value={query}
-                            onChangeText={setQuery}
-                            style={styles.searchInput}
-                            placeholderTextColor="#999"
-                        />
-                        <Ionicons name="mic-outline" size={18} color="#888" style={{ marginLeft: 8 }} />
-                    </View>
-                    <TouchableOpacity style={styles.filterBtn}>
-                        <Ionicons name="options" size={18} color="#fff" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* 🧩 Banner từ MongoDB */}
-                {/* 🖼 Banner từ MongoDB (URL online) */}
-                {/* 🧩 Banner slideshow từ MongoDB */}
-                {loadingBanner ? (
-                    <ActivityIndicator size="small" color="#000" style={{ marginVertical: 10 }} />
-                ) : banners.length > 0 ? (
-                    <ScrollView
-                        ref={scrollRef}
-                        horizontal
-                        pagingEnabled
-                        showsHorizontalScrollIndicator={false}
-                        scrollEventThrottle={16}
-                        onScroll={(e) => {
-                            const x = e.nativeEvent.contentOffset.x;
-                            const index = Math.round(x / (width - 32 + 10));
-                            setCurrentIndex(index);
-                        }}
-                        contentContainerStyle={{ paddingHorizontal: 16 }}
-                    >
-                        {banners.map((item) => (
-                            <View key={item._id} style={[styles.bannerWrap, { marginRight: 10 }]}>
-                                <Image
-                                    source={{ uri: item.image }}
-                                    style={styles.bannerImage}
-                                    resizeMode="cover"
-                                />
+        <View style={styles.container}>
+            <FlatList
+                data={filtered}
+                keyExtractor={(item, index) => item._id ? item._id.toString() : index.toString()}
+                renderItem={renderProduct}
+                numColumns={2}
+                columnWrapperStyle={styles.row}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.contentContainer}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                ListHeaderComponent={
+                    <>
+                        {/* Header + Search */}
+                        <View style={styles.headerRow}>
+                            <View style={styles.headerLeft}>
+                                <Image source={require("../../assets/images/logo.png.png")} style={styles.avatar} />
+                                <View style={{ marginLeft: 10 }}>
+                                    <Text style={styles.greetSmall}>Good Morning 👋</Text>
+                                    <Text style={styles.greetName}>Andrew Ainsley</Text>
+                                </View>
                             </View>
-                        ))}
-                    </ScrollView>
-                ) : (
-                    <Text style={{ textAlign: "center", color: "#555", marginVertical: 10 }}>
-                        Không có banner nào
-                    </Text>
-                )}
-
-
-                {/* Danh mục */}
-                {loading ? (
-                    <ActivityIndicator size="small" color="#000" style={{ marginBottom: 10 }} />
-                ) : (
-                    <View style={styles.brandsRow}>
-                        {categories.map((b) => (
-                            <TouchableOpacity
-                                key={b}
-                                style={[styles.brandChip, brand === b && styles.brandChipActive]}
-                                onPress={() => setBrand(b)}
-                            >
-                                <Text style={[styles.brandText, brand === b && styles.brandTextActive]}>{b}</Text>
+                            <TouchableOpacity style={styles.bellBtn}>
+                                <Ionicons name="notifications-outline" size={22} color="#222" />
                             </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
+                        </View>
 
-                {/* Products grid */}
-                <FlatList
-                    contentContainerStyle={{ paddingBottom: 100 }}
-                    data={filtered}
-                    keyExtractor={(i) => i.id}
-                    renderItem={renderProduct}
-                    numColumns={2}
-                    columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: ITEM_MARGIN }}
-                    showsVerticalScrollIndicator={false}
-                />
+                        {/* Search */}
+                        <View style={styles.searchRow}>
+                            <View style={styles.searchBox}>
+                                <Ionicons name="search" size={18} color="#888" style={{ marginRight: 8 }} />
+                                <TextInput
+                                    placeholder="Tìm kiếm"
+                                    value={query}
+                                    onChangeText={setQuery}
+                                    style={styles.searchInput}
+                                    placeholderTextColor="#999"
+                                />
+                                <Ionicons name="mic-outline" size={18} color="#888" style={{ marginLeft: 8 }} />
+                            </View>
+                            <TouchableOpacity style={styles.filterBtn}>
+                                <Ionicons name="options" size={18} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
 
-                {/* Bottom Nav */}
-                <View style={styles.bottomNav}>
-                    <Ionicons name="home" size={22} color="black" />
-                    <Ionicons name="heart-outline" size={22} color="gray" />
-                    <Ionicons name="cart-outline" size={22} color="gray" />
-                    <Ionicons name="person-outline" size={22} color="gray" />
-                </View>
+                        {/* Banner */}
+                        {loadingBanner ? (
+                            <ActivityIndicator size="small" color="#000" style={{ marginVertical: 10 }} />
+                        ) : (
+                            renderBanner()
+                        )}
+
+                        {/* Categories */}
+                        {loading ? (
+                            <ActivityIndicator size="small" color="#000" style={{ marginBottom: 10 }} />
+                        ) : (
+                            <View style={styles.brandsRow}>
+                                {categories.map((category, i) => (
+                                    <TouchableOpacity
+                                        key={`${category.id}-${i}`} // unique key tránh lỗi
+                                        style={[styles.brandChip, brand === category.name && styles.brandChipActive]}
+                                        onPress={() => setBrand(category.name)}
+                                    >
+                                        <Text style={[styles.brandText, brand === category.name && styles.brandTextActive]}>{category.name}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </>
+                }
+            />
+
+            {/* Bottom Nav */}
+            <View style={styles.bottomNav}>
+                <Ionicons name="home" size={22} color="black" />
+                <Ionicons name="heart-outline" size={22} color="gray" />
+                <Ionicons name="cart-outline" size={22} color="gray" />
+                <Ionicons name="person-outline" size={22} color="gray" />
             </View>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#fff' },
-    container: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
-    headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-    headerLeft: { flexDirection: 'row', alignItems: 'center' },
-    avatar: { width: 44, height: 44, borderRadius: 22 },
-    greetSmall: { fontSize: 12, color: '#777' },
-    greetName: { fontSize: 16, color: '#111', fontWeight: '700' },
-    bellBtn: { backgroundColor: '#fff', padding: 8, borderRadius: 12, elevation: 2 },
-
-    searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+    container: { flex: 1, backgroundColor: "#fff" },
+    contentContainer: {
+        paddingHorizontal: ITEM_PADDING,
+        paddingTop: 10,
+        paddingBottom: 100
+    },
+    row: {
+        justifyContent: "space-between",
+        marginBottom: ITEM_MARGIN
+    },
+    headerRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        marginTop: 10
+    },
+    headerLeft: { flexDirection: "row", alignItems: "center" },
+    avatar: { width: 40, height: 40, borderRadius: 20 },
+    greetSmall: { fontSize: 14, color: "#555" },
+    greetName: { fontSize: 16, fontWeight: "bold" },
+    bellBtn: { padding: 6 },
+    searchRow: { flexDirection: "row", marginHorizontal: 16, marginTop: 10 },
     searchBox: {
         flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f7f7f7',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 12,
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#f1f1f1",
+        borderRadius: 8,
+        paddingHorizontal: 8
     },
-    searchInput: { flex: 1, fontSize: 15, color: '#222' },
-    filterBtn: {
-        width: 44,
-        height: 44,
-        backgroundColor: '#111',
-        marginLeft: 10,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
+    searchInput: { flex: 1, height: 36 },
+    filterBtn: { marginLeft: 10, backgroundColor: "#222", padding: 8, borderRadius: 8 },
+    bannerWrap: { borderRadius: 12, overflow: "hidden", marginHorizontal: 16 },
+    bannerImage: { width: "100%", height: width * 0.5 },
+    indicatorWrap: {
+        flexDirection: "row",
+        justifyContent: "center",
+        marginTop: 8,
+        position: "absolute",
+        bottom: 10,
+        width: "100%"
     },
-
-    bannerWrap: {
-        marginBottom: 14,
-        borderRadius: 14,
-        overflow: 'hidden',
-        position: 'relative',
-        width: width - 32,
-        height: (width - 40) * 0.55,
+    indicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#fff",
+        marginHorizontal: 4
     },
-    bannerImage: { width: '100%', height: 120, resizeMode: 'cover' },
-    bannerTextWrap: {
-        position: 'absolute',
-        left: 16,
-        top: 18,
-        right: 16,
+    brandsRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        marginHorizontal: 16,
+        marginTop: 10
     },
-    bannerPct: { color: '#fff', fontSize: 28, fontWeight: '800' },
-    bannerTitle: { color: '#fff', fontSize: 18, marginTop: 6, fontWeight: '700' },
-    bannerSub: { color: '#fff', marginTop: 6, fontSize: 12, opacity: 0.95 },
-
-    brandsRow: { flexDirection: 'row', marginBottom: 12 },
     brandChip: {
         paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#eee',
+        paddingVertical: 6,
+        backgroundColor: "#eee",
+        borderRadius: 16,
         marginRight: 8,
-        backgroundColor: '#fff',
-        elevation: 1,
+        marginBottom: 8
     },
-    brandChipActive: {
-        backgroundColor: '#fff',
-        borderColor: '#111',
-    },
-    brandText: { color: '#333' },
-    brandTextActive: { color: '#111', fontWeight: '700' },
-
+    brandChipActive: { backgroundColor: "#222" },
+    brandText: { color: "#555" },
+    brandTextActive: { color: "#fff" },
     card: {
         width: ITEM_WIDTH,
-        backgroundColor: '#fff',
+        backgroundColor: "#fff",
         borderRadius: 12,
-        padding: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
+        overflow: "hidden",
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
         elevation: 3,
+        marginBottom: 8,
     },
     imageWrap: {
-        width: '100%',
-        height: ITEM_WIDTH - 10,
-        borderRadius: 10,
-        backgroundColor: '#f8f8f8',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 10,
-        position: 'relative',
+        width: "100%",
+        aspectRatio: 1, // ảnh vuông
     },
     productImage: {
-        width: '90%',
-        height: '90%',
-        resizeMode: 'contain',
+        width: "100%",
+        height: "100%",
+        resizeMode: "cover",
     },
-    heartBtn: {
-        position: 'absolute',
-        right: 8,
-        top: 8,
-        backgroundColor: '#fff',
-        padding: 6,
-        borderRadius: 999,
-        elevation: 2,
+    productInfo: {
+        padding: 8,
     },
-
-    productName: { fontSize: 14, color: '#111', fontWeight: '700', marginBottom: 4 },
-    row: { flexDirection: 'row', alignItems: 'center' },
-    ratingText: { marginLeft: 6, color: '#444', fontWeight: '700' },
-    soldText: { color: '#888', marginLeft: 4, fontSize: 12 },
-    price: { marginTop: 8, fontSize: 16, fontWeight: '800', color: '#111' },
+    productName: {
+        fontWeight: "bold",
+        fontSize: 14,
+        marginBottom: 4,
+        lineHeight: 18
+    },
+    soldText: {
+        color: "#555",
+        fontSize: 12,
+        marginBottom: 4
+    },
+    price: {
+        fontWeight: "bold",
+        fontSize: 16,
+        color: "#222"
+    },
     bottomNav: {
         flexDirection: "row",
         justifyContent: "space-around",
-        paddingVertical: 12,
+        alignItems: "center",
+        height: 56,
         borderTopWidth: 1,
-        borderColor: "#eee",
-        backgroundColor: "#fff",
+        borderTopColor: "#eee"
     },
 });

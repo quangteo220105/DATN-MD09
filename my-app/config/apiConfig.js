@@ -1,7 +1,7 @@
 // my-app/config/apiConfig.js
 
 // 🖥️ Chỉ cần đổi dòng IP này khi dùng mạng khác
-const LOCAL_IP = "192.168.1.22"; // IP máy tính của Quang
+const LOCAL_IP = "192.168.1.9"; // IP máy tính của Quang
 const PORT = 3000;
 
 // Tạo URL API gốc
