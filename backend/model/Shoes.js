@@ -15,7 +15,7 @@ const productSchema = new mongoose.Schema({
 const productVariantSchema = new mongoose.Schema({
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
     color: { type: String, required: true },
-    size: { type: Number, required: true },
+    size: { type: String, required: true }, // Đổi từ Number sang String để linh hoạt hơn
     originalPrice: { type: Number, required: true }, // Giá gốc, KHÔNG được sửa
     currentPrice: { type: Number, required: true },  // Giá bán hiện tại, bắt buộc nhập
     stock: { type: Number, required: true },         // Số lượng tồn kho, bắt buộc

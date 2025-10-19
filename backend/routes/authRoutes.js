@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const User = require("../model/User");
+const upload = require("../middleware/upload");
 
 // Đăng ký người dùng
-router.post("/register", async (req, res) => {
+router.post("/register", upload.single("avatar"), async (req, res) => {
     try {
         const { name, email, phone, password } = req.body;
 
@@ -17,16 +18,32 @@ router.post("/register", async (req, res) => {
         // Mã hóa mật khẩu
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Xử lý avatar
+        let avatarPath = null;
+        if (req.file) {
+            avatarPath = `/uploads/${req.file.filename}`;
+        }
+
         // Tạo user mới
         const newUser = new User({
             name,
             email,
             phone,
             password: hashedPassword,
+            avatar: avatarPath,
         });
 
         await newUser.save();
-        res.status(201).json({ message: "Đăng ký thành công!" });
+        res.status(201).json({
+            message: "Đăng ký thành công!",
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                phone: newUser.phone,
+                avatar: newUser.avatar,
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Lỗi server!" });
@@ -58,6 +75,7 @@ router.post("/login", async (req, res) => {
                 name: user.name,
                 email: user.email,
                 phone: user.phone,
+                avatar: user.avatar,
             },
         });
     } catch (error) {
@@ -114,6 +132,31 @@ router.post("/reset-password", async (req, res) => {
         await user.save();
 
         res.status(200).json({ message: "Đặt lại mật khẩu thành công!" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Lỗi server!" });
+    }
+});
+
+// Lấy thông tin user hiện tại
+router.get("/me/:userId", async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const user = await User.findById(userId).select('-password -resetCode');
+
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng!" });
+        }
+
+        res.status(200).json({
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                avatar: user.avatar,
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Lỗi server!" });

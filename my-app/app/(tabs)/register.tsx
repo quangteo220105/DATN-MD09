@@ -8,11 +8,14 @@ import {
     TouchableOpacity,
     View,
     ActivityIndicator,
-    Image
+    Image,
+    Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { BASE_URL } from '../../config/apiConfig';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneRegex = /^(0|\+84)\d{9}$/;
@@ -26,6 +29,7 @@ const RegisterScreen = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [avatar, setAvatar] = useState<string | null>(null);
 
     const [touched, setTouched] = useState({
         name: false,
@@ -41,20 +45,104 @@ const RegisterScreen = () => {
 
     const canSubmit = nameValid && phoneValid && emailValid && passwordValid;
 
+    const pickImage = async () => {
+        try {
+            // Yêu cầu quyền truy cập thư viện ảnh
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+            if (permissionResult.granted === false) {
+                Alert.alert("Cần quyền truy cập", "Ứng dụng cần quyền truy cập thư viện ảnh để chọn avatar!");
+                return;
+            }
+
+            // Hiển thị menu lựa chọn
+            Alert.alert(
+                "Chọn ảnh avatar",
+                "Bạn muốn chọn ảnh như thế nào?",
+                [
+                    {
+                        text: "Chọn ảnh (không crop)",
+                        onPress: async () => {
+                            const result = await ImagePicker.launchImageLibraryAsync({
+                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                allowsEditing: false,
+                                quality: 0.8,
+                                allowsMultipleSelection: false,
+                                exif: false,
+                            });
+
+                            if (!result.canceled && result.assets[0]) {
+                                setAvatar(result.assets[0].uri);
+                                Alert.alert("Thành công", "Đã chọn ảnh avatar thành công!");
+                            }
+                        }
+                    },
+                    {
+                        text: "Chọn ảnh (có crop)",
+                        onPress: async () => {
+                            const result = await ImagePicker.launchImageLibraryAsync({
+                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                allowsEditing: true,
+                                aspect: [1, 1],
+                                quality: 0.8,
+                                allowsMultipleSelection: false,
+                                exif: false,
+                            });
+
+                            if (!result.canceled && result.assets[0]) {
+                                setAvatar(result.assets[0].uri);
+                                Alert.alert("Thành công", "Đã chọn ảnh avatar thành công!");
+                            }
+                        }
+                    },
+                    {
+                        text: "Hủy",
+                        style: "cancel"
+                    }
+                ]
+            );
+        } catch (error) {
+            console.error('Lỗi chọn ảnh:', error);
+            Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại!");
+        }
+    };
+
     const handleRegister = async () => {
         if (!canSubmit) return;
         setLoading(true);
 
         try {
-            const response = await axios.post(`${BASE_URL}/auth/register`, {
-                name,
-                phone,
-                email,
-                password,
+            // Tạo FormData để gửi file
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('phone', phone);
+            formData.append('email', email);
+            formData.append('password', password);
+
+            if (avatar) {
+                formData.append('avatar', {
+                    uri: avatar,
+                    type: 'image/jpeg',
+                    name: 'avatar.jpg',
+                } as any);
+            }
+
+            const response = await axios.post(`${BASE_URL}/auth/register`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
-            alert(response.data.message);
-            router.push('/(tabs)/login');
+            // Lưu thông tin user vào AsyncStorage nếu có
+            if (response.data.user) {
+                await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+                console.log('User saved to AsyncStorage after registration:', response.data.user);
+                alert(response.data.message);
+                router.replace('/(tabs)/home'); // Chuyển thẳng đến Home thay vì Login
+            } else {
+                alert(response.data.message);
+                router.push('/(tabs)/login');
+            }
         } catch (error: any) {
             if (error.response) {
                 alert(error.response.data.message);
@@ -68,13 +156,7 @@ const RegisterScreen = () => {
 
     return (
         <View style={styles.container}>
-            <Image
-                source={require("../../assets/images/logo.png.png")} // 🔧 đổi đường dẫn nếu cần
-                style={styles.image}
-                resizeMode="contain"
-            />
             <Text style={styles.title}>Đăng ký</Text>
-
             {/* Họ tên */}
             <View
                 style={[
@@ -187,6 +269,21 @@ const RegisterScreen = () => {
                 <Text style={styles.error}>Mật khẩu phải có ít nhất 6 ký tự</Text>
             )}
 
+            {/* Avatar Selection */}
+            <View style={styles.avatarSection}>
+                <Text style={styles.avatarLabel}>Ảnh đại diện (tùy chọn)</Text>
+                <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
+                    {avatar ? (
+                        <Image source={{ uri: avatar }} style={styles.avatarImage} />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Ionicons name="camera-outline" size={40} color="#ccc" />
+                            <Text style={styles.avatarPlaceholderText}>Chọn ảnh</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
                 style={[styles.button, (!canSubmit || loading) && { backgroundColor: '#ccc' }]}
                 activeOpacity={0.8}
@@ -225,16 +322,26 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         backgroundColor: '#fff',
     },
-    image: {
-        width: "80%",
-        height: 180,
-        alignSelf: "center",
-        marginBottom: 20,
-    },
     input: { flex: 1, paddingVertical: 12, fontSize: 16, color: '#000' },
     button: { backgroundColor: '#000', padding: 15, borderRadius: 8, marginTop: 8 },
     buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: 16 },
     error: { color: '#ff4d4f', marginBottom: 10 },
     loginPrompt: { flexDirection: 'row', justifyContent: 'center', marginTop: 25 },
     registerLink: { color: '#000', fontWeight: 'bold', marginLeft: 4 },
+    avatarSection: { marginBottom: 15 },
+    avatarLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: '#000' },
+    avatarContainer: { alignSelf: 'center' },
+    avatarImage: { width: 100, height: 100, borderRadius: 50 },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#f0f0f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#ddd',
+        borderStyle: 'dashed'
+    },
+    avatarPlaceholderText: { marginTop: 5, color: '#999', fontSize: 12 },
 });

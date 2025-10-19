@@ -7,21 +7,23 @@ export default function ManagerDashboard() {
     const [categories, setCategories] = useState([]);
     const [editingProduct, setEditingProduct] = useState(null);
 
-    // 🟢 Form state (1 biến thể duy nhất)
+    // 🟢 Form state với multiple variants
     const [formProduct, setFormProduct] = useState({
         name: "",
         description: "",
         brand: "",
         categoryId: "",
         isActive: true,
-        variant: {
-            size: "",
-            color: "",
-            originalPrice: "",
-            currentPrice: "",
-            stock: "",
-            imageFile: null,
-        },
+        variants: [
+            {
+                size: "",
+                color: "",
+                originalPrice: "",
+                currentPrice: "",
+                stock: "",
+                imageFile: null,
+            }
+        ],
     });
 
     useEffect(() => {
@@ -50,18 +52,75 @@ export default function ManagerDashboard() {
         }
     };
 
-    // 🟢 Submit form
-    // 🟢 Submit form
+    // 🟢 Thêm variant mới
+    const addVariant = () => {
+        setFormProduct({
+            ...formProduct,
+            variants: [
+                ...formProduct.variants,
+                {
+                    size: "",
+                    color: "",
+                    originalPrice: "",
+                    currentPrice: "",
+                    stock: "",
+                    imageFile: null,
+                }
+            ]
+        });
+    };
+
+    // 🟢 Xóa variant
+    const removeVariant = (index) => {
+        if (formProduct.variants.length > 1) {
+            const newVariants = formProduct.variants.filter((_, i) => i !== index);
+            setFormProduct({
+                ...formProduct,
+                variants: newVariants
+            });
+        }
+    };
+
+    // 🟢 Cập nhật variant
+    const updateVariant = (index, field, value) => {
+        const newVariants = [...formProduct.variants];
+        newVariants[index] = {
+            ...newVariants[index],
+            [field]: value
+        };
+        setFormProduct({
+            ...formProduct,
+            variants: newVariants
+        });
+    };
+
+    // 🟢 Cập nhật ảnh cho variant
+    const updateVariantImage = (index, file) => {
+        const newVariants = [...formProduct.variants];
+        newVariants[index] = {
+            ...newVariants[index],
+            imageFile: file
+        };
+        setFormProduct({
+            ...formProduct,
+            variants: newVariants
+        });
+    };
+
+    // 🟢 Submit form với multiple variants
     const handleSubmit = async () => {
         if (!formProduct.name || !formProduct.categoryId) {
             alert("Tên sản phẩm và danh mục là bắt buộc!");
             return;
         }
 
-        const v = formProduct.variant;
-        if (!v.size || !v.color || !v.originalPrice || !v.currentPrice || !v.stock || !v.imageFile) {
-            alert("Vui lòng điền đầy đủ thông tin biến thể và chọn ảnh!");
-            return;
+        // ✅ Kiểm tra từng biến thể
+        for (let i = 0; i < formProduct.variants.length; i++) {
+            const v = formProduct.variants[i];
+            if (!v.size || !v.color || !v.originalPrice || !v.currentPrice || !v.stock || !v.imageFile) {
+                alert(`Vui lòng điền đủ thông tin biến thể ${i + 1} và chọn ảnh!`);
+                return;
+            }
         }
 
         const formData = new FormData();
@@ -69,22 +128,25 @@ export default function ManagerDashboard() {
         formData.append("description", formProduct.description);
         formData.append("brand", formProduct.brand);
         formData.append("categoryId", formProduct.categoryId);
-        formData.append("isActive", formProduct.isActive);
+        formData.append("isActive", formProduct.isActive ? "true" : "false");
 
-        // ✅ Gửi variants dưới dạng JSON string
-        const variantsPayload = [
-            {
-                size: Number(v.size),
-                color: v.color,
-                originalPrice: Number(v.originalPrice),
-                currentPrice: Number(v.currentPrice),
-                stock: Number(v.stock),
-            },
-        ];
+        // ✅ Gửi danh sách variants dưới dạng JSON (chưa có ảnh)
+        const variantsPayload = formProduct.variants.map((v, index) => ({
+            size: v.size,
+            color: v.color,
+            originalPrice: Number(v.originalPrice),
+            currentPrice: Number(v.currentPrice),
+            stock: Number(v.stock),
+            imageIndex: index, // giúp backend biết ảnh nào khớp với biến thể
+        }));
         formData.append("variants", JSON.stringify(variantsPayload));
 
-        // ✅ Thêm ảnh cho biến thể
-        formData.append("image", v.imageFile);
+        // ✅ Gắn từng ảnh vào FormData
+        formProduct.variants.forEach((v, index) => {
+            if (v.imageFile) {
+                formData.append(`image-${index}`, v.imageFile);
+            }
+        });
 
         try {
             const res = await fetch("http://localhost:3000/api/products", {
@@ -94,69 +156,79 @@ export default function ManagerDashboard() {
             const data = await res.json();
 
             if (res.ok) {
-                alert("Thêm sản phẩm thành công!");
+                alert("✅ Thêm sản phẩm thành công!");
                 fetchProducts();
                 setShowModal(false);
-                // Reset form
-                setFormProduct({
-                    name: "",
-                    description: "",
-                    brand: "",
-                    categoryId: "",
-                    isActive: true,
-                    variant: {
-                        size: "",
-                        color: "",
-                        originalPrice: "",
-                        currentPrice: "",
-                        stock: "",
-                        imageFile: null,
-                    },
-                });
+                resetForm();
             } else {
-                alert(data.message || "Lỗi thêm sản phẩm!");
+                alert(data.message || "❌ Lỗi thêm sản phẩm!");
             }
         } catch (error) {
             console.error(error);
-            alert("Lỗi kết nối server!");
+            alert("❌ Lỗi kết nối server!");
         }
+    };
+
+    // 🟢 Reset form
+    const resetForm = () => {
+        setFormProduct({
+            name: "",
+            description: "",
+            brand: "",
+            categoryId: "",
+            isActive: true,
+            variants: [
+                {
+                    size: "",
+                    color: "",
+                    originalPrice: "",
+                    currentPrice: "",
+                    stock: "",
+                    imageFile: null,
+                }
+            ],
+        });
     };
 
     // 🟢 Khi click "Sửa" trên table
     const handleEditClick = (product) => {
         setEditingProduct(product);
 
-        const firstVariant = product.variants?.[0] || {};
+        // Load tất cả variants của sản phẩm
+        const variants = product.variants?.map(variant => ({
+            _id: variant._id,
+            size: variant.size || "",
+            color: variant.color || "",
+            originalPrice: variant.originalPrice || "",
+            currentPrice: variant.currentPrice || "",
+            stock: variant.stock || "",
+            imageFile: null,
+            existingImage: variant.image || null
+        })) || [{
+            size: "",
+            color: "",
+            originalPrice: "",
+            currentPrice: "",
+            stock: "",
+            imageFile: null,
+        }];
+
         setFormProduct({
             name: product.name || "",
             description: product.description || "",
             brand: product.brand || "",
             categoryId: product.categoryId || "",
             isActive: product.isActive,
-            variant: {
-                size: firstVariant.size || "",
-                color: firstVariant.color || "",
-                originalPrice: firstVariant.originalPrice || "",
-                currentPrice: firstVariant.currentPrice || "",
-                stock: firstVariant.stock || "",
-                imageFile: null,
-                _id: firstVariant._id || "", // lưu id biến thể để update
-            },
+            variants: variants
         });
 
         setShowModal(true);
     };
 
-    // 🟢 Hàm submit sửa
+    // 🟢 Hàm submit sửa với multiple variants
     const handleUpdate = async () => {
         if (!formProduct.name || !formProduct.categoryId) {
             alert("Tên sản phẩm và danh mục là bắt buộc!");
-            return;
-        }
-
-        const v = formProduct.variant;
-        if (!v.size || !v.color || !v.currentPrice || !v.stock) {
-            alert("Vui lòng điền đầy đủ thông tin biến thể!");
             return;
         }
 
@@ -165,24 +237,27 @@ export default function ManagerDashboard() {
         formData.append("description", formProduct.description);
         formData.append("brand", formProduct.brand);
         formData.append("categoryId", formProduct.categoryId);
-        formData.append("isActive", formProduct.isActive);
+        formData.append("isActive", formProduct.isActive ? "true" : "false");
 
-        // gửi biến thể dưới dạng array JSON, giữ nguyên originalPrice
-        const variantsPayload = [
-            {
-                _id: v._id, // bắt buộc để backend biết update biến thể nào
-                size: v.size,
-                color: v.color,
-                currentPrice: Number(v.currentPrice),
-                stock: Number(v.stock),
-            },
-        ];
+        // ✅ Cho phép thay toàn bộ biến thể
+        formData.append("replaceVariants", "true");
+
+        const variantsPayload = formProduct.variants.map((v, index) => ({
+            size: v.size,
+            color: v.color,
+            originalPrice: Number(v.originalPrice) || 0,
+            currentPrice: Number(v.currentPrice) || 0,
+            stock: Number(v.stock) || 0,
+            imageIndex: index,
+        }));
+
         formData.append("variants", JSON.stringify(variantsPayload));
 
-        // nếu chọn ảnh mới
-        if (v.imageFile) {
-            formData.append("image-0", v.imageFile); // backend sẽ map image-0
-        }
+        formProduct.variants.forEach((v, index) => {
+            if (v.imageFile) {
+                formData.append(`image-${index}`, v.imageFile);
+            }
+        });
 
         try {
             const res = await fetch(`http://localhost:3000/api/products/${editingProduct._id}`, {
@@ -190,19 +265,21 @@ export default function ManagerDashboard() {
                 body: formData,
             });
             const data = await res.json();
+
             if (res.ok) {
-                alert("Cập nhật sản phẩm thành công!");
+                alert("✅ Cập nhật sản phẩm thành công!");
                 fetchProducts();
                 setShowModal(false);
                 setEditingProduct(null);
             } else {
-                alert(data.message || "Lỗi cập nhật sản phẩm!");
+                alert(data.message || "❌ Lỗi cập nhật sản phẩm!");
             }
         } catch (error) {
             console.error(error);
-            alert("Lỗi kết nối server!");
+            alert("❌ Lỗi kết nối server!");
         }
     };
+
 
     return (
         <div style={styles.page}>
@@ -225,25 +302,27 @@ export default function ManagerDashboard() {
                                 <th style={styles.th}>Ảnh</th>
                                 <th style={styles.th}>Tên sản phẩm</th>
                                 <th style={styles.th}>Thương hiệu</th>
-                                <th style={styles.th}>Size</th>          {/* thêm */}
-                                <th style={styles.th}>Màu</th>           {/* thêm */}
-                                <th style={styles.th}>Danh mục</th>      {/* thêm */}
-                                <th style={styles.th}>Giá bán</th>
-                                <th style={styles.th}>Số lượng</th>  {/* ✅ Thêm cột số lượng */}
+                                <th style={styles.th}>Danh mục</th>
+                                <th style={styles.th}>Số biến thể</th>
+                                <th style={styles.th}>Tổng số lượng</th>
+                                <th style={styles.th}>Giá từ</th>
                                 <th style={styles.th}>Trạng thái</th>
                                 <th style={styles.th}>Hành động</th>
                             </tr>
                         </thead>
                         <tbody>
                             {products.map((p) => {
-                                const firstVariant = p.variants?.[0];
+                                const totalStock = p.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0;
+                                const minPrice = p.variants?.reduce((min, v) =>
+                                    Math.min(min, v.currentPrice || Infinity), Infinity) || 0;
                                 const categoryName = categories.find(c => c._id === p.categoryId)?.name || "—";
+
                                 return (
                                     <tr key={p._id} style={{ height: 90 }}>
                                         <td style={styles.td}>
-                                            {firstVariant?.image ? (
+                                            {p.variants?.[0]?.image ? (
                                                 <img
-                                                    src={`http://localhost:3000${firstVariant.image}`}
+                                                    src={`http://localhost:3000${p.variants[0].image}`}
                                                     alt={p.name}
                                                     style={{
                                                         width: "80px",
@@ -260,13 +339,14 @@ export default function ManagerDashboard() {
 
                                         <td style={styles.td}>{p.name}</td>
                                         <td style={styles.td}>{p.brand}</td>
-                                        <td style={styles.td}>{firstVariant.size || "—"}</td>           {/* size */}
-                                        <td style={styles.td}>{firstVariant.color || "—"}</td>         {/* màu */}
-                                        <td style={styles.td}>{categoryName}</td>                      {/* danh mục */}
-                                        <td style={styles.td}>{firstVariant?.currentPrice?.toLocaleString() || "—"} ₫</td>
-                                        <td style={styles.td}>{firstVariant?.stock || 0}</td> {/* ✅ Hiển thị số lượng */}
+                                        <td style={styles.td}>{categoryName}</td>
+                                        <td style={styles.td}>{p.variants?.length || 0}</td>
+                                        <td style={styles.td}>{totalStock}</td>
                                         <td style={styles.td}>
-                                            {firstVariant?.stock > 0 ? (p.isActive ? "Còn hàng" : "Ngừng kinh doanh") : "Hết hàng"}
+                                            {minPrice > 0 ? `${minPrice.toLocaleString()} ₫` : "—"}
+                                        </td>
+                                        <td style={styles.td}>
+                                            {totalStock > 0 ? (p.isActive ? "Còn hàng" : "Ngừng kinh doanh") : "Hết hàng"}
                                         </td>
 
                                         <td style={styles.td}>
@@ -281,7 +361,7 @@ export default function ManagerDashboard() {
 
             </div>
 
-            {/* ===== Modal Thêm sản phẩm ===== */}
+            {/* ===== Modal Thêm/Sửa sản phẩm ===== */}
             {showModal && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -337,89 +417,121 @@ export default function ManagerDashboard() {
                             </select>
                         </div>
 
-                        <h4 style={{ marginTop: 20, marginBottom: 8 }}>Biến thể</h4>
-                        <div style={styles.variantRow}>
-                            <input
-                                placeholder="Size"
-                                value={formProduct.variant.size}
-                                onChange={(e) =>
-                                    setFormProduct({ ...formProduct, variant: { ...formProduct.variant, size: e.target.value } })
-                                }
-                            />
-                            <input
-                                placeholder="Màu"
-                                value={formProduct.variant.color}
-                                onChange={(e) =>
-                                    setFormProduct({ ...formProduct, variant: { ...formProduct.variant, color: e.target.value } })
-                                }
-                            />
-                            <input
-                                placeholder="Giá nhập"
-                                type="number"
-                                value={formProduct.variant.originalPrice}
-                                disabled
-                            />
-                            <input
-                                placeholder="Giá bán"
-                                type="number"
-                                value={formProduct.variant.currentPrice}
-                                onChange={(e) =>
-                                    setFormProduct({ ...formProduct, variant: { ...formProduct.variant, currentPrice: e.target.value } })
-                                }
-                            />
-                            <input
-                                placeholder="Số lượng"
-                                type="number"
-                                value={formProduct.variant.stock}
-                                onChange={(e) =>
-                                    setFormProduct({ ...formProduct, variant: { ...formProduct.variant, stock: e.target.value } })
-                                }
-                            />
-                            {/* Chọn ảnh */}
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                        if (e.target.files && e.target.files[0]) {
-                                            setFormProduct({
-                                                ...formProduct,
-                                                variant: { ...formProduct.variant, imageFile: e.target.files[0] },
-                                            });
-                                        }
-                                    }}
-                                />
-                                {/* Preview ảnh */}
-                                {formProduct.variant.imageFile && (
-                                    <img
-                                        src={URL.createObjectURL(formProduct.variant.imageFile)}
-                                        alt="Preview"
-                                        style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 6 }}
-                                    />
-                                )}
+                        <div style={styles.variantsSection}>
+                            <div style={styles.variantsHeader}>
+                                <h4>Biến thể sản phẩm</h4>
+                                <button type="button" style={styles.addVariantBtn} onClick={addVariant}>
+                                    + Thêm biến thể
+                                </button>
                             </div>
+
+                            {formProduct.variants.map((variant, index) => (
+                                <div key={index} style={styles.variantCard}>
+                                    <div style={styles.variantHeader}>
+                                        <h5>Biến thể {index + 1}</h5>
+                                        {formProduct.variants.length > 1 && (
+                                            <button
+                                                type="button"
+                                                style={styles.removeVariantBtn}
+                                                onClick={() => removeVariant(index)}
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div style={styles.variantRow}>
+                                        <div style={styles.inputGroup}>
+                                            <label>Size:</label>
+                                            <input
+                                                placeholder="VD: 40, 41, 42..."
+                                                value={variant.size}
+                                                onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div style={styles.inputGroup}>
+                                            <label>Màu:</label>
+                                            <input
+                                                placeholder="VD: Đen, Trắng, Xanh..."
+                                                value={variant.color}
+                                                onChange={(e) => updateVariant(index, 'color', e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div style={styles.inputGroup}>
+                                            <label>Giá nhập:</label>
+                                            <input
+                                                placeholder="Giá nhập"
+                                                type="number"
+                                                value={variant.originalPrice}
+                                                onChange={(e) => updateVariant(index, 'originalPrice', e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div style={styles.inputGroup}>
+                                            <label>Giá bán:</label>
+                                            <input
+                                                placeholder="Giá bán"
+                                                type="number"
+                                                value={variant.currentPrice}
+                                                onChange={(e) => updateVariant(index, 'currentPrice', e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div style={styles.inputGroup}>
+                                            <label>Số lượng:</label>
+                                            <input
+                                                placeholder="Số lượng"
+                                                type="number"
+                                                value={variant.stock}
+                                                onChange={(e) => updateVariant(index, 'stock', e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div style={styles.inputGroup}>
+                                            <label>Ảnh:</label>
+                                            <div style={styles.imageUpload}>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => {
+                                                        if (e.target.files && e.target.files[0]) {
+                                                            updateVariantImage(index, e.target.files[0]);
+                                                        }
+                                                    }}
+                                                />
+                                                {/* Preview ảnh */}
+                                                {(variant.imageFile || variant.existingImage) && (
+                                                    <img
+                                                        src={variant.imageFile ?
+                                                            URL.createObjectURL(variant.imageFile) :
+                                                            `http://localhost:3000${variant.existingImage}`
+                                                        }
+                                                        alt="Preview"
+                                                        style={styles.previewImage}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
-                        <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                        <div style={styles.modalActions}>
                             <button
-                                style={{
-                                    ...styles.primaryBtn,
-                                    flex: 1,            // chia đều chiều ngang
-                                    maxWidth: 120,      // tùy chỉnh chiều ngang tối đa nếu muốn
-                                }}
+                                style={styles.primaryBtn}
                                 onClick={editingProduct ? handleUpdate : handleSubmit}
                             >
                                 {editingProduct ? "Cập nhật" : "Lưu"}
                             </button>
                             <button
-                                style={{
-                                    ...styles.deleteBtn,
-                                    flex: 1,            // chia đều chiều ngang
-                                    maxWidth: 120,      // giống nút kia
-                                }}
+                                style={styles.cancelBtn}
                                 onClick={() => {
                                     setShowModal(false);
                                     setEditingProduct(null);
+                                    resetForm();
                                 }}
                             >
                                 Hủy
@@ -443,37 +555,18 @@ const styles = {
         gap: 16,
         fontFamily: "Arial, sans-serif",
     },
-    topBar: {
+    mainContent: {
         backgroundColor: "#fff",
         borderRadius: 10,
-        padding: "10px 16px",
+        padding: 16,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05)"
+    },
+    headerRow: {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+        marginBottom: 16
     },
-    topBarTitle: { fontSize: 20, fontWeight: 700 },
-    topBarRight: { display: "flex", alignItems: "center", gap: 10 },
-    userPill: {
-        display: "flex",
-        alignItems: "center",
-        backgroundColor: "#f3f4f6",
-        borderRadius: 999,
-        padding: "6px 10px",
-        gap: 8,
-    },
-    avatarCircle: { width: 24, height: 24, borderRadius: "50%", backgroundColor: "#cbd5e1" },
-    userName: { fontSize: 12, color: "#111827" },
-    logoutBtn: {
-        backgroundColor: "#ef4444",
-        borderRadius: 8,
-        padding: "8px 12px",
-        color: "#fff",
-        fontWeight: 600,
-        cursor: "pointer",
-    },
-    mainContent: { backgroundColor: "#fff", borderRadius: 10, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" },
-    headerRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
     sectionTitle: { fontSize: 18, fontWeight: 700 },
     primaryBtn: {
         backgroundColor: "#2563eb",
@@ -481,47 +574,17 @@ const styles = {
         borderRadius: 6,
         color: "#fff",
         cursor: "pointer",
-        minWidth: 100,  // để nút đồng đều
+        border: "none",
+        minWidth: 100,
     },
     table: { width: "100%", borderCollapse: "collapse" },
-    productImg: { width: 60, height: 60, objectFit: "cover", borderRadius: 6 },
-    editBtn: { backgroundColor: "#facc15", border: "none", padding: "4px 8px", marginRight: 4, borderRadius: 4, cursor: "pointer" },
-    deleteBtn: { backgroundColor: "#ef4444", border: "none", padding: "4px 8px", borderRadius: 4, color: "#fff", cursor: "pointer" },
-    "th, td": { border: "1px solid #e5e7eb", padding: "8px", textAlign: "center" },
-    modalOverlay: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 999,
-    },
-    modal: {
-        backgroundColor: "#fff",
-        padding: 24,
-        borderRadius: 10,
-        width: 700,
-        maxHeight: "90vh",
-        overflowY: "auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-    },
-    variantRow: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 12,
-        flexWrap: "wrap",
-    },
     th: {
         border: "1px solid #e5e7eb",
         padding: "8px",
         textAlign: "center",
         verticalAlign: "middle",
+        backgroundColor: "#f9fafb",
+        fontWeight: 600,
     },
     td: {
         border: "1px solid #e5e7eb",
@@ -538,9 +601,117 @@ const styles = {
         color: "#fff",
         cursor: "pointer",
     },
+    modalOverlay: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 999,
+    },
+    modal: {
+        backgroundColor: "#fff",
+        padding: 24,
+        borderRadius: 10,
+        width: "90%",
+        maxWidth: 1000,
+        maxHeight: "90vh",
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+    },
     formGroup: {
         display: "flex",
         flexDirection: "column",
-        marginBottom: 12,  // khoảng cách giữa label & input
+        marginBottom: 12,
+    },
+    variantsSection: {
+        border: "1px solid #e5e7eb",
+        borderRadius: 8,
+        padding: 16,
+        backgroundColor: "#f9fafb",
+    },
+    variantsHeader: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    addVariantBtn: {
+        backgroundColor: "#10b981",
+        color: "#fff",
+        border: "none",
+        padding: "6px 12px",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontSize: 14,
+    },
+    variantCard: {
+        border: "1px solid #d1d5db",
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 16,
+        backgroundColor: "#fff",
+    },
+    variantHeader: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    removeVariantBtn: {
+        backgroundColor: "#ef4444",
+        color: "#fff",
+        border: "none",
+        borderRadius: "50%",
+        width: 24,
+        height: 24,
+        cursor: "pointer",
+        fontSize: 16,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    variantRow: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+        gap: 12,
+    },
+    inputGroup: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+    },
+    imageUpload: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+    },
+    previewImage: {
+        width: 80,
+        height: 80,
+        objectFit: "cover",
+        borderRadius: 6,
+        border: "1px solid #d1d5db",
+    },
+    modalActions: {
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: 12,
+        marginTop: 20,
+    },
+    cancelBtn: {
+        backgroundColor: "#6b7280",
+        color: "#fff",
+        border: "none",
+        padding: "8px 20px",
+        borderRadius: 6,
+        cursor: "pointer",
+        minWidth: 100,
     },
 };

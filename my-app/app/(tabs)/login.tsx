@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { BASE_URL } from '../../config/apiConfig'; // thêm dòng này ở đầu file
+import { BASE_URL } from '../../config/apiConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -42,6 +43,10 @@ const LoginScreen = () => {
       // Nếu login thành công, response.data.user chứa thông tin user
       const user = response.data.user;
       console.log('User info:', user);
+
+      // Lưu thông tin user vào AsyncStorage
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      console.log('User saved to AsyncStorage:', user);
 
       // Chuyển sang màn hình Home
       router.replace('/(tabs)/home'); // replace để không thể back lại login
