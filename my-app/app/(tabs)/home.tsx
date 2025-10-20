@@ -6,6 +6,7 @@ import {
     TextInput,
     Image,
     FlatList,
+    ScrollView,
     Dimensions,
     TouchableOpacity,
     ActivityIndicator,
@@ -34,6 +35,8 @@ export default function HomeScreen() {
     const router = useRouter();
     const [query, setQuery] = useState("");
     const [brand, setBrand] = useState("Tất cả");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [favorites, setFavorites] = useState(new Set<string>());
     const [categories, setCategories] = useState([{ name: "Tất cả", id: "all" }]);
     const [loading, setLoading] = useState(false);
@@ -45,6 +48,8 @@ export default function HomeScreen() {
     const [user, setUser] = useState<any>(null);
     const bannerRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [showOutOfStockDialog, setShowOutOfStockDialog] = useState(false);
+    const searchInputRef = useRef<any>(null);
 
     // Lấy thông tin user từ AsyncStorage
     const fetchUser = async () => {
@@ -93,22 +98,40 @@ export default function HomeScreen() {
     }, []);
 
     // Lấy danh mục
+    const fetchCategories = async () => {
+        try {
+            setLoading(true);
+            const res = await axios.get(`${BASE_URL}/categories`);
+            const data = res.data.map((c: any, i: number) => ({ name: c.name, id: c._id }));
+            setCategories([{ name: "Tất cả", id: "all" }, ...data]);
+        } catch (error) {
+            console.log("Lỗi lấy danh mục:", (error as Error).message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                setLoading(true);
-                const res = await axios.get(`${BASE_URL}/categories`);
-                const data = res.data.map((c: any, i: number) => ({ name: c.name, id: c._id }));
-                setCategories([{ name: "Tất cả", id: "all" }, ...data]);
-            } catch (error) {
-                console.log("Lỗi lấy danh mục:", (error as Error).message);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchCategories();
         fetchUser();
     }, []);
+
+    // Debounce query input for smarter searching
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            setDebouncedQuery(query);
+            setShowSuggestions(!!query.trim());
+        }, 250);
+        return () => clearTimeout(handle);
+    }, [query]);
+
+    // ✅ Refresh categories mỗi khi Home screen được focus
+    useFocusEffect(
+        React.useCallback(() => {
+            console.log('Home screen focused, refreshing categories...');
+            fetchCategories();
+        }, [])
+    );
 
     // Lấy banner
     const fetchBanners = async () => {
@@ -148,7 +171,7 @@ export default function HomeScreen() {
     // Pull to refresh
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([fetchBanners(), fetchProducts(), fetchUser()]);
+        await Promise.all([fetchBanners(), fetchProducts(), fetchUser(), fetchCategories()]);
         setRefreshing(false);
     };
 
@@ -171,9 +194,16 @@ export default function HomeScreen() {
         return () => clearInterval(interval);
     }, [banners]);
 
-    // Lọc sản phẩm theo search & brand
+    // Utility: remove Vietnamese diacritics and lowercase
+    const normalizeText = (text: string) =>
+        (text || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/\p{Diacritic}+/gu, "");
+
+    // Lọc sản phẩm theo search & brand (thông minh, bỏ dấu)
     const filtered = useMemo(() => {
-        const q = query.trim().toLowerCase();
+        const q = normalizeText(debouncedQuery.trim());
         const selectedCategory = categories.find(c => c.name === brand);
 
         return products.filter((p) => {
@@ -186,11 +216,47 @@ export default function HomeScreen() {
                 if (p.categoryId !== selectedCategory.id) return false;
             }
 
-            // Lọc theo tìm kiếm
+            // Lọc theo tìm kiếm nâng cao
             if (!q) return true;
-            return p.name.toLowerCase().includes(q);
+
+            const name = normalizeText(p.name);
+            const brandName = normalizeText(p.brand || "");
+            const categoryName = normalizeText(categories.find(c => c.id === p.categoryId)?.name || "");
+            const variantsText = normalizeText(
+                (p.variants || [])
+                    .map((v: any) => `${v.color || ""} ${v.size || ""}`)
+                    .join(" ")
+            );
+
+            return (
+                name.includes(q) ||
+                brandName.includes(q) ||
+                categoryName.includes(q) ||
+                variantsText.includes(q)
+            );
         });
-    }, [query, brand, products, categories]);
+    }, [debouncedQuery, brand, products, categories]);
+
+    // Gợi ý nhanh dưới thanh tìm kiếm
+    const suggestions = useMemo(() => {
+        const q = normalizeText(debouncedQuery.trim());
+        if (!q) return [] as any[];
+        // Ưu tiên tên sản phẩm khớp đầu, sau đó chứa
+        const scored = products
+            .filter(p => p.isActive)
+            .map(p => {
+                const name = normalizeText(p.name);
+                let score = 0;
+                if (name.startsWith(q)) score += 2;
+                if (name.includes(q)) score += 1;
+                return { p, score };
+            })
+            .filter(x => x.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6)
+            .map(x => x.p);
+        return scored;
+    }, [debouncedQuery, products]);
 
     const toggleFav = async (id: string) => {
         setFavorites((prev) => {
@@ -212,13 +278,18 @@ export default function HomeScreen() {
         const mainVariant = item.variants[0];
         const totalStock = item.variants.reduce((sum: number, v: any) => sum + v.stock, 0);
         const isFavorite = favorites.has(item._id);
+        const isOutOfStock = totalStock === 0;
 
         return (
             <TouchableOpacity
-                style={styles.card}
+                style={[styles.card, isOutOfStock && styles.outOfStockCard]}
                 onPress={() => {
-                    console.log('Navigating to product:', item._id);
-                    router.push(`/product/${item._id}` as any);
+                    if (isOutOfStock) {
+                        setShowOutOfStockDialog(true);
+                    } else {
+                        console.log('Navigating to product:', item._id);
+                        router.push(`/product/${item._id}` as any);
+                    }
                 }}
             >
                 <View style={styles.imageWrap}>
@@ -251,7 +322,11 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.productInfo}>
                     <Text numberOfLines={2} style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.soldText}>Số lượng còn {totalStock}</Text>
+                    {isOutOfStock ? (
+                        <Text style={styles.outOfStockText}>Hết hàng</Text>
+                    ) : (
+                        <Text style={styles.soldText}>Số lượng còn {totalStock}</Text>
+                    )}
                     <Text style={styles.price}>{mainVariant.currentPrice.toLocaleString('vi-VN')} VND</Text>
                 </View>
             </TouchableOpacity>
@@ -310,6 +385,15 @@ export default function HomeScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.contentContainer}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                ListEmptyComponent={() => (
+                    loadingProducts ? null : (
+                        <View style={styles.emptyWrap}>
+                            <Ionicons name="search" size={42} color="#999" />
+                            <Text style={styles.emptyTitle}>Không tìm thấy sản phẩm</Text>
+                            <Text style={styles.emptyHint}>Thử điều chỉnh từ khóa hoặc bộ lọc</Text>
+                        </View>
+                    )
+                )}
                 ListHeaderComponent={
                     <>
                         {/* User Info Section */}
@@ -340,7 +424,11 @@ export default function HomeScreen() {
                         {/* Search Section */}
                         <View style={styles.searchSection}>
                             <View style={styles.searchRow}>
-                                <View style={styles.searchBox}>
+                                <View
+                                    style={styles.searchBox}
+                                    onStartShouldSetResponder={() => true}
+                                    onResponderRelease={() => searchInputRef.current?.focus()}
+                                >
                                     <Ionicons name="search" size={18} color="#888" style={{ marginRight: 8 }} />
                                     <TextInput
                                         placeholder="Tìm kiếm sản phẩm..."
@@ -348,13 +436,47 @@ export default function HomeScreen() {
                                         onChangeText={setQuery}
                                         style={styles.searchInput}
                                         placeholderTextColor="#999"
+                                        onFocus={() => setShowSuggestions(!!query.trim())}
+                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                                        returnKeyType="search"
+                                        ref={searchInputRef}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        underlineColorAndroid="transparent"
+                                        numberOfLines={1}
                                     />
-                                    <Ionicons name="mic-outline" size={18} color="#888" style={{ marginLeft: 8 }} />
+                                    {query.length > 0 && (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setQuery("");
+                                                setShowSuggestions(false);
+                                            }}
+                                            style={styles.clearBtn}
+                                            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                                        >
+                                            <Ionicons name="close-circle" size={18} color="#999" />
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
-                                <TouchableOpacity style={styles.filterBtn}>
-                                    <Ionicons name="options" size={18} color="#fff" />
-                                </TouchableOpacity>
                             </View>
+                            {showSuggestions && suggestions.length > 0 && (
+                                <View style={styles.suggestionsPanel}>
+                                    {suggestions.map((s: any) => (
+                                        <TouchableOpacity
+                                            key={s._id}
+                                            style={styles.suggestionItem}
+                                            onPress={() => {
+                                                setShowSuggestions(false);
+                                                setQuery(s.name);
+                                                // Điều hướng tới chi tiết sản phẩm khi chọn gợi ý
+                                                router.push(`/product/${s._id}` as any);
+                                            }}
+                                        >
+                                            <Text numberOfLines={1} style={styles.suggestionText}>{s.name}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
                         </View>
 
                         {/* Banner Section */}
@@ -376,7 +498,12 @@ export default function HomeScreen() {
                                     <ActivityIndicator size="small" color="#000" />
                                 </View>
                             ) : (
-                                <View style={styles.brandsRow}>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    style={styles.categoriesScrollView}
+                                    contentContainerStyle={styles.categoriesScrollContent}
+                                >
                                     {categories.map((category, i) => (
                                         <TouchableOpacity
                                             key={`${category.id}-${i}`}
@@ -386,7 +513,7 @@ export default function HomeScreen() {
                                             <Text style={[styles.brandText, brand === category.name && styles.brandTextActive]}>{category.name}</Text>
                                         </TouchableOpacity>
                                     ))}
-                                </View>
+                                </ScrollView>
                             )}
                         </View>
 
@@ -412,6 +539,27 @@ export default function HomeScreen() {
                 <Ionicons name="cart-outline" size={22} color="gray" />
                 <Ionicons name="person-outline" size={22} color="gray" />
             </View>
+
+            {/* Out of Stock Dialog */}
+            {showOutOfStockDialog && (
+                <View style={styles.dialogOverlay}>
+                    <View style={styles.dialogContainer}>
+                        <View style={styles.dialogIcon}>
+                            <Ionicons name="warning" size={48} color="#ff4757" />
+                        </View>
+                        <Text style={styles.dialogTitle}>Sản phẩm đã hết hàng</Text>
+                        <Text style={styles.dialogMessage}>
+                            Xin lỗi, sản phẩm này hiện tại đã hết hàng. Vui lòng chọn sản phẩm khác hoặc quay lại sau.
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.dialogButton}
+                            onPress={() => setShowOutOfStockDialog(false)}
+                        >
+                            <Text style={styles.dialogButtonText}>Đóng</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
         </View>
     );
 }
@@ -423,6 +571,22 @@ const styles = StyleSheet.create({
         paddingTop: 0,
         paddingBottom: 100,
         backgroundColor: "#f8f9fa"
+    },
+    emptyWrap: {
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 40,
+        gap: 8
+    },
+    emptyTitle: {
+        marginTop: 8,
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#444"
+    },
+    emptyHint: {
+        fontSize: 13,
+        color: "#888"
     },
     row: {
         justifyContent: "space-between",
@@ -477,8 +641,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "#f8f9fa",
         borderRadius: 12,
-        paddingHorizontal: 15,
-        paddingVertical: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14, // tăng vùng chạm
         borderWidth: 1,
         borderColor: "#e9ecef",
         shadowColor: "#000",
@@ -487,21 +651,39 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
         elevation: 1
     },
+    clearBtn: {
+        marginLeft: 8,
+    },
     searchInput: {
         flex: 1,
-        height: 20,
+        minHeight: 22, // tránh text bị cắt/ẩn trên Android emulator
         fontSize: 16,
-        color: "#333"
+        color: "#111",
+        includeFontPadding: false, // Android: tránh khoảng trắng thừa
+        paddingVertical: 0 // giữ text hiển thị gọn
     },
-    filterBtn: {
-        backgroundColor: "#222",
-        padding: 12,
+    suggestionsPanel: {
+        marginTop: 8,
+        backgroundColor: "#fff",
         borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#ececec",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 4,
+        paddingVertical: 4,
+        overflow: "hidden",
+        maxHeight: 220
+    },
+    suggestionItem: {
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    suggestionText: {
+        fontSize: 14,
+        color: "#333"
     },
     bannerSection: {
         paddingHorizontal: 20,
@@ -600,6 +782,15 @@ const styles = StyleSheet.create({
         marginTop: 0,
         gap: 8
     },
+    categoriesScrollView: {
+        marginTop: 0,
+    },
+    categoriesScrollContent: {
+        flexDirection: "row",
+        paddingHorizontal: 0,
+        gap: 8,
+        alignItems: "center"
+    },
     brandChip: {
         paddingHorizontal: 16,
         paddingVertical: 10,
@@ -611,7 +802,9 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 2,
-        elevation: 1
+        elevation: 1,
+        flexShrink: 0, // ✅ Không cho phép co lại
+        minWidth: 80, // ✅ Chiều rộng tối thiểu
     },
     brandChipActive: {
         backgroundColor: "#222",
@@ -697,4 +890,70 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: "#eee"
     },
+    // Out of Stock Styles
+    outOfStockCard: {
+        opacity: 0.6,
+        backgroundColor: "#f8f9fa"
+    },
+    outOfStockText: {
+        fontSize: 12,
+        color: "#ff4757",
+        fontWeight: "600",
+        marginBottom: 4
+    },
+    // Dialog Styles
+    dialogOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000
+    },
+    dialogContainer: {
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        padding: 24,
+        marginHorizontal: 20,
+        maxWidth: 320,
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 8
+    },
+    dialogIcon: {
+        marginBottom: 16
+    },
+    dialogTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#333",
+        marginBottom: 12,
+        textAlign: "center"
+    },
+    dialogMessage: {
+        fontSize: 14,
+        color: "#666",
+        textAlign: "center",
+        lineHeight: 20,
+        marginBottom: 24
+    },
+    dialogButton: {
+        backgroundColor: "#ff4757",
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+        minWidth: 100
+    },
+    dialogButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+        textAlign: "center"
+    }
 });

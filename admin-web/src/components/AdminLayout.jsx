@@ -134,7 +134,7 @@ export default function AdminLayout({ onLogout }) {
                                     backgroundColor: "#007bff",
                                 }}
                             ></div>
-                            <span>Nguyễn Văn A</span>
+                            <span>Lê Nhật Quang</span>
                         </div>
                         <button
                             style={{

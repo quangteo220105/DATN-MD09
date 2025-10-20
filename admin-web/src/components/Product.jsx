@@ -477,7 +477,7 @@ export default function ManagerDashboard() {
                                                             onClick={() => handleStopSelling(p._id)}
                                                             title="Ngừng bán sản phẩm này"
                                                         >
-                                                            ⏸️ Ngừng bán
+                                                            Ngừng bán
                                                         </button>
                                                     ) : (
                                                         <button
@@ -485,7 +485,7 @@ export default function ManagerDashboard() {
                                                             onClick={() => handleResumeSelling(p._id)}
                                                             title="Tiếp tục bán sản phẩm này"
                                                         >
-                                                            ▶️ Tiếp tục bán
+                                                            Tiếp tục bán
                                                         </button>
                                                     )}
                                                 </div>
@@ -761,35 +761,36 @@ const styles = {
         color: "#fff",
         cursor: "pointer",
         fontSize: "12px",
-        minWidth: "60px",
+        minWidth: "80px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
     },
     stopSellingBtn: {
         backgroundColor: "#dc3545",
         border: "none",
-        padding: "4px 8px",
+        padding: "4px 10px",
         borderRadius: 6,
         color: "#fff",
         cursor: "pointer",
-        fontSize: "11px",
+        fontSize: "12px",
         minWidth: "80px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "2px",
     },
     resumeSellingBtn: {
         backgroundColor: "#28a745",
         border: "none",
-        padding: "4px 8px",
+        padding: "4px 10px",
         borderRadius: 6,
         color: "#fff",
         cursor: "pointer",
-        fontSize: "11px",
+        fontSize: "12px",
         minWidth: "80px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "2px",
     },
     statusContainer: {
         display: "flex",
