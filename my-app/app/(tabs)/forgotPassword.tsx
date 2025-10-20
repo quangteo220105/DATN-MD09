@@ -1,10 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } from "react-native";
 import axios from "axios";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BASE_URL } from '../../config/apiConfig';
-
 
 const ForgotPasswordScreen = () => {
     const router = useRouter();
@@ -69,54 +68,94 @@ const ForgotPasswordScreen = () => {
 
     return (
         <View style={styles.container}>
-            {/* 🔙 Nút quay lại */}
-            <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => router.replace("/(tabs)/login")}
-            >
-                <Ionicons name="arrow-back" size={24} color="#000" />
-            </TouchableOpacity>
-            {/* 🖼 Ảnh minh họa */}
-            <Image
-                source={require("../../assets/images/forgotPassword.png")} // 🔧 đổi đường dẫn nếu cần
-                style={styles.image}
-                resizeMode="contain"
-            />
-            <Text style={styles.title}>Quên mật khẩu</Text>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* 🔙 Nút quay lại */}
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => router.replace("/(tabs)/login")}
+                >
+                    <Ionicons name="arrow-back" size={20} color="#1a1a1a" />
+                    <Text style={styles.backText}>Quay lại</Text>
+                </TouchableOpacity>
 
-            <TextInput
-                style={styles.input}
-                placeholder="Nhập email của bạn"
-                placeholderTextColor="#777"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-            />
+                {/* 🖼 Ảnh minh họa */}
+                <View style={styles.imageContainer}>
+                    <Image
+                        source={require("../../assets/images/forgotPassword.png")}
+                        style={styles.image}
+                        resizeMode="contain"
+                    />
+                </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleSendCode} disabled={loading}>
-                <Text style={styles.buttonText}>{loading ? "Đang gửi..." : "Gửi mã xác nhận"}</Text>
-            </TouchableOpacity>
+                {/* Tiêu đề */}
+                <View style={styles.headerContainer}>
+                    <Text style={styles.title}>Quên mật khẩu</Text>
+                    <Text style={styles.subtitle}>
+                        Nhập email để nhận mã xác nhận và đặt lại mật khẩu mới
+                    </Text>
+                </View>
 
-            <TextInput
-                style={styles.input}
-                placeholder="Mã xác nhận"
-                placeholderTextColor="#777"
-                value={resetCode}
-                onChangeText={setResetCode}
-            />
+                {/* Form */}
+                <View style={styles.formContainer}>
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>Email</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Nhập email của bạn"
+                            placeholderTextColor="#999"
+                            keyboardType="email-address"
+                            value={email}
+                            onChangeText={setEmail}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                    </View>
 
-            <TextInput
-                style={styles.input}
-                placeholder="Mật khẩu mới"
-                placeholderTextColor="#777"
-                secureTextEntry
-                value={newPassword}
-                onChangeText={setNewPassword}
-            />
+                    <TouchableOpacity
+                        style={[styles.button, styles.primaryButton]}
+                        onPress={handleSendCode}
+                        disabled={loading}
+                    >
+                        <Text style={styles.buttonText}>
+                            {loading ? "Đang gửi..." : "Gửi mã xác nhận"}
+                        </Text>
+                    </TouchableOpacity>
 
-            <TouchableOpacity style={styles.button} onPress={handleResetPassword} disabled={loading}>
-                <Text style={styles.buttonText}>{loading ? "Đang cập nhật..." : "Đổi mật khẩu"}</Text>
-            </TouchableOpacity>
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>Mã xác nhận</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Nhập mã xác nhận"
+                            placeholderTextColor="#999"
+                            value={resetCode}
+                            onChangeText={setResetCode}
+                            autoCapitalize="none"
+                        />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>Mật khẩu mới</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Nhập mật khẩu mới"
+                            placeholderTextColor="#999"
+                            secureTextEntry
+                            value={newPassword}
+                            onChangeText={setNewPassword}
+                        />
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.button, styles.secondaryButton]}
+                        onPress={handleResetPassword}
+                        disabled={loading}
+                    >
+                        <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+                            {loading ? "Đang cập nhật..." : "Đổi mật khẩu"}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
         </View>
     );
 };
@@ -124,24 +163,104 @@ const ForgotPasswordScreen = () => {
 export default ForgotPasswordScreen;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20, justifyContent: "center", backgroundColor: "#fff" },
-    title: { fontSize: 26, fontWeight: "bold", textAlign: "center", marginBottom: 25, color: "#000" },
+    container: {
+        flex: 1,
+        backgroundColor: "#f8f9fa"
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingHorizontal: 24,
+        paddingTop: 60,
+        paddingBottom: 40,
+    },
+    headerContainer: {
+        alignItems: "center",
+        marginBottom: 32
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: "bold",
+        textAlign: "center",
+        marginBottom: 8,
+        color: "#1a1a1a"
+    },
+    subtitle: {
+        fontSize: 16,
+        color: "#666",
+        textAlign: "center",
+        lineHeight: 22,
+        paddingHorizontal: 20
+    },
+    imageContainer: {
+        alignItems: "center",
+        marginBottom: 24
+    },
+    image: {
+        width: 200,
+        height: 200,
+    },
+    formContainer: {
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        padding: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 4
+    },
+    inputContainer: {
+        marginBottom: 20
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#333",
+        marginBottom: 8
+    },
     input: {
         borderWidth: 1,
-        borderColor: "#d9d9d9",
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 15,
+        borderColor: "#e1e5e9",
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         fontSize: 16,
-        color: "#000",
+        color: "#1a1a1a",
+        backgroundColor: "#fff",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1
     },
-    button: { backgroundColor: "#000", padding: 15, borderRadius: 8, marginTop: 5 },
-    buttonText: { color: "#fff", textAlign: "center", fontWeight: "bold", fontSize: 16 },
-    image: {
-        width: "80%",
-        height: 180,
-        alignSelf: "center",
-        marginBottom: 20,
+    button: {
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        marginTop: 8,
+        marginBottom: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3
+    },
+    primaryButton: {
+        backgroundColor: "#1a1a1a"
+    },
+    secondaryButton: {
+        backgroundColor: "#f0f0f0",
+        borderWidth: 1,
+        borderColor: "#e1e5e9"
+    },
+    buttonText: {
+        textAlign: "center",
+        fontWeight: "600",
+        fontSize: 16,
+        color: "#fff"
+    },
+    secondaryButtonText: {
+        color: "#1a1a1a"
     },
     // 🟢 Nút quay lại
     backButton: {
@@ -150,9 +269,19 @@ const styles = StyleSheet.create({
         left: 20,
         flexDirection: "row",
         alignItems: "center",
+        backgroundColor: "#fff",
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+        zIndex: 10
     },
     backText: {
-        color: "#000",
+        color: "#1a1a1a",
         fontSize: 16,
         fontWeight: "500",
         marginLeft: 5,
