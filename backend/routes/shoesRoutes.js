@@ -263,6 +263,32 @@ router.put("/:id", upload.any(), async (req, res) => {
 
 
 // ==========================
+// 🟡 Toggle trạng thái sản phẩm (Ngừng bán/Tiếp tục bán)
+// ==========================
+router.put("/:id/toggle-status", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ message: "Không tìm thấy sản phẩm!" });
+        }
+
+        product.isActive = isActive;
+        await product.save();
+
+        res.status(200).json({
+            message: isActive ? "✅ Đã tiếp tục bán sản phẩm!" : "✅ Đã ngừng bán sản phẩm!",
+            product
+        });
+    } catch (err) {
+        console.error("❌ Lỗi toggle status:", err);
+        res.status(500).json({ message: "Không thể thay đổi trạng thái sản phẩm!" });
+    }
+});
+
+// ==========================
 // 🔴 Xóa sản phẩm + biến thể + ảnh
 // ==========================
 router.delete("/:id", async (req, res) => {

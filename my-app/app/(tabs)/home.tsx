@@ -177,6 +177,10 @@ export default function HomeScreen() {
         const selectedCategory = categories.find(c => c.name === brand);
 
         return products.filter((p) => {
+            // ✅ Chỉ hiển thị sản phẩm đang bán (isActive = true)
+            // Sản phẩm đã ngừng bán sẽ không xuất hiện ở Home
+            if (!p.isActive) return false;
+
             // Lọc theo danh mục
             if (brand !== "Tất cả" && selectedCategory && selectedCategory.id !== "all") {
                 if (p.categoryId !== selectedCategory.id) return false;
