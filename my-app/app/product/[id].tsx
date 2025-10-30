@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import axios from 'axios';
-import { BASE_URL } from '../../config/apiConfig';
+import { DOMAIN, BASE_URL } from '../../config/apiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
@@ -142,12 +142,46 @@ export default function ProductDetailScreen() {
         return Math.round(((selectedVariant.price - selectedVariant.currentPrice) / selectedVariant.price) * 100);
     };
 
-    const addToCart = () => {
+    const addToCart = async () => {
         if (!selectedVariant) {
             Alert.alert('Thông báo', 'Vui lòng chọn màu sắc và kích cỡ');
             return;
         }
-        Alert.alert('Thành công', 'Đã thêm sản phẩm vào giỏ hàng');
+        try {
+            const userString = await AsyncStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            if (!user || !user._id) {
+                Alert.alert('Lỗi', 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
+                return;
+            }
+            const cartKey = `cart_${user._id}`;
+            const cartString = await AsyncStorage.getItem(cartKey);
+            let cart = cartString ? JSON.parse(cartString) : [];
+            cart = Array.isArray(cart) ? cart : [];
+            const idx = cart.findIndex((item: any) => item.id === product?._id && item.color === selectedVariant.color && item.size === selectedVariant.size);
+            if (idx > -1) {
+                cart[idx].qty = (cart[idx].qty || 1) + 1;
+            } else {
+                cart.push({
+                    id: product?._id,
+                    name: product?.name,
+                    image: selectedVariant.image,
+                    size: selectedVariant.size,
+                    color: selectedVariant.color,
+                    price: selectedVariant.currentPrice,
+                    qty: 1,
+                    checked: true
+                });
+            }
+            await AsyncStorage.setItem(cartKey, JSON.stringify(cart));
+            Alert.alert('Thành công', 'Đã thêm sản phẩm vào giỏ hàng', [
+                { text: 'Xem giỏ hàng', onPress: () => router.push('/(tabs)/cart') },
+                { text: 'Tiếp tục xem', style: 'cancel' },
+            ]);
+        } catch (error) {
+            Alert.alert('Lỗi', 'Không thể thêm vào giỏ hàng!');
+            console.error('ERROR ADD TO CART:', error);
+        }
     };
 
     const buyNow = () => {
@@ -206,7 +240,7 @@ export default function ProductDetailScreen() {
                         onScroll={(e) => setCurrentImageIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
                         renderItem={({ item }) => (
                             <View style={styles.imageContainer}>
-                                <Image source={{ uri: `http://192.168.1.9:3000${item}` }} style={styles.productImage} resizeMode="cover" />
+                                <Image source={{ uri: `${DOMAIN}${item}` }} style={styles.productImage} resizeMode="cover" />
                             </View>
                         )}
                     />

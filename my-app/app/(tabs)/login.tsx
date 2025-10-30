@@ -45,8 +45,12 @@ const LoginScreen = () => {
       console.log('User info:', user);
 
       // Lưu thông tin user vào AsyncStorage
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      console.log('User saved to AsyncStorage:', user);
+      let fixedUser = { ...user };
+      if (!fixedUser._id) {
+        fixedUser._id = fixedUser.id || fixedUser.userId || '';
+      }
+      await AsyncStorage.setItem('user', JSON.stringify(fixedUser));
+      console.log('User saved to AsyncStorage:', fixedUser);
 
       // Chuyển sang màn hình Home
       router.replace('/(tabs)/home'); // replace để không thể back lại login

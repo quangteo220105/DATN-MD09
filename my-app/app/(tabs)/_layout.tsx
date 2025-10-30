@@ -52,6 +52,26 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* --- Màn hình Checkout --- */}
+      <Tabs.Screen
+        name="checkout"
+        options={{
+          title: 'Thanh toán',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="creditcard" color={color} />
+          ),
+        }}
+      />
+      {/* --- Màn hình Lịch sử đơn hàng --- */}
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'Lịch sử',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="clock.arrow.circlepath" color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

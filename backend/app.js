@@ -11,6 +11,7 @@ var categoryRoutes = require("./routes/categoryRoutes");
 var bannerRoutes = require("./routes/bannerRoutes");
 var adminRoutes = require("./routes/adminRoutes");
 var shoesRoutes = require("./routes/shoesRoutes"); // 👈 router sản phẩm
+var userRoutes = require('./routes/userRoutes'); // 🆕 user routes
 
 var database = require('./config/db');
 
@@ -39,6 +40,7 @@ app.use("/api/banners", bannerRoutes);
 //Sản phẩm
 // 🛍️ Routes sản phẩm giày
 app.use("/api/products", shoesRoutes);
+app.use('/api/users', userRoutes); // 🆕 danh sách người dùng
 app.use('/images', express.static(path.join(__dirname, 'public/images'))); // public/images → /images
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 

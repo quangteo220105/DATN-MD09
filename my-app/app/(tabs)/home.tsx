@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import { BASE_URL } from "../../config/apiConfig";
+import { BASE_URL, DOMAIN } from "../../config/apiConfig";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -71,6 +71,14 @@ export default function HomeScreen() {
         console.log('User changed:', user);
     }, [user]);
 
+    // Đăng xuất và chuyển về login
+    const forceLogout = async () => {
+        try {
+            await AsyncStorage.removeItem('user');
+        } catch {}
+        router.replace('/(tabs)/login');
+    };
+
     // Tự động cập nhật user data mỗi khi Home screen được focus
     useFocusEffect(
         React.useCallback(() => {
@@ -115,6 +123,32 @@ export default function HomeScreen() {
         fetchCategories();
         fetchUser();
     }, []);
+
+    // Kiểm tra tài khoản còn tồn tại không; nếu bị xoá -> đăng xuất ngay
+    useEffect(() => {
+        if (!user?._id) return;
+        let stop = false;
+        const check = async () => {
+            try {
+                const res = await axios.get(`${BASE_URL}/users/${user._id}`);
+                if (!res?.data?._id) throw new Error('User missing');
+            } catch (err: any) {
+                if (err?.response?.status === 404) {
+                    console.log('Tài khoản đã bị xoá trên server. Thoát ra login...');
+                    forceLogout();
+                }
+            }
+        };
+        // kiểm tra ngay và đặt interval
+        check();
+        const intervalId = setInterval(() => {
+            if (!stop) check();
+        }, 5000);
+        return () => {
+            stop = true;
+            clearInterval(intervalId);
+        };
+    }, [user?._id]);
 
     // Debounce query input for smarter searching
     useEffect(() => {
@@ -294,15 +328,15 @@ export default function HomeScreen() {
             >
                 <View style={styles.imageWrap}>
                     <Image
-                        source={{ uri: `http://192.168.1.9:3000${mainVariant.image}` }}
+                        source={{ uri: `${DOMAIN}${mainVariant.image}` }}
                         style={styles.productImage}
                         resizeMode="cover"
                         onError={(error) => {
                             console.log('Home image load error:', error);
-                            console.log('Failed to load image:', `http://192.168.1.9:3000${mainVariant.image}`);
+                            console.log('Failed to load image:', `${DOMAIN}${mainVariant.image}`);
                         }}
                         onLoad={() => {
-                            console.log('Home image loaded successfully:', `http://192.168.1.9:3000${mainVariant.image}`);
+                            console.log('Home image loaded successfully:', `${DOMAIN}${mainVariant.image}`);
                         }}
                     />
                     {/* Favorite Button */}
@@ -402,7 +436,7 @@ export default function HomeScreen() {
                                 <View style={styles.userInfoLeft}>
                                     {user?.avatar ? (
                                         <Image
-                                            source={{ uri: `${BASE_URL.replace("/api", "")}${user.avatar}` }}
+                                            source={{ uri: `${DOMAIN}${user.avatar}` }}
                                             style={styles.avatar}
                                         />
                                     ) : (
@@ -534,10 +568,18 @@ export default function HomeScreen() {
             />
             {/* Bottom Nav */}
             <View style={styles.bottomNav}>
-                <Ionicons name="home" size={22} color="black" />
-                <Ionicons name="heart-outline" size={22} color="gray" />
-                <Ionicons name="cart-outline" size={22} color="gray" />
-                <Ionicons name="person-outline" size={22} color="gray" />
+                <TouchableOpacity>
+                    <Ionicons name="home" size={22} color="black" />
+                </TouchableOpacity>
+                <TouchableOpacity>
+                    <Ionicons name="heart-outline" size={22} color="gray" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/cart')}>
+                    <Ionicons name="cart-outline" size={22} color="gray" />
+                </TouchableOpacity>
+                <TouchableOpacity>
+                    <Ionicons name="person-outline" size={22} color="gray" />
+                </TouchableOpacity>
             </View>
 
             {/* Out of Stock Dialog */}

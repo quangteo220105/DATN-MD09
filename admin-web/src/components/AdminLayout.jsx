@@ -4,11 +4,13 @@ import {
     ShopOutlined,
     AppstoreOutlined,
     PictureOutlined, // 🆕 icon banner
+    UserOutlined // 🆕 icon quản lý tài khoản khách hàng
 } from "@ant-design/icons";
 import Dashboard from "./Dashboard";
 import Product from "./Product";
 import Categories from "./Categories";
 import Banners from "./Banners"; // 🆕 import màn hình banner
+import UserManager from "./UserManager"; // 🆕 (tạo tiếp nếu chưa có)
 
 export default function AdminLayout({ onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -23,6 +25,7 @@ export default function AdminLayout({ onLogout }) {
                 return <Categories />;
             case "banners":
                 return <Banners />; // 🆕 thêm Banner
+            case "users": return <UserManager />; // 🆕
             default:
                 return <Dashboard />;
         }
@@ -96,6 +99,20 @@ export default function AdminLayout({ onLogout }) {
                     title="Banners"
                 >
                     <PictureOutlined />
+                </div>
+
+                {/* Quản lý tài khoản khách hàng (User) */}
+                <div
+                    style={{
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        color: activeTab === "users" ? "#ff8000" : "#fff",
+                        fontSize: 24,
+                    }}
+                    onClick={() => setActiveTab("users")}
+                    title="Quản lý tài khoản khách hàng"
+                >
+                    <UserOutlined />
                 </div>
             </div>
 

@@ -135,10 +135,14 @@ const RegisterScreen = () => {
 
             // Lưu thông tin user vào AsyncStorage nếu có
             if (response.data.user) {
-                await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-                console.log('User saved to AsyncStorage after registration:', response.data.user);
+                let fixedUser = { ...response.data.user };
+                if (!fixedUser._id) {
+                    fixedUser._id = fixedUser.id || fixedUser.userId || '';
+                }
+                await AsyncStorage.setItem('user', JSON.stringify(fixedUser));
+                console.log('User saved to AsyncStorage after registration:', fixedUser);
                 alert(response.data.message);
-                router.replace('/(tabs)/home'); // Chuyển thẳng đến Home thay vì Login
+                router.replace('/(tabs)/login');
             } else {
                 alert(response.data.message);
                 router.push('/(tabs)/login');
