@@ -184,12 +184,49 @@ export default function ProductDetailScreen() {
         }
     };
 
-    const buyNow = () => {
+    const buyNow = async () => {
         if (!selectedVariant) {
             Alert.alert('Thông báo', 'Vui lòng chọn màu sắc và kích cỡ');
             return;
         }
-        Alert.alert('Thông báo', 'Chức năng mua ngay đang được phát triển');
+        try {
+            const userString = await AsyncStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            if (!user || !user._id) {
+                Alert.alert('Lưu ý', 'Vui lòng đăng nhập để mua ngay');
+                return;
+            }
+            const cartKey = `cart_${user._id}`;
+            const cartString = await AsyncStorage.getItem(cartKey);
+            let cart = cartString ? JSON.parse(cartString) : [];
+            cart = Array.isArray(cart) ? cart : [];
+
+            // Bỏ chọn tất cả item khác để chỉ hiển thị sản phẩm này ở checkout
+            cart = cart.map((c: any) => ({ ...c, checked: false }));
+
+            const idx = cart.findIndex((item: any) => item.id === product?._id && item.color === selectedVariant.color && item.size === selectedVariant.size);
+            if (idx > -1) {
+                // Đánh dấu checked và đảm bảo qty >= 1
+                const qty = cart[idx].qty && cart[idx].qty > 0 ? cart[idx].qty : 1;
+                cart[idx] = { ...cart[idx], checked: true, qty };
+            } else {
+                cart.push({
+                    id: product?._id,
+                    name: product?.name,
+                    image: selectedVariant.image,
+                    size: selectedVariant.size,
+                    color: selectedVariant.color,
+                    price: selectedVariant.currentPrice,
+                    qty: 1,
+                    checked: true,
+                });
+            }
+            await AsyncStorage.setItem(cartKey, JSON.stringify(cart));
+            router.push('/checkout');
+        } catch (e) {
+            Alert.alert('Lỗi', 'Không thể thực hiện mua ngay');
+            console.log('BUY_NOW_ERROR', e);
+        }
     };
 
     if (loading) {

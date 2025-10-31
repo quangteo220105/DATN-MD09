@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Image, S
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { DOMAIN } from '../config/apiConfig';
+import { DOMAIN, BASE_URL } from '../config/apiConfig';
 
 const PAYMENT_METHODS = [
   { key: 'cod', label: 'Thanh toán khi nhận hàng (COD)' },
@@ -79,16 +79,50 @@ export default function CheckoutScreen() {
       total,
       address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
       payment,
-      status: 'Đang xử lý',
+      status: 'Chờ xác nhận',
       createdAt: new Date().toISOString()
     };
     history.unshift(newOrder);
     await AsyncStorage.setItem(historyKey, JSON.stringify(history));
-    await AsyncStorage.setItem(`cart_${user._id}`, '[]');
+    // 🔗 Tạo đơn trên backend để Admin nhìn thấy
+    try {
+      await fetch(`${BASE_URL}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user._id,
+          customerName: user.name || addressObj.name,
+          customerPhone: addressObj.phone || user.phone,
+          items: cart.map(i => ({
+            productId: i._id || i.productId,
+            name: i.name,
+            size: i.size,
+            color: i.color,
+            qty: i.qty,
+            price: i.price,
+            image: i.image
+          })),
+          total,
+          address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+          payment,
+          status: 'Chờ xác nhận',
+        })
+      });
+    } catch (e) {
+      console.log('POST /orders failed, fallback local only', e);
+    }
+    // ✅ Chỉ xoá khỏi giỏ những sản phẩm đã chọn thanh toán
+    try {
+      const fullCartStr = await AsyncStorage.getItem(`cart_${user._id}`);
+      let fullCart = fullCartStr ? JSON.parse(fullCartStr) : [];
+      fullCart = Array.isArray(fullCart) ? fullCart : [];
+      const remaining = fullCart.filter((i: any) => !i?.checked);
+      await AsyncStorage.setItem(`cart_${user._id}`, JSON.stringify(remaining));
+    } catch {}
     Alert.alert('Thành công', 'Đơn hàng đã được đặt!', [
       {
-        text: 'Xem lịch sử',
-        onPress: () => router.replace('/history'),
+        text: 'Xem trạng thái',
+        onPress: () => router.replace('/orders'),
       },
       {
         text: 'Quay về Home',

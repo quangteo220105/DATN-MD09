@@ -577,7 +577,7 @@ export default function HomeScreen() {
                 <TouchableOpacity onPress={() => router.push('/(tabs)/cart')}>
                     <Ionicons name="cart-outline" size={22} color="gray" />
                 </TouchableOpacity>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/settings')}>
                     <Ionicons name="person-outline" size={22} color="gray" />
                 </TouchableOpacity>
             </View>
