@@ -6,7 +6,6 @@ const STATUS_OPTIONS = [
     { value: "Đã xác nhận", label: "📦 Đã xác nhận" },
     { value: "Đang giao hàng", label: "🚚 Đang giao hàng" },
     { value: "Đã giao hàng", label: "✅ Đã giao hàng" },
-    { value: "Đã hủy", label: "❌ Đã hủy" },
 ];
 
 const pageSizeOptions = [10, 20, 50];
@@ -78,6 +77,25 @@ export default function Orders() {
         }
     };
 
+    const handleCancel = async (order) => {
+        if (!window.confirm(`Bạn có chắc muốn hủy đơn hàng ${order.code || order._id || order.id}?`)) {
+            return;
+        }
+        try {
+            const res = await fetch(`http://localhost:3000/api/orders/${order._id || order.id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Đã hủy' })
+            });
+            if (!res.ok) throw new Error('Failed to cancel order');
+            setOrders(prev => prev.map(o => (o._id || o.id) === (order._id || order.id) ? { ...o, status: 'Đã hủy' } : o));
+            alert('Đã hủy đơn hàng thành công');
+        } catch (e) {
+            console.error(e);
+            alert('Hủy đơn hàng thất bại');
+        }
+    };
+
     const openDetail = async (order) => {
         try {
             // Thử tải chi tiết mới nhất
@@ -97,7 +115,6 @@ export default function Orders() {
             "Đã xác nhận": 0,
             "Đang giao hàng": 0,
             "Đã giao hàng": 0,
-            "Đã hủy": 0,
         };
         orders.forEach(o => {
             if (counts[o.status] !== undefined) counts[o.status] += 1;
@@ -130,7 +147,7 @@ export default function Orders() {
             </form>
 
             {/* Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                 {Object.entries(statusCounts).map(([k, v]) => (
                     <div key={k} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: 12 }}>
                         <div style={{ fontWeight: 700, marginBottom: 4 }}>{k}</div>
@@ -176,20 +193,10 @@ export default function Orders() {
                                             </td>
                                             <td style={td}>
                                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (!window.confirm('Xác nhận xóa vĩnh viễn đơn hàng này?')) return;
-                                                            try {
-                                                                const id = o._id || o.id;
-                                                                await fetch(`http://localhost:3000/api/orders/${id}`, { method: 'DELETE' });
-                                                            } catch (e) { console.error(e); }
-                                                            fetchOrders();
-                                                        }}
-                                                        style={{ ...btn, background: '#ef4444', color: '#fff' }}
-                                                    >
-                                                        Xóa đơn
-                                                    </button>
                                                     <button onClick={() => openDetail(o)} style={btnLink}>Chi tiết</button>
+                                                    {o.status !== 'Đã hủy' && o.status !== 'Đã giao hàng' && (
+                                                        <button onClick={() => handleCancel(o)} style={{ ...btnLink, color: '#ef4444' }}>Hủy đơn</button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -231,7 +238,7 @@ export default function Orders() {
                                 <div><strong>Trạng thái:</strong> {selected.status}</div>
                             </div>
                             <div>
-                                <div><strong>Tên KH:</strong> {selected.customerName || selected.name || '—'}</div>
+                                <div><strong>Tên khách hàng:</strong> {selected.customerName || selected.name || '—'}</div>
                                 <div><strong>Điện thoại:</strong> {selected.customerPhone || selected.phone || '—'}</div>
                                 <div><strong>Địa chỉ:</strong> {selected.address || '—'}</div>
                             </div>
@@ -250,7 +257,21 @@ export default function Orders() {
                                 <tbody>
                                     {(selected.items || []).map((it, idx) => (
                                         <tr key={idx}>
-                                            <td style={td}>{it.name}</td>
+                                            <td style={td}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <img
+                                                        src={
+                                                            it.image?.startsWith('http')
+                                                                ? it.image
+                                                                : `http://localhost:3000/${it.image?.replace(/^\/+/, '')}`
+                                                        }
+                                                        alt={it.name}
+                                                        style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }}
+                                                        onError={(e) => (e.target.src = '/placeholder.png')}
+                                                    />
+                                                    <span>{it.name}</span>
+                                                </div>
+                                            </td>
                                             <td style={td}>{[it.size, it.color].filter(Boolean).join(', ')}</td>
                                             <td style={td}>{it.qty}</td>
                                             <td style={td}>{(it.price || 0).toLocaleString('vi-VN')} VND</td>
@@ -258,6 +279,7 @@ export default function Orders() {
                                         </tr>
                                     ))}
                                 </tbody>
+
                             </table>
                             <div style={{ textAlign: 'right', marginTop: 10 }}>
                                 <strong>Tổng cộng: {(selected.total || 0).toLocaleString('vi-VN')} VND</strong>

@@ -67,11 +67,26 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/orders (create)
+// POST /api/orders (create)
 router.post('/', async (req, res) => {
   try {
     const body = req.body || {};
-    // auto code
     body.code = body.code || `ORD-${Date.now()}`;
+
+    // ✅ Bổ sung: tự động gán ảnh sản phẩm nếu chưa có
+    if (Array.isArray(body.items)) {
+      for (let i = 0; i < body.items.length; i++) {
+        const item = body.items[i];
+        // Nếu item có productId mà chưa có image → lấy từ ProductVariant
+        if (item.productId && !item.image) {
+          const variant = await mongoose.model("ProductVariant").findById(item.productId);
+          if (variant && variant.image) {
+            item.image = variant.image; // ✅ Gán ảnh từ sản phẩm
+          }
+        }
+      }
+    }
+
     const ord = await Order.create(body);
     res.status(201).json(ord);
   } catch (e) {
@@ -79,6 +94,7 @@ router.post('/', async (req, res) => {
     res.status(400).json({ message: 'Bad request' });
   }
 });
+
 
 // GET /api/users/:userId/orders (list orders for a user)
 router.get('/user/:userId/list', async (req, res) => {

@@ -5,7 +5,8 @@ import {
     AppstoreOutlined,
     PictureOutlined, // 🆕 icon banner
     UserOutlined, // 🆕 icon quản lý tài khoản khách hàng
-    ShoppingCartOutlined
+    ShoppingCartOutlined,
+    StarOutlined // 🆕 icon đánh giá
 } from "@ant-design/icons";
 import Dashboard from "./Dashboard";
 import Product from "./Product";
@@ -13,6 +14,7 @@ import Categories from "./Categories";
 import Banners from "./Banners"; // 🆕 import màn hình banner
 import UserManager from "./UserManager"; // 🆕 (tạo tiếp nếu chưa có)
 import Orders from "./Orders";
+import Reviews from "./Reviews";
 
 export default function AdminLayout({ onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -29,6 +31,7 @@ export default function AdminLayout({ onLogout }) {
                 return <Banners />; // 🆕 thêm Banner
             case "users": return <UserManager />; // 🆕
             case "orders": return <Orders />;
+            case "reviews": return <Reviews />; // 🆕 thêm Reviews
             default:
                 return <Dashboard />;
         }
@@ -116,6 +119,20 @@ export default function AdminLayout({ onLogout }) {
                     title="Đơn hàng"
                 >
                     <ShoppingCartOutlined />
+                </div>
+
+                {/* 🆕 Reviews */}
+                <div
+                    style={{
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        color: activeTab === "reviews" ? "#ff8000" : "#fff",
+                        fontSize: 24,
+                    }}
+                    onClick={() => setActiveTab("reviews")}
+                    title="Đánh giá"
+                >
+                    <StarOutlined />
                 </div>
 
                 {/* Quản lý tài khoản khách hàng (User) */}

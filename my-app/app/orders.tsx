@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { BASE_URL } from '../config/apiConfig';
+import { BASE_URL, DOMAIN } from '../config/apiConfig';
 import { useFocusEffect } from '@react-navigation/native';
 import ReactNative from 'react';
 
@@ -12,8 +12,8 @@ const STATUS_INFO: Record<string, { emoji: string; color: string }> = {
     'Chờ xác nhận': { emoji: '🛒', color: '#0ea5e9' },
     'Đã xác nhận': { emoji: '📦', color: '#22c55e' },
     'Đang giao hàng': { emoji: '🚚', color: '#f59e0b' },
-    'Đã giao hàng': { emoji: '✅', color: '#16a34a' },
-    'Đã hủy': { emoji: '❌', color: '#ef4444' },
+    'Đã giao hàng': { emoji: '', color: '#16a34a' },
+    'Đã hủy': { emoji: '', color: '#ef4444' },
 };
 
 function normalizeStatus(raw?: string) {
@@ -100,6 +100,71 @@ export default function OrdersScreen() {
         );
     };
 
+    const checkReviewExists = async (orderId: any, orderBackendId?: any) => {
+        try {
+            const userString = await AsyncStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            if (!user || !user._id) return false;
+            
+            // ƯU TIÊN: Kiểm tra từ API trước (nếu admin xóa thì trong database sẽ không còn)
+            const checkId = orderBackendId || orderId;
+            try {
+                const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const reviews = Array.isArray(data) ? data : [];
+                    // Chỉ kiểm tra đánh giá của user hiện tại (hỗ trợ cả populate và không populate)
+                    const userReview = reviews.find((r: any) => {
+                        const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
+                        return String(reviewUserId) === String(user._id);
+                    });
+                    if (userReview) return true;
+                }
+            } catch (e) {
+                console.log('API check failed, checking local:', e);
+            }
+            
+            // Fallback: Kiểm tra trong AsyncStorage (khi không có kết nối)
+            const reviewKey1 = `review_${user._id}_${orderId}`;
+            const reviewString1 = await AsyncStorage.getItem(reviewKey1);
+            if (reviewString1) {
+                // Nếu có trong local, vẫn kiểm tra lại API một lần nữa để đảm bảo
+                try {
+                    const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const reviews = Array.isArray(data) ? data : [];
+                        const userReview = reviews.find((r: any) => {
+                            const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
+                            return String(reviewUserId) === String(user._id);
+                        });
+                        // Nếu không tìm thấy trong API nhưng có trong local, xóa local để sync
+                        if (!userReview) {
+                            await AsyncStorage.removeItem(reviewKey1);
+                            if (orderBackendId && orderBackendId !== orderId) {
+                                await AsyncStorage.removeItem(`review_${user._id}_${orderBackendId}`);
+                            }
+                            return false;
+                        }
+                        return true;
+                    }
+                } catch {}
+                // Nếu không kết nối được API, dùng dữ liệu local
+                return true;
+            }
+            
+            if (orderBackendId && orderBackendId !== orderId) {
+                const reviewKey2 = `review_${user._id}_${orderBackendId}`;
+                const reviewString2 = await AsyncStorage.getItem(reviewKey2);
+                if (reviewString2) return true;
+            }
+            
+            return false;
+        } catch {
+            return false;
+        }
+    };
+
     const handleCancel = async (orderId: any, backendId?: any) => {
         const userString = await AsyncStorage.getItem('user');
         const user = userString ? JSON.parse(userString) : null;
@@ -125,6 +190,16 @@ export default function OrdersScreen() {
         setOrders(history);
     };
 
+    const handleReviewPress = async (item: any) => {
+        const orderId = item.id || item._id;
+        const hasReviewed = await checkReviewExists(orderId, item._id);
+        if (hasReviewed) {
+            Alert.alert('Thông báo', 'Bạn đã đánh giá đơn hàng này rồi');
+            return;
+        }
+        router.push(`/review/${orderId}` as any);
+    };
+
     const renderItem = ({ item }: { item: any }) => {
         const created = item.createdAt ? new Date(item.createdAt).toLocaleString() : '';
         const status = normalizeStatus(item.status);
@@ -137,13 +212,21 @@ export default function OrdersScreen() {
                 {renderStepper(status)}
                 <View style={{ marginTop: 8 }}>
                     {(item.items || []).slice(0, 3).map((p: any, idx: number) => (
-                        <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                            <Text>{p.name} ({p.size}, {p.color}) x{p.qty}</Text>
-                            <Text>{(p.price * p.qty).toLocaleString('vi-VN')} VND</Text>
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                            {p.image ? (
+                                <Image source={{ uri: `${DOMAIN}${p.image}` }} style={styles.productImage} />
+                            ) : (
+                                <View style={[styles.productImage, { backgroundColor: '#f0f0f0' }]} />
+                            )}
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={styles.productName}>{p.name}</Text>
+                                <Text style={styles.productMeta}>({p.size}, {p.color}) x{p.qty}</Text>
+                            </View>
+                            <Text style={styles.productPrice}>{(p.price * p.qty).toLocaleString('vi-VN')} VND</Text>
                         </View>
                     ))}
                     {Array.isArray(item.items) && item.items.length > 3 && (
-                        <Text style={{ color: '#666', marginTop: 4 }}>+ {item.items.length - 3} sản phẩm khác</Text>
+                        <Text style={{ color: '#666', marginTop: 8, marginLeft: 60 }}>+ {item.items.length - 3} sản phẩm khác</Text>
                     )}
                 </View>
                 <Text style={styles.total}>Tổng: {Number(item.total || 0).toLocaleString('vi-VN')} VND</Text>
@@ -153,6 +236,14 @@ export default function OrdersScreen() {
                     <TouchableOpacity onPress={() => router.push(`/order/${item.id || item._id}` as any)} style={[styles.actionBtn, { backgroundColor: '#111827' }]}>
                         <Text style={{ color: '#fff', fontWeight: '600' }}>Xem chi tiết</Text>
                     </TouchableOpacity>
+                    {status === 'Đã giao hàng' && (
+                        <TouchableOpacity
+                            onPress={() => handleReviewPress(item)}
+                            style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]}
+                        >
+                            <Text style={{ color: '#fff', fontWeight: '600' }}>Đánh giá</Text>
+                        </TouchableOpacity>
+                    )}
                     {status !== 'Đã hủy' && status !== 'Đã giao hàng' && (
                         <TouchableOpacity
                             onPress={() => Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
@@ -265,6 +356,11 @@ const styles = StyleSheet.create({
     // Tabs
     tabChip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18, backgroundColor: '#f3f4f6', marginRight: 8 },
     tabText: { color: '#111827', fontWeight: '600' },
+    // Product images
+    productImage: { width: 50, height: 50, borderRadius: 8, marginRight: 10, borderWidth: 1, borderColor: '#eee' },
+    productName: { fontSize: 14, fontWeight: '600', color: '#222' },
+    productMeta: { fontSize: 12, color: '#666', marginTop: 2 },
+    productPrice: { fontSize: 14, fontWeight: '600', color: '#222' },
 });
 
 

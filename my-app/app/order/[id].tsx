@@ -66,6 +66,73 @@ export default function OrderDetailScreen() {
 
     const currentIndex = useMemo(() => Math.max(0, STATUS_ORDER.indexOf(status as any)), [status]);
 
+    const checkReviewExists = async () => {
+        try {
+            const userString = await AsyncStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            if (!user || !user._id) return false;
+            
+            const backendId = order?._id || (String(id).length === 24 ? id : null);
+            const checkId = backendId || id;
+            
+            // ƯU TIÊN: Kiểm tra từ API trước (nếu admin xóa thì trong database sẽ không còn)
+            try {
+                const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const reviews = Array.isArray(data) ? data : [];
+                    // Chỉ kiểm tra đánh giá của user hiện tại (hỗ trợ cả populate và không populate)
+                    const userReview = reviews.find((r: any) => {
+                        const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
+                        return String(reviewUserId) === String(user._id);
+                    });
+                    if (userReview) return true;
+                }
+            } catch (e) {
+                console.log('API check failed, checking local:', e);
+            }
+            
+            // Fallback: Kiểm tra trong AsyncStorage (khi không có kết nối)
+            const reviewKey1 = `review_${user._id}_${id}`;
+            const reviewString1 = await AsyncStorage.getItem(reviewKey1);
+            if (reviewString1) {
+                // Nếu có trong local, vẫn kiểm tra lại API một lần nữa để đảm bảo
+                try {
+                    const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const reviews = Array.isArray(data) ? data : [];
+                        const userReview = reviews.find((r: any) => {
+                            const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
+                            return String(reviewUserId) === String(user._id);
+                        });
+                        // Nếu không tìm thấy trong API nhưng có trong local, xóa local để sync
+                        if (!userReview) {
+                            await AsyncStorage.removeItem(reviewKey1);
+                            if (backendId && backendId !== id) {
+                                await AsyncStorage.removeItem(`review_${user._id}_${backendId}`);
+                            }
+                            return false;
+                        }
+                        return true;
+                    }
+                } catch {}
+                // Nếu không kết nối được API, dùng dữ liệu local
+                return true;
+            }
+            
+            if (backendId && backendId !== id) {
+                const reviewKey2 = `review_${user._id}_${backendId}`;
+                const reviewString2 = await AsyncStorage.getItem(reviewKey2);
+                if (reviewString2) return true;
+            }
+            
+            return false;
+        } catch {
+            return false;
+        }
+    };
+
     const handleCancel = () => {
         if (!order) return;
         if (status === 'Đã giao hàng' || status === 'Đã hủy') return;
@@ -102,6 +169,15 @@ export default function OrderDetailScreen() {
         ]);
     };
 
+    const handleReviewPress = async () => {
+        const hasReviewed = await checkReviewExists();
+        if (hasReviewed) {
+            Alert.alert('Thông báo', 'Bạn đã đánh giá đơn hàng này rồi');
+            return;
+        }
+        router.push(`/review/${id}` as any);
+    };
+
     if (!order) {
         return (
             <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f8f9' }}>
@@ -135,21 +211,35 @@ export default function OrderDetailScreen() {
                     </View>
                 ) : (
                     <View style={styles.stepperWrap}>
-                        {STATUS_ORDER.map((step, i) => {
-                            const active = i <= currentIndex;
-                            const isLast = i === STATUS_ORDER.length - 1;
-                            return (
-                                <View key={step} style={styles.stepItem}>
-                                    <View style={[styles.stepCircle, active ? { backgroundColor: STATUS_INFO[step].color } : { backgroundColor: '#e5e7eb' }]}>
-                                        <Text style={styles.stepEmoji}>{STATUS_INFO[step].emoji}</Text>
+                        {/* Horizontal line connecting all circles */}
+                        <View style={styles.stepLineContainer}>
+                            {STATUS_ORDER.map((step, i) => {
+                                if (i === STATUS_ORDER.length - 1) return null;
+                                // Vạch nối giữa step i và i+1 có màu của step i+1 nếu cả hai đều active
+                                const isComplete = i + 1 <= currentIndex;
+                                const lineColor = isComplete ? STATUS_INFO[STATUS_ORDER[i + 1]].color : '#e5e7eb';
+                                return (
+                                    <View key={`line-${i}`} style={[styles.stepConnector, { backgroundColor: lineColor }]} />
+                                );
+                            })}
+                        </View>
+                        {/* Circles and labels */}
+                        <View style={styles.stepContainer}>
+                            {STATUS_ORDER.map((step, i) => {
+                                const active = i <= currentIndex;
+                                const stepColor = active ? STATUS_INFO[step].color : '#e5e7eb';
+                                return (
+                                    <View key={step} style={styles.stepItem}>
+                                        <View style={[styles.stepCircle, { backgroundColor: stepColor }]}>
+                                            <Text style={styles.stepEmoji}>{STATUS_INFO[step].emoji}</Text>
+                                        </View>
+                                        <Text style={[styles.stepLabel, { color: active ? stepColor : '#666' }]} numberOfLines={2} adjustsFontSizeToFit>
+                                            {step}
+                                        </Text>
                                     </View>
-                                    {!isLast && (
-                                        <View style={[styles.stepLine, active ? { backgroundColor: STATUS_INFO[step].color } : { backgroundColor: '#e5e7eb' }]} />
-                                    )}
-                                    <Text style={[styles.stepLabel, active ? { color: STATUS_INFO[step].color } : null]} numberOfLines={1}>{step}</Text>
-                                </View>
-                            );
-                        })}
+                                );
+                            })}
+                        </View>
                     </View>
                 )}
 
@@ -188,10 +278,18 @@ export default function OrderDetailScreen() {
                 </View>
 
                 {/* Actions */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
                     <TouchableOpacity onPress={() => router.back()} style={[styles.actionBtn, { backgroundColor: '#111827' }]}>
                         <Text style={styles.actionText}>Quay lại</Text>
                     </TouchableOpacity>
+                    {status === 'Đã giao hàng' && (
+                        <TouchableOpacity
+                            onPress={handleReviewPress}
+                            style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]}
+                        >
+                            <Text style={styles.actionText}>Đánh giá</Text>
+                        </TouchableOpacity>
+                    )}
                     {status !== 'Đã giao hàng' && status !== 'Đã hủy' && (
                         <TouchableOpacity onPress={handleCancel} style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}>
                             <Text style={styles.actionText}>Hủy đơn</Text>
@@ -219,12 +317,14 @@ const styles = StyleSheet.create({
     itemMeta: { color: '#666', fontSize: 12, marginTop: 2 },
     itemPrice: { fontWeight: '600', color: '#222' },
     // Stepper
-    stepperWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#eee', marginBottom: 12 },
-    stepItem: { flexDirection: 'column', alignItems: 'center', flex: 1 },
-    stepCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    stepEmoji: { fontSize: 14 },
-    stepLine: { height: 3, width: '100%', marginHorizontal: 6, marginTop: 14 },
-    stepLabel: { fontSize: 11, marginTop: 6, color: '#666' },
+    stepperWrap: { backgroundColor: '#fff', borderRadius: 10, paddingVertical: 20, paddingHorizontal: 12, borderWidth: 1, borderColor: '#eee', marginBottom: 12, position: 'relative' },
+    stepLineContainer: { position: 'absolute', top: 38, left: 40, right: 40, height: 4, flexDirection: 'row', zIndex: 0 },
+    stepConnector: { flex: 1, height: 4, borderRadius: 2 },
+    stepContainer: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', zIndex: 1 },
+    stepItem: { flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 0 },
+    stepCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    stepEmoji: { fontSize: 18 },
+    stepLabel: { fontSize: 11, textAlign: 'center', color: '#666', fontWeight: '500', lineHeight: 13, paddingHorizontal: 2, minHeight: 26 },
     cancelWrap: { backgroundColor: '#fee2e2', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 12 },
     cancelText: { color: '#ef4444', fontWeight: 'bold' },
     // Actions
