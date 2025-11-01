@@ -1,5 +1,6 @@
 const express = require('express');
 const Order = require('../model/Order');
+const mongoose = require('mongoose');
 const router = express.Router();
 
 // Normalize query
@@ -47,10 +48,86 @@ router.get('/:id', async (req, res) => {
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
-    const ord = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
-    if (!ord) return res.status(404).json({ message: 'Not found' });
+    const orderId = req.params.id;
+    
+    // Lấy order hiện tại để kiểm tra trạng thái cũ
+    const oldOrder = await Order.findById(orderId);
+    if (!oldOrder) return res.status(404).json({ message: 'Not found' });
+    
+    // Cập nhật trạng thái
+    const ord = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
+    
+    // Nếu đổi thành "Đã giao hàng" và trạng thái cũ không phải "Đã giao hàng" → trừ stock
+    if (status === 'Đã giao hàng' && oldOrder.status !== 'Đã giao hàng') {
+      const { ProductVariant } = require('../model/Shoes');
+      const Product = mongoose.model('Product');
+      
+      // Duyệt qua tất cả items trong order
+      if (ord.items && Array.isArray(ord.items) && ord.items.length > 0) {
+        for (const item of ord.items) {
+          try {
+            let variant = null;
+            
+            if (item.productId) {
+              // productId trong Order.items thường là Product ID chính (từ product._id)
+              // Tìm variant theo productId + color + size
+              variant = await ProductVariant.findOne({
+                productId: item.productId,
+                color: item.color,
+                size: item.size
+              });
+              
+              // Nếu không tìm thấy, thử tìm variant trực tiếp theo ID (fallback)
+              if (!variant) {
+                variant = await ProductVariant.findById(item.productId);
+              }
+            } else if (item.name && item.color && item.size) {
+              // Fallback: Tìm variant theo tên sản phẩm + color + size
+              const product = await Product.findOne({ name: item.name });
+              if (product) {
+                variant = await ProductVariant.findOne({
+                  productId: product._id,
+                  color: item.color,
+                  size: item.size
+                });
+              }
+            }
+            
+            if (variant) {
+              const qtyToReduce = item.qty || 1;
+              const oldStock = variant.stock || 0;
+              
+              // Trừ stock (đảm bảo không âm)
+              variant.stock = Math.max(0, oldStock - qtyToReduce);
+              
+              // Cập nhật status nếu hết hàng
+              if (variant.stock === 0) {
+                variant.status = 'Hết hàng';
+              } else if (variant.status === 'Hết hàng' && variant.stock > 0) {
+                variant.status = 'Còn hàng';
+              }
+              
+              await variant.save();
+              console.log(`✅ Đã trừ ${qtyToReduce} sản phẩm từ variant ${variant._id} (${variant.color}/${variant.size}). Stock: ${oldStock} → ${variant.stock}`);
+            } else {
+              console.warn(`⚠️ Không tìm thấy variant cho item:`, {
+                productId: item.productId,
+                name: item.name,
+                color: item.color,
+                size: item.size
+              });
+            }
+          } catch (itemError) {
+            console.error(`❌ Lỗi khi trừ stock cho item:`, item, itemError);
+            // Tiếp tục xử lý các item khác
+          }
+        }
+      }
+    }
+    
     res.json(ord);
   } catch (e) {
+    console.error('Error updating order status:', e);
     res.status(500).json({ message: 'Server error' });
   }
 });

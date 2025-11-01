@@ -169,6 +169,95 @@ router.get('/order/:orderId', async (req, res) => {
   }
 });
 
+// GET /api/reviews/product/:productId - Lấy đánh giá theo sản phẩm
+router.get('/product/:productId', async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    console.log('🔍 Fetching reviews for productId:', productId);
+    
+    // Lấy thông tin sản phẩm để có tên sản phẩm
+    let productName = null;
+    try {
+      const { Product } = require('../model/Shoes');
+      const product = await Product.findById(productId);
+      if (product && product.name) {
+        productName = product.name;
+        console.log('📦 Product name:', productName);
+      }
+    } catch (e) {
+      console.log('Could not fetch product name:', e);
+    }
+    
+    // Tìm tất cả reviews, sau đó filter để lấy những reviews có chứa sản phẩm này
+    const allReviews = await Review.find({})
+      .populate('userId', 'name phone')
+      .populate('orderId', 'code _id')
+      .sort({ createdAt: -1 });
+    
+    console.log('📊 Total reviews found:', allReviews.length);
+    
+    // Lọc lại để chỉ lấy reviews có chứa sản phẩm này
+    const filteredReviews = allReviews.filter(review => {
+      if (!review.items || review.items.length === 0) return false;
+      return review.items.some(item => {
+        // Kiểm tra theo productId (hỗ trợ cả ObjectId và string)
+        const itemProductId = item.productId;
+        let matchById = false;
+        
+        if (itemProductId) {
+          // Xử lý nhiều trường hợp: ObjectId, string, hoặc object có _id
+          let itemIdStr = '';
+          if (typeof itemProductId === 'object' && itemProductId._id) {
+            itemIdStr = String(itemProductId._id);
+          } else if (itemProductId.toString) {
+            itemIdStr = itemProductId.toString();
+          } else {
+            itemIdStr = String(itemProductId);
+          }
+          const productIdStr = String(productId);
+          matchById = itemIdStr === productIdStr;
+        }
+        
+        // Kiểm tra theo tên sản phẩm (fallback - dùng khi productId không khớp)
+        const matchByName = productName && item.name && 
+          item.name.toLowerCase().trim() === productName.toLowerCase().trim();
+        
+        if (matchById || matchByName) {
+          console.log('✅ Match found:', {
+            itemProductId,
+            itemName: item.name,
+            matchById,
+            matchByName
+          });
+        }
+        
+        return matchById || matchByName;
+      });
+    });
+    
+    console.log('⭐ Filtered reviews for product:', filteredReviews.length);
+    
+    // Tính rating trung bình từ filtered reviews
+    let avgRating = 0;
+    let totalReviews = 0;
+    if (filteredReviews.length > 0) {
+      const sum = filteredReviews.reduce((acc, r) => acc + (r.rating || 0), 0);
+      avgRating = sum / filteredReviews.length;
+      totalReviews = filteredReviews.length;
+      console.log('📈 Average rating:', avgRating, 'Total:', totalReviews);
+    }
+    
+    res.json({
+      reviews: filteredReviews,
+      averageRating: parseFloat(avgRating.toFixed(1)),
+      totalReviews
+    });
+  } catch (e) {
+    console.error('GET /api/reviews/product/:productId error:', e);
+    res.status(500).json({ message: 'Lỗi lấy đánh giá theo sản phẩm' });
+  }
+});
+
 // POST /api/reviews
 router.post('/', async (req, res) => {
   try {

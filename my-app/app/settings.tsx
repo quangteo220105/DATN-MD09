@@ -14,7 +14,7 @@ export default function SettingsScreen() {
             try {
                 const u = await AsyncStorage.getItem('user');
                 if (u) setUser(JSON.parse(u));
-            } catch {}
+            } catch { }
         };
         load();
     }, []);
@@ -22,7 +22,7 @@ export default function SettingsScreen() {
     const logout = async () => {
         try {
             await AsyncStorage.removeItem('user');
-        } catch {}
+        } catch { }
         router.replace('/(tabs)/login');
     };
 
@@ -46,7 +46,7 @@ export default function SettingsScreen() {
 
                 <View style={styles.section}>
                     <SettingsItem icon="key-outline" title="Đổi mật khẩu" onPress={() => Alert.alert('Thông báo', 'Tính năng sẽ có sớm.')} />
-                    <SettingsItem icon="chatbubbles-outline" title="Chat với AI" onPress={() => router.push('/chat')} />
+                    <SettingsItem icon="chatbubbles-outline" title="Hỗ trợ" onPress={() => router.push('/chat')} />
                     <SettingsItem icon="cube-outline" title="Đơn hàng của tôi" onPress={() => router.push('/orders')} />
                 </View>
 

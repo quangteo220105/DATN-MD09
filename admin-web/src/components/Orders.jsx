@@ -257,21 +257,7 @@ export default function Orders() {
                                 <tbody>
                                     {(selected.items || []).map((it, idx) => (
                                         <tr key={idx}>
-                                            <td style={td}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <img
-                                                        src={
-                                                            it.image?.startsWith('http')
-                                                                ? it.image
-                                                                : `http://localhost:3000/${it.image?.replace(/^\/+/, '')}`
-                                                        }
-                                                        alt={it.name}
-                                                        style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }}
-                                                        onError={(e) => (e.target.src = '/placeholder.png')}
-                                                    />
-                                                    <span>{it.name}</span>
-                                                </div>
-                                            </td>
+                                            <td style={td}>{it.name}</td>
                                             <td style={td}>{[it.size, it.color].filter(Boolean).join(', ')}</td>
                                             <td style={td}>{it.qty}</td>
                                             <td style={td}>{(it.price || 0).toLocaleString('vi-VN')} VND</td>
@@ -279,7 +265,6 @@ export default function Orders() {
                                         </tr>
                                     ))}
                                 </tbody>
-
                             </table>
                             <div style={{ textAlign: 'right', marginTop: 10 }}>
                                 <strong>Tổng cộng: {(selected.total || 0).toLocaleString('vi-VN')} VND</strong>

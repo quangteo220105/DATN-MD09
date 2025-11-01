@@ -94,7 +94,7 @@ export default function CheckoutScreen() {
           customerName: user.name || addressObj.name,
           customerPhone: addressObj.phone || user.phone,
           items: cart.map(i => ({
-            productId: i._id || i.productId,
+            productId: i._id || i.productId || i.id,
             name: i.name,
             size: i.size,
             color: i.color,

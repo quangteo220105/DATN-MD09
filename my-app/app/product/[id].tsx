@@ -49,6 +49,8 @@ export default function ProductDetailScreen() {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isFavorite, setIsFavorite] = useState(false);
     const [favorites, setFavorites] = useState(new Set<string>());
+    const [productRating, setProductRating] = useState<{ averageRating: number; totalReviews: number } | null>(null);
+    const [loadingRating, setLoadingRating] = useState(false);
 
     const scrollViewRef = useRef<ScrollView>(null);
 
@@ -75,6 +77,34 @@ export default function ProductDetailScreen() {
         };
 
         if (id) fetchProduct();
+    }, [id]);
+
+    // Load product rating
+    useEffect(() => {
+        const fetchRating = async () => {
+            if (!id) return;
+            try {
+                setLoadingRating(true);
+                const response = await fetch(`${BASE_URL}/reviews/product/${id}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Product rating data:', data);
+                    setProductRating({
+                        averageRating: data.averageRating || 0,
+                        totalReviews: data.totalReviews || 0
+                    });
+                } else {
+                    const errorText = await response.text();
+                    console.log('Failed to fetch rating:', response.status, errorText);
+                }
+            } catch (error) {
+                console.log('Lỗi lấy đánh giá sản phẩm:', error);
+            } finally {
+                setLoadingRating(false);
+            }
+        };
+
+        fetchRating();
     }, [id]);
 
     // Load favorites
@@ -297,6 +327,28 @@ export default function ProductDetailScreen() {
                     <Text style={styles.productName}>{product.name || 'Tên sản phẩm không xác định'}</Text>
                     <Text style={styles.description}>{product.description || 'Mô tả không có sẵn'}</Text>
 
+                    {/* Product Rating */}
+                    {productRating && productRating.totalReviews > 0 && (
+                        <View style={styles.ratingSection}>
+                            <View style={styles.ratingRow}>
+                                <View style={styles.starsContainer}>
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <Ionicons
+                                            key={star}
+                                            name={star <= Math.round(productRating.averageRating) ? "star" : "star-outline"}
+                                            size={20}
+                                            color="#f59e0b"
+                                            style={styles.star}
+                                        />
+                                    ))}
+                                </View>
+                                <Text style={styles.ratingText}>
+                                    {productRating.averageRating.toFixed(1)} ({productRating.totalReviews} đánh giá)
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+
                     {/* Price */}
                     <View style={styles.priceSection}>
                         <View style={styles.priceRow}>
@@ -412,6 +464,11 @@ const styles = StyleSheet.create({
     sizeOptionSelected: { borderColor: '#ff4757', backgroundColor: '#ffe3e3' },
     sizeText: { fontSize: 14 },
     sizeTextSelected: { color: '#ff4757', fontWeight: 'bold' },
+    ratingSection: { marginVertical: 10, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#eee' },
+    ratingRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+    starsContainer: { flexDirection: 'row', marginRight: 10 },
+    star: { marginRight: 2 },
+    ratingText: { fontSize: 14, color: '#666', fontWeight: '500' },
     stockSection: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
     stockText: { marginLeft: 5, fontSize: 14, color: '#555' },
     actionSection: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#eee', padding: 10 },
