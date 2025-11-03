@@ -35,6 +35,7 @@ interface Product {
     brand: string;
     description: string;
     variants: Variant[];
+    categoryId?: string;
 }
 
 export default function ProductDetailScreen() {
@@ -88,14 +89,10 @@ export default function ProductDetailScreen() {
                 const response = await fetch(`${BASE_URL}/reviews/product/${id}`);
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Product rating data:', data);
                     setProductRating({
                         averageRating: data.averageRating || 0,
-                        totalReviews: data.totalReviews || 0
+                        totalReviews: data.totalReviews || 0,
                     });
-                } else {
-                    const errorText = await response.text();
-                    console.log('Failed to fetch rating:', response.status, errorText);
                 }
             } catch (error) {
                 console.log('Lỗi lấy đánh giá sản phẩm:', error);
@@ -103,7 +100,6 @@ export default function ProductDetailScreen() {
                 setLoadingRating(false);
             }
         };
-
         fetchRating();
     }, [id]);
 
@@ -124,7 +120,6 @@ export default function ProductDetailScreen() {
         loadFavorites();
     }, [id]);
 
-    // Toggle favorite
     const toggleFavorite = async () => {
         try {
             const newFavorites = new Set(favorites);
@@ -139,7 +134,6 @@ export default function ProductDetailScreen() {
         }
     };
 
-    // Get all unique colors and sizes
     const getAllColors = () => {
         if (!product) return [];
         return [...new Set(product.variants.map(v => v.color))];
@@ -150,59 +144,64 @@ export default function ProductDetailScreen() {
         return [...new Set(product.variants.map(v => v.size))];
     };
 
-    // Update selected variant when color or size changes
     useEffect(() => {
         if (!product) return;
-        const variant = product.variants.find(v =>
-            v.color === selectedColor && v.size === selectedSize
-        ) || null;
+        const variant = product.variants.find(v => v.color === selectedColor && v.size === selectedSize) || null;
         setSelectedVariant(variant);
     }, [selectedColor, selectedSize]);
 
-    // Get current images for selected variant
     const getCurrentImages = () => {
         if (!product) return [];
         if (selectedVariant) return [selectedVariant.image];
         return [...new Set(product.variants.map(v => v.image))];
     };
 
-    // Calculate discount percentage
     const getDiscountPercentage = () => {
         if (!selectedVariant || !selectedVariant.price || !selectedVariant.currentPrice) return 0;
         return Math.round(((selectedVariant.price - selectedVariant.currentPrice) / selectedVariant.price) * 100);
     };
 
     const addToCart = async () => {
-        if (!selectedVariant) {
+        if (!selectedVariant || !product) {
             Alert.alert('Thông báo', 'Vui lòng chọn màu sắc và kích cỡ');
+            return;
+        }
+        // Kiểm tra stock
+        if (selectedVariant.stock === 0) {
+            Alert.alert('Thông báo', 'Sản phẩm đã hết hàng');
             return;
         }
         try {
             const userString = await AsyncStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
-            if (!user || !user._id) {
+            if (!user?._id) {
                 Alert.alert('Lỗi', 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
                 return;
             }
+
             const cartKey = `cart_${user._id}`;
             const cartString = await AsyncStorage.getItem(cartKey);
             let cart = cartString ? JSON.parse(cartString) : [];
             cart = Array.isArray(cart) ? cart : [];
-            const idx = cart.findIndex((item: any) => item.id === product?._id && item.color === selectedVariant.color && item.size === selectedVariant.size);
+
+            const idx = cart.findIndex((item: any) => item.id === product._id && item.color === selectedVariant.color && item.size === selectedVariant.size);
+
             if (idx > -1) {
                 cart[idx].qty = (cart[idx].qty || 1) + 1;
             } else {
                 cart.push({
-                    id: product?._id,
-                    name: product?.name,
+                    id: product._id,
+                    name: product.name,
                     image: selectedVariant.image,
                     size: selectedVariant.size,
                     color: selectedVariant.color,
                     price: selectedVariant.currentPrice,
+                    categoryId: product.categoryId,
                     qty: 1,
-                    checked: true
+                    checked: true,
                 });
             }
+
             await AsyncStorage.setItem(cartKey, JSON.stringify(cart));
             Alert.alert('Thành công', 'Đã thêm sản phẩm vào giỏ hàng', [
                 { text: 'Xem giỏ hàng', onPress: () => router.push('/(tabs)/cart') },
@@ -215,42 +214,38 @@ export default function ProductDetailScreen() {
     };
 
     const buyNow = async () => {
-        if (!selectedVariant) {
+        if (!selectedVariant || !product) {
             Alert.alert('Thông báo', 'Vui lòng chọn màu sắc và kích cỡ');
+            return;
+        }
+        // Kiểm tra stock
+        if (selectedVariant.stock === 0) {
+            Alert.alert('Thông báo', 'Sản phẩm đã hết hàng');
             return;
         }
         try {
             const userString = await AsyncStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
-            if (!user || !user._id) {
+            if (!user?._id) {
                 Alert.alert('Lưu ý', 'Vui lòng đăng nhập để mua ngay');
                 return;
             }
+
             const cartKey = `cart_${user._id}`;
-            const cartString = await AsyncStorage.getItem(cartKey);
-            let cart = cartString ? JSON.parse(cartString) : [];
-            cart = Array.isArray(cart) ? cart : [];
-
-            // Bỏ chọn tất cả item khác để chỉ hiển thị sản phẩm này ở checkout
-            cart = cart.map((c: any) => ({ ...c, checked: false }));
-
-            const idx = cart.findIndex((item: any) => item.id === product?._id && item.color === selectedVariant.color && item.size === selectedVariant.size);
-            if (idx > -1) {
-                // Đánh dấu checked và đảm bảo qty >= 1
-                const qty = cart[idx].qty && cart[idx].qty > 0 ? cart[idx].qty : 1;
-                cart[idx] = { ...cart[idx], checked: true, qty };
-            } else {
-                cart.push({
-                    id: product?._id,
-                    name: product?.name,
+            const cart = [
+                {
+                    id: product._id,
+                    name: product.name,
                     image: selectedVariant.image,
                     size: selectedVariant.size,
                     color: selectedVariant.color,
                     price: selectedVariant.currentPrice,
                     qty: 1,
                     checked: true,
-                });
-            }
+                    categoryId: product.categoryId,
+                },
+            ];
+
             await AsyncStorage.setItem(cartKey, JSON.stringify(cart));
             router.push('/checkout');
         } catch (e) {
@@ -291,7 +286,7 @@ export default function ProductDetailScreen() {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Chi tiết sản phẩm</Text>
                 <TouchableOpacity style={styles.headerBtn} onPress={toggleFavorite}>
-                    <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#ff4757" : "#222"} />
+                    <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#ff4757' : '#222'} />
                 </TouchableOpacity>
             </View>
 
@@ -304,14 +299,13 @@ export default function ProductDetailScreen() {
                         pagingEnabled
                         showsHorizontalScrollIndicator={false}
                         keyExtractor={(item, index) => index.toString()}
-                        onScroll={(e) => setCurrentImageIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
+                        onScroll={e => setCurrentImageIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
                         renderItem={({ item }) => (
                             <View style={styles.imageContainer}>
                                 <Image source={{ uri: `${DOMAIN}${item}` }} style={styles.productImage} resizeMode="cover" />
                             </View>
                         )}
                     />
-
                     {currentImages.length > 1 && (
                         <View style={styles.imageIndicators}>
                             {currentImages.map((_, index) => (
@@ -327,18 +321,17 @@ export default function ProductDetailScreen() {
                     <Text style={styles.productName}>{product.name || 'Tên sản phẩm không xác định'}</Text>
                     <Text style={styles.description}>{product.description || 'Mô tả không có sẵn'}</Text>
 
-                    {/* Product Rating */}
+                    {/* Rating */}
                     {productRating && productRating.totalReviews > 0 && (
                         <View style={styles.ratingSection}>
                             <View style={styles.ratingRow}>
                                 <View style={styles.starsContainer}>
-                                    {[1, 2, 3, 4, 5].map((star) => (
+                                    {[1, 2, 3, 4, 5].map(star => (
                                         <Ionicons
                                             key={star}
-                                            name={star <= Math.round(productRating.averageRating) ? "star" : "star-outline"}
+                                            name={star <= Math.round(productRating.averageRating) ? 'star' : 'star-outline'}
                                             size={20}
                                             color="#f59e0b"
-                                            style={styles.star}
                                         />
                                     ))}
                                 </View>
@@ -353,7 +346,10 @@ export default function ProductDetailScreen() {
                     <View style={styles.priceSection}>
                         <View style={styles.priceRow}>
                             <Text style={styles.currentPrice}>
-                                {selectedVariant?.currentPrice ? selectedVariant.currentPrice.toLocaleString('vi-VN') : 'Chọn màu và size để xem giá'} VND
+                                {selectedVariant?.currentPrice
+                                    ? selectedVariant.currentPrice.toLocaleString('vi-VN')
+                                    : 'Chọn màu và size để xem giá'}{' '}
+                                VND
                             </Text>
                             {discountPercentage > 0 && (
                                 <View style={styles.discountBadge}>
@@ -361,18 +357,18 @@ export default function ProductDetailScreen() {
                                 </View>
                             )}
                         </View>
-                        {selectedVariant?.price && selectedVariant?.currentPrice && selectedVariant.price !== selectedVariant.currentPrice && (
-                            <Text style={styles.originalPrice}>
-                                {selectedVariant.price.toLocaleString('vi-VN')} VND
-                            </Text>
-                        )}
+                        {selectedVariant?.price &&
+                            selectedVariant?.currentPrice &&
+                            selectedVariant.price !== selectedVariant.currentPrice && (
+                                <Text style={styles.originalPrice}>{selectedVariant.price.toLocaleString('vi-VN')} VND</Text>
+                            )}
                     </View>
 
-                    {/* Color Selection */}
+                    {/* Color */}
                     <View style={styles.selectionSection}>
                         <Text style={styles.selectionTitle}>Màu sắc</Text>
                         <View style={styles.colorOptions}>
-                            {getAllColors().map((color) => {
+                            {getAllColors().map(color => {
                                 const isSelected = selectedColor === color;
                                 return (
                                     <TouchableOpacity
@@ -387,11 +383,11 @@ export default function ProductDetailScreen() {
                         </View>
                     </View>
 
-                    {/* Size Selection */}
+                    {/* Size */}
                     <View style={styles.selectionSection}>
                         <Text style={styles.selectionTitle}>Kích cỡ</Text>
                         <View style={styles.sizeOptions}>
-                            {getAllSizes().map((size) => {
+                            {getAllSizes().map(size => {
                                 const isSelected = selectedSize === size;
                                 return (
                                     <TouchableOpacity
@@ -406,12 +402,17 @@ export default function ProductDetailScreen() {
                         </View>
                     </View>
 
-                    {/* Stock Info */}
+                    {/* Stock */}
                     <View style={styles.stockSection}>
                         <Ionicons name="checkmark-circle" size={20} color="#30c48d" />
                         <Text style={styles.stockText}>
-                            {selectedVariant ? `Còn ${selectedVariant.stock} sản phẩm` : 'Chọn màu sắc và kích cỡ để xem số lượng'}
+                            {selectedVariant
+                                ? selectedVariant.stock > 0
+                                    ? `Còn ${selectedVariant.stock} sản phẩm`
+                                    : 'Hết hàng'
+                                : 'Chọn màu sắc và kích cỡ để xem số lượng'}
                         </Text>
+
                     </View>
                 </View>
             </ScrollView>

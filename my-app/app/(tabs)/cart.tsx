@@ -15,6 +15,7 @@ interface CartItem {
     price: number;
     qty: number;
     checked: boolean;
+    categoryId?: string;
 }
 
 export default function CartScreen() {
@@ -41,9 +42,17 @@ export default function CartScreen() {
                 } catch {
                     items = [];
                 }
-                // Đảm bảo mỗi item có đủ trường qty, checked
-                items = items.map(item => ({ ...item, qty: item.qty || 1, checked: typeof item.checked === 'boolean' ? item.checked : true }));
+
+                // Đảm bảo mỗi item có đủ trường qty, checked và categoryId
+                items = items.map(item => ({
+                    ...item,
+                    qty: item.qty || 1,
+                    checked: typeof item.checked === 'boolean' ? item.checked : true,
+                    categoryId: item.categoryId ? String(item.categoryId) : '' // ✅ ép sang string
+                }));
+
                 setCart(items);
+
             };
             fetchUserAndCart();
         }, [])
@@ -57,8 +66,12 @@ export default function CartScreen() {
             return;
         }
         const cartKey = `cart_${user._id}`;
-        // Đảm bảo mỗi item có đủ trường qty, checked khi lưu
-        const sanitizedCart = newCart.map(item => ({ ...item, qty: item.qty || 1, checked: typeof item.checked === 'boolean' ? item.checked : true }));
+        const sanitizedCart = newCart.map(item => ({
+            ...item,
+            qty: item.qty || 1,
+            checked: typeof item.checked === 'boolean' ? item.checked : true,
+            categoryId: item.categoryId ? String(item.categoryId) : '' // ✅ ép sang string
+        }));
         setCart(sanitizedCart);
         await AsyncStorage.setItem(cartKey, JSON.stringify(sanitizedCart));
     };

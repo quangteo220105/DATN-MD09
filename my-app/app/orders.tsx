@@ -1,10 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView, Image } from 'react-native';
+import {
+    View,
+    Text,
+    FlatList,
+    StyleSheet,
+    SafeAreaView,
+    TouchableOpacity,
+    Alert,
+    ScrollView,
+    Image
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { BASE_URL, DOMAIN } from '../config/apiConfig';
 import { useFocusEffect } from '@react-navigation/native';
-import ReactNative from 'react';
 
 const STATUS_ORDER = ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng'] as const;
 
@@ -29,11 +38,10 @@ function normalizeStatus(raw?: string) {
 
 export default function OrdersScreen() {
     const [orders, setOrders] = useState<any[]>([]);
-    const [selected, setSelected] = useState<any | null>(null);
-    const [showModal, setShowModal] = useState(false);
     const [activeTab, setActiveTab] = useState<string>('Tất cả');
     const router = useRouter();
 
+    // Fetch orders từ API hoặc AsyncStorage fallback
     const fetchOrders = React.useCallback(async () => {
         const userString = await AsyncStorage.getItem('user');
         const user = userString ? JSON.parse(userString) : null;
@@ -41,6 +49,7 @@ export default function OrdersScreen() {
             router.replace('/(tabs)/login');
             return;
         }
+
         try {
             const res = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
             const json = await res.json();
@@ -49,8 +58,11 @@ export default function OrdersScreen() {
                 setOrders(list);
                 return;
             }
-        } catch { }
-        // Fallback: lấy từ AsyncStorage cục bộ
+        } catch (e) {
+            console.log('Fetch orders failed', e);
+        }
+
+        // Fallback lấy từ AsyncStorage
         const historyKey = `order_history_${user._id}`;
         const historyString = await AsyncStorage.getItem(historyKey);
         let history = historyString ? JSON.parse(historyString) : [];
@@ -61,6 +73,7 @@ export default function OrdersScreen() {
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
     useFocusEffect(React.useCallback(() => { fetchOrders(); }, [fetchOrders]));
 
+    // Stepper hiển thị trạng thái
     const renderStepper = (statusRaw: string) => {
         const status = normalizeStatus(statusRaw);
         if (status === 'Đã hủy') {
@@ -100,80 +113,40 @@ export default function OrdersScreen() {
         );
     };
 
+    // Kiểm tra review đã tồn tại
     const checkReviewExists = async (orderId: any, orderBackendId?: any) => {
         try {
             const userString = await AsyncStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
             if (!user || !user._id) return false;
-            
-            // ƯU TIÊN: Kiểm tra từ API trước (nếu admin xóa thì trong database sẽ không còn)
+
             const checkId = orderBackendId || orderId;
             try {
                 const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
                 if (res.ok) {
                     const data = await res.json();
                     const reviews = Array.isArray(data) ? data : [];
-                    // Chỉ kiểm tra đánh giá của user hiện tại (hỗ trợ cả populate và không populate)
                     const userReview = reviews.find((r: any) => {
                         const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
                         return String(reviewUserId) === String(user._id);
                     });
                     if (userReview) return true;
                 }
-            } catch (e) {
-                console.log('API check failed, checking local:', e);
-            }
-            
-            // Fallback: Kiểm tra trong AsyncStorage (khi không có kết nối)
-            const reviewKey1 = `review_${user._id}_${orderId}`;
-            const reviewString1 = await AsyncStorage.getItem(reviewKey1);
-            if (reviewString1) {
-                // Nếu có trong local, vẫn kiểm tra lại API một lần nữa để đảm bảo
-                try {
-                    const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const reviews = Array.isArray(data) ? data : [];
-                        const userReview = reviews.find((r: any) => {
-                            const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
-                            return String(reviewUserId) === String(user._id);
-                        });
-                        // Nếu không tìm thấy trong API nhưng có trong local, xóa local để sync
-                        if (!userReview) {
-                            await AsyncStorage.removeItem(reviewKey1);
-                            if (orderBackendId && orderBackendId !== orderId) {
-                                await AsyncStorage.removeItem(`review_${user._id}_${orderBackendId}`);
-                            }
-                            return false;
-                        }
-                        return true;
-                    }
-                } catch {}
-                // Nếu không kết nối được API, dùng dữ liệu local
-                return true;
-            }
-            
-            if (orderBackendId && orderBackendId !== orderId) {
-                const reviewKey2 = `review_${user._id}_${orderBackendId}`;
-                const reviewString2 = await AsyncStorage.getItem(reviewKey2);
-                if (reviewString2) return true;
-            }
-            
+            } catch { }
+
+            const reviewKey = `review_${user._id}_${orderId}`;
+            const reviewString = await AsyncStorage.getItem(reviewKey);
+            if (reviewString) return true;
             return false;
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     };
 
+    // Hủy đơn
     const handleCancel = async (orderId: any, backendId?: any) => {
         const userString = await AsyncStorage.getItem('user');
         const user = userString ? JSON.parse(userString) : null;
         if (!user || !user._id) return;
-        const historyKey = `order_history_${user._id}`;
-        const historyString = await AsyncStorage.getItem(historyKey);
-        let history = historyString ? JSON.parse(historyString) : [];
-        history = Array.isArray(history) ? history : [];
-        // Try update backend first if backend id provided
+
         if (backendId) {
             try {
                 await fetch(`${BASE_URL}/orders/${backendId}/status`, {
@@ -185,11 +158,18 @@ export default function OrdersScreen() {
                 console.log('PATCH /orders/:id/status failed', e);
             }
         }
-        history = history.map((o: any) => (o.id === orderId || o._id === orderId) ? { ...o, status: 'Đã hủy' } : o);
-        await AsyncStorage.setItem(historyKey, JSON.stringify(history));
-        setOrders(history);
+
+        setOrders(prevOrders => {
+            const newOrders = prevOrders.map(o =>
+                (o.id === orderId || o._id === orderId) ? { ...o, status: 'Đã hủy' } : o
+            );
+            const historyKey = `order_history_${user._id}`;
+            AsyncStorage.setItem(historyKey, JSON.stringify(newOrders));
+            return newOrders;
+        });
     };
 
+    // Bấm review
     const handleReviewPress = async (item: any) => {
         const orderId = item.id || item._id;
         const hasReviewed = await checkReviewExists(orderId, item._id);
@@ -200,42 +180,112 @@ export default function OrdersScreen() {
         router.push(`/review/${orderId}` as any);
     };
 
+    // Tính tổng giảm và thanh toán
+    const calculateOrderDiscount = (item: any) => {
+        const productDiscount = (item.items || []).reduce((sum: number, p: any) => {
+            const disc = Number(p.discountAmount ?? p.discount ?? 0) || 0;
+            const qty = Number(p.qty ?? 1) || 1;
+            return sum + disc * qty;
+        }, 0);
+
+        const voucherDiscount = Number(item.voucherAppliedAmount ?? 0) || 0;
+        const total = Number(item.total ?? 0) || 0;
+        const totalPayment = Math.max(0, total - (productDiscount + voucherDiscount));
+
+        return { productDiscount, voucherDiscount, totalPayment };
+    };
+
+    // Render từng đơn hàng
     const renderItem = ({ item }: { item: any }) => {
         const created = item.createdAt ? new Date(item.createdAt).toLocaleString() : '';
         const status = normalizeStatus(item.status);
+        const { productDiscount, voucherDiscount, totalPayment } = calculateOrderDiscount(item);
+
         return (
             <View style={styles.card}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={styles.date}>{created}</Text>
-                    <Text style={[styles.badge, { color: STATUS_INFO[status].color }]}>{STATUS_INFO[status].emoji} {status}</Text>
+                    <Text style={[styles.badge, { color: STATUS_INFO[status].color }]}>
+                        {STATUS_INFO[status].emoji} {status}
+                    </Text>
                 </View>
+
+                {/* Stepper */}
                 {renderStepper(status)}
+
+                {/* Danh sách sản phẩm */}
                 <View style={{ marginTop: 8 }}>
-                    {(item.items || []).slice(0, 3).map((p: any, idx: number) => (
-                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                            {p.image ? (
-                                <Image source={{ uri: `${DOMAIN}${p.image}` }} style={styles.productImage} />
-                            ) : (
-                                <View style={[styles.productImage, { backgroundColor: '#f0f0f0' }]} />
-                            )}
-                            <View style={{ flex: 1, marginLeft: 10 }}>
-                                <Text style={styles.productName}>{p.name}</Text>
-                                <Text style={styles.productMeta}>({p.size}, {p.color}) x{p.qty}</Text>
+                    {(item.items || []).slice(0, 3).map((p: any, idx: number) => {
+                        const disc = Number(p.discountAmount ?? p.discount ?? 0) || 0;
+                        const qty = Number(p.qty ?? 1) || 1;
+                        const totalDisc = disc * qty;
+
+                        return (
+                            <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                                {p.image ? (
+                                    <Image source={{ uri: `${DOMAIN}${p.image}` }} style={styles.productImage} />
+                                ) : (
+                                    <View style={[styles.productImage, { backgroundColor: '#f0f0f0' }]} />
+                                )}
+                                <View style={{ flex: 1, marginLeft: 10 }}>
+                                    <Text style={styles.productName}>{p.name}</Text>
+                                    <Text style={styles.productMeta}>({p.size}, {p.color}) x{qty}</Text>
+                                    {/* Hiển thị giảm giá từng sản phẩm nếu > 0 */}
+                                </View>
+                                <Text style={styles.productPrice}>
+                                    {(Number(p.price ?? 0) * qty).toLocaleString('vi-VN')} VND
+                                </Text>
                             </View>
-                            <Text style={styles.productPrice}>{(p.price * p.qty).toLocaleString('vi-VN')} VND</Text>
-                        </View>
-                    ))}
+                        );
+                    })}
                     {Array.isArray(item.items) && item.items.length > 3 && (
-                        <Text style={{ color: '#666', marginTop: 8, marginLeft: 60 }}>+ {item.items.length - 3} sản phẩm khác</Text>
+                        <Text style={{ color: '#666', marginTop: 8, marginLeft: 60 }}>
+                            + {item.items.length - 3} sản phẩm khác
+                        </Text>
                     )}
                 </View>
-                <Text style={styles.total}>Tổng: {Number(item.total || 0).toLocaleString('vi-VN')} VND</Text>
+
+                {/* Giảm giá voucher */}
+                {voucherDiscount > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                        <Text style={{ color: '#16a34a', fontSize: 14, flex: 1 }}>
+                            Giảm từ voucher{item.voucher?.code ? ` (${item.voucher.code})` : ''}:
+                        </Text>
+                        <Text style={{ color: '#16a34a', fontSize: 14 }}>
+                            -{voucherDiscount.toLocaleString('vi-VN')} VND
+                        </Text>
+                    </View>
+                )}
+
+                {/* Tổng giảm từ sản phẩm */}
+                {productDiscount > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+                        <Text style={{ color: '#16a34a', fontSize: 14 }}>Giảm giá:</Text>
+                        <Text style={{ color: '#16a34a', fontSize: 14 }}>
+                            -{productDiscount.toLocaleString('vi-VN')} VND
+                        </Text>
+                    </View>
+                )}
+
+                {/* Tổng thanh toán */}
+                <Text style={[styles.total, { marginTop: 4 }]}>
+                    Tổng thanh toán: {totalPayment.toLocaleString('vi-VN')} VND
+                </Text>
+
+                {/* Địa chỉ & phương thức */}
                 <Text style={styles.small}>Địa chỉ: {item.address}</Text>
                 <Text style={styles.small}>Phương thức: {item.payment}</Text>
+
+                {/* Nút hành động */}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
-                    <TouchableOpacity onPress={() => router.push(`/order/${item.id || item._id}` as any)} style={[styles.actionBtn, { backgroundColor: '#111827' }]}>
+                    <TouchableOpacity
+                        onPress={() => router.push(`/order/${item.id || item._id}` as any)}
+                        style={[styles.actionBtn, { backgroundColor: '#111827' }]}
+                    >
                         <Text style={{ color: '#fff', fontWeight: '600' }}>Xem chi tiết</Text>
                     </TouchableOpacity>
+
                     {status === 'Đã giao hàng' && (
                         <TouchableOpacity
                             onPress={() => handleReviewPress(item)}
@@ -244,6 +294,7 @@ export default function OrdersScreen() {
                             <Text style={{ color: '#fff', fontWeight: '600' }}>Đánh giá</Text>
                         </TouchableOpacity>
                     )}
+
                     {status !== 'Đã hủy' && status !== 'Đã giao hàng' && (
                         <TouchableOpacity
                             onPress={() => Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
@@ -255,6 +306,7 @@ export default function OrdersScreen() {
                             <Text style={{ color: '#fff', fontWeight: '600' }}>Hủy đơn</Text>
                         </TouchableOpacity>
                     )}
+
                     {status === 'Đã hủy' && (
                         <TouchableOpacity
                             onPress={async () => {
@@ -265,7 +317,6 @@ export default function OrdersScreen() {
                                             const userString = await AsyncStorage.getItem('user');
                                             const user = userString ? JSON.parse(userString) : null;
                                             if (!user || !user._id) return;
-                                            // Try delete on backend if _id exists
                                             if (item._id) {
                                                 try { await fetch(`${BASE_URL}/orders/${item._id}`, { method: 'DELETE' }); } catch { }
                                             }
@@ -305,7 +356,6 @@ export default function OrdersScreen() {
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f8f9' }}>
             <View style={{ padding: 13 }}>
                 <Text style={{ fontSize: 21, fontWeight: 'bold', marginBottom: 9, color: '#222' }}>Đơn hàng của tôi</Text>
-                {/* Horizontal status tabs */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row' }}>
                         {tabs.map((t) => {
@@ -331,7 +381,6 @@ export default function OrdersScreen() {
                     showsVerticalScrollIndicator={false}
                 />
             </View>
-            {/* Modal chi tiết đã chuyển sang màn riêng /order/[id] */}
         </SafeAreaView>
     );
 }
@@ -343,7 +392,6 @@ const styles = StyleSheet.create({
     total: { fontWeight: 'bold', color: '#ef233c', marginTop: 6 },
     small: { color: '#888', fontSize: 13, marginTop: 2 },
     actionBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, marginRight: 10, marginBottom: 8 },
-    // Stepper
     stepperWrap: { marginTop: 8, marginBottom: 4 },
     stepRow: { flexDirection: 'row', alignItems: 'center' },
     stepCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -353,14 +401,10 @@ const styles = StyleSheet.create({
     stepLabelFlex: { flex: 1, textAlign: 'center', fontSize: 12, color: '#666' },
     cancelWrap: { backgroundColor: '#fee2e2', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10, marginTop: 6, marginBottom: 6 },
     cancelText: { color: '#ef4444', fontWeight: 'bold' },
-    // Tabs
     tabChip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18, backgroundColor: '#f3f4f6', marginRight: 8 },
     tabText: { color: '#111827', fontWeight: '600' },
-    // Product images
     productImage: { width: 50, height: 50, borderRadius: 8, marginRight: 10, borderWidth: 1, borderColor: '#eee' },
     productName: { fontSize: 14, fontWeight: '600', color: '#222' },
     productMeta: { fontSize: 12, color: '#666', marginTop: 2 },
     productPrice: { fontSize: 14, fontWeight: '600', color: '#222' },
 });
-
-

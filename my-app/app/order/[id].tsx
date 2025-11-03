@@ -266,7 +266,14 @@ export default function OrderDetailScreen() {
                                     <Text style={styles.itemMeta}>{[it.size, it.color].filter(Boolean).join(', ') || '—'}</Text>
                                     <Text style={styles.itemMeta}>x{it.qty}</Text>
                                 </View>
-                                <Text style={styles.itemPrice}>{((it.price || 0) * (it.qty || 0)).toLocaleString('vi-VN')} VND</Text>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={styles.itemPrice}>{((it.price || 0) * (it.qty || 0)).toLocaleString('vi-VN')} VND</Text>
+                                    {Number(it.discountAmount || 0) > 0 && (
+                                        <Text style={{ color: '#22c55e', fontSize: 12, marginTop: 2 }}>
+                                            -{Number(it.discountAmount).toLocaleString('vi-VN')} VND
+                                        </Text>
+                                    )}
+                                </View>
                             </View>
                         ))
                     ) : (
