@@ -5,7 +5,8 @@ import {
     AppstoreOutlined,
     PictureOutlined, // 🆕 icon banner
     UserOutlined, // 🆕 icon quản lý tài khoản khách hàng
-    ShoppingCartOutlined
+    ShoppingCartOutlined,
+    MessageOutlined
 } from "@ant-design/icons";
 import Dashboard from "./Dashboard";
 import Product from "./Product";
@@ -13,6 +14,7 @@ import Categories from "./Categories";
 import Banners from "./Banners"; // 🆕 import màn hình banner
 import UserManager from "./UserManager"; // 🆕 (tạo tiếp nếu chưa có)
 import Orders from "./Orders";
+import ChatManager from "./ChatManager";
 
 export default function AdminLayout({ onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -29,6 +31,7 @@ export default function AdminLayout({ onLogout }) {
                 return <Banners />; // 🆕 thêm Banner
             case "users": return <UserManager />; // 🆕
             case "orders": return <Orders />;
+            case "chat": return <ChatManager />;
             default:
                 return <Dashboard />;
         }
@@ -130,6 +133,20 @@ export default function AdminLayout({ onLogout }) {
                     title="Quản lý tài khoản khách hàng"
                 >
                     <UserOutlined />
+                </div>
+
+                {/* Chat */}
+                <div
+                    style={{
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        color: activeTab === "chat" ? "#ff8000" : "#fff",
+                        fontSize: 24,
+                    }}
+                    onClick={() => setActiveTab("chat")}
+                    title="Chat với khách hàng"
+                >
+                    <MessageOutlined />
                 </div>
             </div>
 
