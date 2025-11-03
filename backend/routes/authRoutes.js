@@ -163,4 +163,64 @@ router.get("/me/:userId", async (req, res) => {
     }
 });
 
+// Cập nhật thông tin user
+router.put("/update-profile", async (req, res) => {
+    try {
+        const { userId, name, phone } = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng!" });
+        }
+
+        // Cập nhật thông tin
+        if (name) user.name = name;
+        if (phone) user.phone = phone;
+
+        await user.save();
+
+        res.status(200).json({
+            message: "Cập nhật thành công!",
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                avatar: user.avatar,
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Lỗi server!" });
+    }
+});
+
+// Đổi mật khẩu
+router.put("/change-password", async (req, res) => {
+    try {
+        const { userId, oldPassword, newPassword } = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng!" });
+        }
+
+        // Kiểm tra mật khẩu cũ
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "Mật khẩu cũ không đúng!" });
+        }
+
+        // Mã hóa mật khẩu mới
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+
+        res.status(200).json({ message: "Đổi mật khẩu thành công!" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Lỗi server!" });
+    }
+});
+
 module.exports = router;
