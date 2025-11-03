@@ -32,7 +32,7 @@ export default function SettingsScreen() {
     const logout = async () => {
         try {
             await AsyncStorage.removeItem('user');
-        } catch {}
+        } catch { }
         router.replace('/(tabs)/login');
     };
 

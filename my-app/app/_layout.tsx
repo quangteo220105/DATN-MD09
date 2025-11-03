@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="history" options={{ title: 'Lịch sử mua hàng' }} />
         <Stack.Screen name="orders" options={{ title: 'Đơn hàng của tôi' }} />
         <Stack.Screen name="order/[id]" options={{ title: 'Chi tiết đơn hàng' }} />
+        <Stack.Screen name="review/[id]" options={{ title: 'Đánh giá đơn hàng' }} />
         <Stack.Screen name="settings" options={{ title: 'Cài đặt' }} />
         <Stack.Screen name="chat" options={{ title: 'Chat với Admin' }} />
         <Stack.Screen name="changePassword" options={{ title: 'Đổi mật khẩu' }} />

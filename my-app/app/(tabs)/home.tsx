@@ -46,6 +46,8 @@ export default function HomeScreen() {
     const [banners, setBanners] = useState<BannerType[]>([]);
     const [products, setProducts] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
+    const [productRatings, setProductRatings] = useState<{ [key: string]: { averageRating: number; totalReviews: number } }>({});
+    const [loadingRatings, setLoadingRatings] = useState(false);
     const bannerRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showOutOfStockDialog, setShowOutOfStockDialog] = useState(false);
@@ -197,6 +199,46 @@ export default function HomeScreen() {
         }
     };
 
+    // Lấy ratings cho tất cả sản phẩm
+    const fetchProductRatings = async (productList: any[]) => {
+        try {
+            setLoadingRatings(true);
+            const ratingsMap: { [key: string]: { averageRating: number; totalReviews: number } } = {};
+            
+            // Fetch ratings song song cho tất cả sản phẩm
+            const ratingPromises = productList.map(async (product) => {
+                try {
+                    const response = await fetch(`${BASE_URL}/reviews/product/${product._id}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.totalReviews > 0) {
+                            ratingsMap[product._id] = {
+                                averageRating: data.averageRating || 0,
+                                totalReviews: data.totalReviews || 0
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.log(`Error fetching rating for product ${product._id}:`, error);
+                }
+            });
+            
+            await Promise.all(ratingPromises);
+            setProductRatings(ratingsMap);
+        } catch (error) {
+            console.log("Lỗi lấy ratings:", (error as Error).message);
+        } finally {
+            setLoadingRatings(false);
+        }
+    };
+
+    // Fetch ratings khi products thay đổi
+    useEffect(() => {
+        if (products.length > 0) {
+            fetchProductRatings(products);
+        }
+    }, [products]);
+
     useEffect(() => {
         fetchBanners();
         fetchProducts();
@@ -206,6 +248,7 @@ export default function HomeScreen() {
     const onRefresh = async () => {
         setRefreshing(true);
         await Promise.all([fetchBanners(), fetchProducts(), fetchUser(), fetchCategories()]);
+        // Ratings sẽ tự động fetch khi products thay đổi (useEffect)
         setRefreshing(false);
     };
 
@@ -313,6 +356,8 @@ export default function HomeScreen() {
         const totalStock = item.variants.reduce((sum: number, v: any) => sum + v.stock, 0);
         const isFavorite = favorites.has(item._id);
         const isOutOfStock = totalStock === 0;
+        const rating = productRatings[item._id];
+        const hasRating = rating && rating.totalReviews > 0;
 
         return (
             <TouchableOpacity
@@ -362,6 +407,14 @@ export default function HomeScreen() {
                         <Text style={styles.soldText}>Số lượng còn {totalStock}</Text>
                     )}
                     <Text style={styles.price}>{mainVariant.currentPrice.toLocaleString('vi-VN')} VND</Text>
+                    {hasRating && (
+                        <View style={styles.ratingContainer}>
+                            <Text style={styles.ratingText}>
+                                {rating.averageRating.toFixed(1)}
+                            </Text>
+                            <Ionicons name="star" size={14} color="#f59e0b" />
+                        </View>
+                    )}
                 </View>
             </TouchableOpacity>
         );
@@ -912,6 +965,17 @@ const styles = StyleSheet.create({
         marginBottom: 6,
         lineHeight: 20,
         color: "#222"
+    },
+    ratingContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 6,
+        gap: 4
+    },
+    ratingText: {
+        fontSize: 12,
+        color: "#666",
+        fontWeight: "500"
     },
     soldText: {
         color: "#666",

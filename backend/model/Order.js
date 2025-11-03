@@ -8,6 +8,7 @@ const orderItemSchema = new mongoose.Schema({
   qty: { type: Number, default: 1 },
   price: { type: Number, default: 0 },
   image: String,
+  discountAmount: { type: Number, default: 0 }
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
@@ -17,6 +18,8 @@ const orderSchema = new mongoose.Schema({
   customerPhone: { type: String },
   items: { type: [orderItemSchema], default: [] },
   total: { type: Number, default: 0 },
+  voucherCode: { type: String }, // Mã voucher đã sử dụng
+  discount: { type: Number, default: 0 }, // Số tiền đã giảm
   address: { type: String },
   payment: { type: String, default: 'cod' },
   status: { type: String, enum: ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy'], default: 'Chờ xác nhận', index: true },

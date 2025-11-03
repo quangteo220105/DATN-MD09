@@ -121,6 +121,34 @@ export default function AdminLayout({ onLogout }) {
                     <ShoppingCartOutlined />
                 </div>
 
+                {/* 🆕 Reviews */}
+                <div
+                    style={{
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        color: activeTab === "reviews" ? "#ff8000" : "#fff",
+                        fontSize: 24,
+                    }}
+                    onClick={() => setActiveTab("reviews")}
+                    title="Đánh giá"
+                >
+                    <StarOutlined />
+                </div>
+
+                {/* 🆕 Vouchers */}
+                <div
+                    style={{
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        color: activeTab === "vouchers" ? "#ff8000" : "#fff",
+                        fontSize: 24,
+                    }}
+                    onClick={() => setActiveTab("vouchers")}
+                    title="Voucher"
+                >
+                    <TagsOutlined />
+                </div>
+
                 {/* Quản lý tài khoản khách hàng (User) */}
                 <div
                     style={{
