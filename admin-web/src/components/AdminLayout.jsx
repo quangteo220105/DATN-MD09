@@ -6,7 +6,9 @@ import {
     PictureOutlined, // 🆕 icon banner
     UserOutlined, // 🆕 icon quản lý tài khoản khách hàng
     ShoppingCartOutlined,
-    MessageOutlined
+    MessageOutlined,
+    StarOutlined,
+    TagsOutlined
 } from "@ant-design/icons";
 import Dashboard from "./Dashboard";
 import Product from "./Product";
@@ -15,6 +17,8 @@ import Banners from "./Banners"; // 🆕 import màn hình banner
 import UserManager from "./UserManager"; // 🆕 (tạo tiếp nếu chưa có)
 import Orders from "./Orders";
 import ChatManager from "./ChatManager";
+import Reviews from "./Reviews";
+import Vouchers from "./Vouchers";
 
 export default function AdminLayout({ onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -31,6 +35,8 @@ export default function AdminLayout({ onLogout }) {
                 return <Banners />; // 🆕 thêm Banner
             case "users": return <UserManager />; // 🆕
             case "orders": return <Orders />;
+            case "reviews": return <Reviews />;
+            case "vouchers": return <Vouchers />;
             case "chat": return <ChatManager />;
             default:
                 return <Dashboard />;

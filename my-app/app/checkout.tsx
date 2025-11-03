@@ -16,6 +16,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { DOMAIN, BASE_URL } from '../config/apiConfig';
 
 const PAYMENT_METHODS = [
@@ -58,11 +59,18 @@ export default function CheckoutScreen() {
       setAddressObj(addr);
       setInput(addr);
 
-      // Lấy cart đã chọn
+      // Lấy cart đã chọn hoặc Buy Now (ưu tiên buy now nếu có)
       const cartKey = `cart_${user._id}`;
       const cartString = await AsyncStorage.getItem(cartKey);
-      let items = cartString ? JSON.parse(cartString) : [];
-      items = Array.isArray(items) ? items.filter(i => i.checked) : [];
+      const buyNowString = await AsyncStorage.getItem(`buy_now_${user._id}`);
+      let items = [] as any[];
+      if (buyNowString) {
+        const single = JSON.parse(buyNowString);
+        items = single ? [single] : [];
+      } else {
+        const parsed = cartString ? JSON.parse(cartString) : [];
+        items = Array.isArray(parsed) ? parsed.filter(i => i.checked) : [];
+      }
 
       // ✅ Thêm discountAmount mặc định = 0
       items = items.map(i => ({ ...i, discountAmount: 0 }));
@@ -77,6 +85,51 @@ export default function CheckoutScreen() {
     };
     fetchData();
   }, []);
+
+  // 🔄 Reload khi quay lại màn hình (đảm bảo tên từ profile cập nhật, hoặc địa chỉ vừa chọn)
+  useFocusEffect(
+    React.useCallback(() => {
+      const reload = async () => {
+        const userString = await AsyncStorage.getItem('user');
+        const user = userString ? JSON.parse(userString) : null;
+        if (!user || !user._id) return;
+
+        setUserId(user._id);
+        const addressString = await AsyncStorage.getItem(`address_${user._id}`);
+        const addr = addressString ? JSON.parse(addressString) : { name: user.name || '', phone: '', address: '' };
+        setAddressObj(addr);
+
+        // Nếu quay lại từ address-book hoặc chi tiết, làm mới danh sách thanh toán nhưng KHÔNG ghi đè cart lưu trữ
+        const cartString = await AsyncStorage.getItem(`cart_${user._id}`);
+        const buyNowString = await AsyncStorage.getItem(`buy_now_${user._id}`);
+        let items = [] as any[];
+        if (buyNowString) {
+          const single = JSON.parse(buyNowString);
+          items = single ? [single] : [];
+        } else {
+          const parsed = cartString ? JSON.parse(cartString) : [];
+          items = Array.isArray(parsed) ? parsed.filter(i => i.checked) : [];
+        }
+        items = items.map(i => ({ ...i, discountAmount: i.discountAmount ?? 0 }));
+        setCart(items);
+        const cartTotal = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+        setTotal(cartTotal);
+      };
+      reload();
+      // Cleanup khi rời màn Checkout (ví dụ nhấn back): xoá trạng thái buy now tạm
+      return () => {
+        (async () => {
+          try {
+            const userString = await AsyncStorage.getItem('user');
+            const user = userString ? JSON.parse(userString) : null;
+            if (user && user._id) {
+              await AsyncStorage.removeItem(`buy_now_${user._id}`);
+            }
+          } catch {}
+        })();
+      };
+    }, [])
+  );
 
   // 🟢 Lấy danh sách categoryId trong cart
   const getCartCategoryIds = () => {
@@ -270,6 +323,11 @@ export default function CheckoutScreen() {
       await AsyncStorage.setItem(`cart_${user._id}`, JSON.stringify(remaining));
     } catch { }
 
+    // Nếu là buy now, dọn dẹp key tạm để không ảnh hưởng lần sau
+    try {
+      await AsyncStorage.removeItem(`buy_now_${user._id}`);
+    } catch {}
+
     // Reset voucher
     setAppliedVoucher(null);
     setVoucherDiscount(0);
@@ -335,9 +393,14 @@ export default function CheckoutScreen() {
               <Text style={{ color: '#333' }}>{addressObj.phone || '[Số điện thoại]'}</Text>
               <Text>{addressObj.address || '[Địa chỉ]'}</Text>
             </View>
-            <TouchableOpacity onPress={openAddressModal}>
-              <Text style={{ color: '#4084f4', fontWeight: 'bold' }}>Sửa</Text>
-            </TouchableOpacity>
+            <View style={{ alignItems: 'flex-end' }}>
+              <TouchableOpacity onPress={openAddressModal}>
+                <Text style={{ color: '#4084f4', fontWeight: 'bold' }}>Sửa</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/address-book')} style={{ marginTop: 6 }}>
+                <Text style={{ color: '#ff4757', fontWeight: 'bold' }}>Chọn</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

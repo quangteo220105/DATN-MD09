@@ -280,6 +280,31 @@ export default function ManagerDashboard() {
         }
     };
 
+    // 🟠 Dừng bán sản phẩm (ẩn sản phẩm ở phía người dùng)
+    const stopSellingProduct = async (productId) => {
+        const confirmed = window.confirm("Bạn có chắc muốn dừng bán sản phẩm này?");
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`http://localhost:3000/api/products/${productId}/toggle-status`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isActive: false })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                alert("✅ Đã dừng bán sản phẩm.");
+                fetchProducts();
+            } else {
+                alert(data.message || "❌ Không thể dừng bán sản phẩm!");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("❌ Lỗi kết nối server!");
+        }
+    };
+
     return (
         <div style={styles.page}>
             <div style={styles.mainContent}>
@@ -345,11 +370,20 @@ export default function ManagerDashboard() {
                                             {minPrice > 0 ? `${minPrice.toLocaleString()} ₫` : "—"}
                                         </td>
                                         <td style={styles.td}>
-                                            {totalStock > 0 ? (p.isActive ? "Còn hàng" : "Ngừng kinh doanh") : "Hết hàng"}
+                                            {(() => {
+                                                const label = totalStock > 0 ? (p.isActive ? "Còn hàng" : "Ngừng kinh doanh") : "Hết hàng";
+                                                const style = label === "Còn hàng"
+                                                    ? { ...styles.statusBadge, ...styles.badgeInStock }
+                                                    : label === "Hết hàng"
+                                                        ? { ...styles.statusBadge, ...styles.badgeOutOfStock }
+                                                        : { ...styles.statusBadge, ...styles.badgeInactive };
+                                                return <span style={style}>{label}</span>;
+                                            })()}
                                         </td>
 
                                         <td style={styles.td}>
                                             <button style={styles.editBtn} onClick={() => handleEditClick(p)}>Sửa</button>
+                                            <button style={styles.stopBtn} onClick={() => stopSellingProduct(p._id)}>Dừng bán</button>
                                         </td>
                                     </tr>
                                 );
@@ -428,15 +462,26 @@ export default function ManagerDashboard() {
                                 <div key={index} style={styles.variantCard}>
                                     <div style={styles.variantHeader}>
                                         <h5>Biến thể {index + 1}</h5>
-                                        {formProduct.variants.length > 1 && (
+                                        <div style={styles.variantHeaderActions}>
                                             <button
                                                 type="button"
-                                                style={styles.removeVariantBtn}
-                                                onClick={() => removeVariant(index)}
+                                                style={styles.addInlineBtn}
+                                                onClick={addVariant}
+                                                title="Thêm biến thể"
                                             >
-                                                ×
+                                                +
                                             </button>
-                                        )}
+                                            {formProduct.variants.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    style={styles.removeVariantBtn}
+                                                    onClick={() => removeVariant(index)}
+                                                    title="Xóa biến thể này"
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div style={styles.variantRow}>
@@ -594,11 +639,46 @@ const styles = {
     editBtn: {
         backgroundColor: "#007bff",
         border: "none",
-        padding: "4px 10px",
+        padding: "6px 14px",
         marginRight: 6,
         borderRadius: 6,
         color: "#fff",
         cursor: "pointer",
+        minWidth: 96,
+        fontWeight: 600,
+    },
+    stopBtn: {
+        backgroundColor: "#f59e0b",
+        border: "none",
+        padding: "6px 14px",
+        borderRadius: 6,
+        color: "#fff",
+        cursor: "pointer",
+        minWidth: 96,
+        fontWeight: 600,
+    },
+    statusBadge: {
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 9999,
+        fontSize: 12,
+        fontWeight: 600,
+        border: "1px solid transparent",
+    },
+    badgeInStock: {
+        backgroundColor: "#dcfce7",
+        color: "#065f46",
+        borderColor: "#86efac",
+    },
+    badgeOutOfStock: {
+        backgroundColor: "#fee2e2",
+        color: "#991b1b",
+        borderColor: "#fca5a5",
+    },
+    badgeInactive: {
+        backgroundColor: "#e5e7eb",
+        color: "#374151",
+        borderColor: "#d1d5db",
     },
     modalOverlay: {
         position: "fixed",
@@ -663,8 +743,26 @@ const styles = {
         alignItems: "center",
         marginBottom: 12,
     },
+    variantHeaderActions: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+    },
     removeVariantBtn: {
         backgroundColor: "#ef4444",
+        color: "#fff",
+        border: "none",
+        borderRadius: "50%",
+        width: 24,
+        height: 24,
+        cursor: "pointer",
+        fontSize: 16,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    addInlineBtn: {
+        backgroundColor: "#10b981",
         color: "#fff",
         border: "none",
         borderRadius: "50%",

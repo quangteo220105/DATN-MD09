@@ -15,7 +15,7 @@ export default function SettingsScreen() {
         try {
             const u = await AsyncStorage.getItem('user');
             if (u) setUser(JSON.parse(u));
-        } catch {}
+        } catch { }
     };
 
     useEffect(() => {
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
             <View style={{ padding: 16 }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={styles.profileCard}
                     onPress={() => router.push('/profile')}
                     activeOpacity={0.7}
@@ -64,7 +64,7 @@ export default function SettingsScreen() {
 
                 <View style={styles.section}>
                     <SettingsItem icon="key-outline" title="Đổi mật khẩu" onPress={handleOpenChangePassword} />
-                    <SettingsItem icon="chatbubbles-outline" title="Chat với Admin" onPress={() => router.push('/chat')} />
+                    <SettingsItem icon="chatbubbles-outline" title="Hỗ trợ tư vấn" onPress={() => router.push('/chat')} />
                     <SettingsItem icon="cube-outline" title="Đơn hàng của tôi" onPress={() => router.push('/orders')} />
                 </View>
 
@@ -74,7 +74,7 @@ export default function SettingsScreen() {
             </View>
 
             {/* Dialog đổi mật khẩu */}
-            <ChangePasswordDialog 
+            <ChangePasswordDialog
                 visible={showChangePassword}
                 onClose={() => setShowChangePassword(false)}
                 userId={user?.id || user?._id}

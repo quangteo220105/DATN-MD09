@@ -86,6 +86,16 @@ export default function HomeScreen() {
         React.useCallback(() => {
             console.log('Home screen focused, fetching user data...');
             fetchUser();
+            // Dọn dẹp trạng thái buy now (nếu còn) khi quay về Home
+            (async () => {
+                try {
+                    const userStr = await AsyncStorage.getItem('user');
+                    const u = userStr ? JSON.parse(userStr) : null;
+                    if (u && u._id) {
+                        await AsyncStorage.removeItem(`buy_now_${u._id}`);
+                    }
+                } catch {}
+            })();
         }, [])
     );
 
