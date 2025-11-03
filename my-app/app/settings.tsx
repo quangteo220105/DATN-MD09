@@ -15,11 +15,10 @@ export default function SettingsScreen() {
         try {
             const u = await AsyncStorage.getItem('user');
             if (u) setUser(JSON.parse(u));
-        } catch {}
+        } catch { }
     };
 
     useEffect(() => {
-<<<<<<< HEAD
         const load = async () => {
             try {
                 const u = await AsyncStorage.getItem('user');
@@ -27,9 +26,7 @@ export default function SettingsScreen() {
             } catch { }
         };
         load();
-=======
         loadUser();
->>>>>>> origin/PhungMinhHuy/ph52365
     }, []);
 
     // Cập nhật user data khi màn hình được focus (quay lại từ profile)
@@ -53,7 +50,7 @@ export default function SettingsScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
             <View style={{ padding: 16 }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={styles.profileCard}
                     onPress={() => router.push('/profile')}
                     activeOpacity={0.7}
@@ -73,13 +70,10 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.section}>
-<<<<<<< HEAD
                     <SettingsItem icon="key-outline" title="Đổi mật khẩu" onPress={() => Alert.alert('Thông báo', 'Tính năng sẽ có sớm.')} />
                     <SettingsItem icon="chatbubbles-outline" title="Hỗ trợ" onPress={() => router.push('/chat')} />
-=======
                     <SettingsItem icon="key-outline" title="Đổi mật khẩu" onPress={handleOpenChangePassword} />
                     <SettingsItem icon="chatbubbles-outline" title="Chat với Admin" onPress={() => router.push('/chat')} />
->>>>>>> origin/PhungMinhHuy/ph52365
                     <SettingsItem icon="cube-outline" title="Đơn hàng của tôi" onPress={() => router.push('/orders')} />
                 </View>
 
@@ -89,7 +83,7 @@ export default function SettingsScreen() {
             </View>
 
             {/* Dialog đổi mật khẩu */}
-            <ChangePasswordDialog 
+            <ChangePasswordDialog
                 visible={showChangePassword}
                 onClose={() => setShowChangePassword(false)}
                 userId={user?.id || user?._id}

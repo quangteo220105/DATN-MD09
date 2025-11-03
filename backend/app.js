@@ -46,6 +46,9 @@ app.use("/api/banners", bannerRoutes);
 app.use("/api/products", shoesRoutes);
 app.use('/api/users', userRoutes); // 🆕 danh sách người dùng
 app.use('/api/orders', orderRoutes);
+app.use('/api/reviews', reviewRoutes); // 🆕 đánh giá
+app.use('/api/vouchers', voucherRoutes); // 🆕 vouchers
+app.use('/api/messages', messageRoutes);
 app.use('/images', express.static(path.join(__dirname, 'public/images'))); // public/images → /images
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
