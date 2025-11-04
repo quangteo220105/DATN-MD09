@@ -64,12 +64,8 @@ export default function SettingsScreen() {
 
                 <View style={styles.section}>
                     <SettingsItem icon="key-outline" title="Đổi mật khẩu" onPress={handleOpenChangePassword} />
- Updated upstream
-                    <SettingsItem icon="chatbubbles-outline" title="Hỗ trợ tư vấn" onPress={() => router.push('/chat')} />
-=======
                     <SettingsItem icon="chatbubbles-outline" title="Chat với Admin" onPress={() => router.push('/chat')} />
                     <SettingsItem icon="sparkles-outline" title="Chat với AI tư vấn" onPress={() => router.push('/chatAI')} />
- Stashed changes
                     <SettingsItem icon="cube-outline" title="Đơn hàng của tôi" onPress={() => router.push('/orders')} />
                 </View>
 

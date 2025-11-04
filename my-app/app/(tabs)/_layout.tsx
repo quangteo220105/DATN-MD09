@@ -42,6 +42,7 @@ export default function TabLayout() {
         }}
       />
 
+
       {/* --- Màn hình Explore --- */}
       <Tabs.Screen
         name="explore"
