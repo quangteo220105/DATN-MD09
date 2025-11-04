@@ -83,9 +83,6 @@ export default function ChatScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Chat với Admin</Text>
-            </View>
 
             <ScrollView
                 ref={scrollViewRef}

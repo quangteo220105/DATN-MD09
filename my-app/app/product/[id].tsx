@@ -281,10 +281,6 @@ export default function ProductDetailScreen() {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="#222" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Chi tiết sản phẩm</Text>
                 <TouchableOpacity style={styles.headerBtn} onPress={toggleFavorite}>
                     <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#ff4757' : '#222'} />
                 </TouchableOpacity>

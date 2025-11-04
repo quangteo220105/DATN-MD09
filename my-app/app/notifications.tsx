@@ -32,7 +32,7 @@ export default function NotificationsScreen() {
                 setUserId(id);
                 return id;
             }
-        } catch {}
+        } catch { }
         setUserId(null);
         return null;
     };
@@ -111,7 +111,7 @@ export default function NotificationsScreen() {
         React.useCallback(() => {
             (async () => {
                 // Cập nhật mốc đã xem thông báo để tính voucher mới
-                try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch {}
+                try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch { }
                 await refresh();
             })();
         }, [userId])
@@ -124,7 +124,7 @@ export default function NotificationsScreen() {
                 if (uid) {
                     await axios.put(`${BASE_URL}/messages/read-all/${uid}`);
                 }
-            } catch {}
+            } catch { }
             router.push('/chat');
             return;
         }
@@ -152,7 +152,6 @@ export default function NotificationsScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
             <View style={{ padding: 16 }}>
-                <Text style={styles.pageTitle}>Thông báo</Text>
                 {notifications.length === 0 ? (
                     <View style={styles.empty}>
                         <Ionicons name="notifications-off-outline" size={42} color="#bbb" />
