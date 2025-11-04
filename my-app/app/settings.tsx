@@ -64,8 +64,20 @@ export default function SettingsScreen() {
 
                 <View style={styles.section}>
                     <SettingsItem icon="key-outline" title="Đổi mật khẩu" onPress={handleOpenChangePassword} />
+<<<<<<< HEAD
                     <SettingsItem icon="chatbubbles-outline" title="Chat với Admin" onPress={() => router.push('/chat')} />
                     <SettingsItem icon="sparkles-outline" title="Chat với AI tư vấn" onPress={() => router.push('/chatAI')} />
+=======
+                    <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                        <View style={{ backgroundColor: '#e6f7ff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#bae7ff' }}>
+                            <Text style={{ color: '#0958d9', fontSize: 13 }}>
+                                Lưu ý: Mật khẩu mới cần tối thiểu 6 ký tự và khác mật khẩu cũ.
+                            </Text>
+                        </View>
+                    </View>
+                    <SettingsItem icon="notifications-outline" title="Thông báo" onPress={() => router.push('/notifications')} />
+                    <SettingsItem icon="chatbubbles-outline" title="Hỗ trợ tư vấn" onPress={() => router.push('/chat')} />
+>>>>>>> 79943307c77f75f1d4216d4c890c69b3a8cbedcc
                     <SettingsItem icon="cube-outline" title="Đơn hàng của tôi" onPress={() => router.push('/orders')} />
                 </View>
 

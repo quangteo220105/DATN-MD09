@@ -13,7 +13,7 @@ export default function Vouchers() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    
+
     const [formData, setFormData] = useState({
         code: "",
         name: "",
@@ -103,8 +103,8 @@ export default function Vouchers() {
             discountValue: record.discountValue,
             minOrderAmount: record.minOrderAmount,
             maxDiscountAmount: record.maxDiscountAmount || "",
-            categoryIds: record.categoryIds && record.categoryIds.length > 0 
-                ? record.categoryIds.map(id => String(id)) 
+            categoryIds: record.categoryIds && record.categoryIds.length > 0
+                ? record.categoryIds.map(id => String(id))
                 : [],
             quantity: record.quantity,
             startDate: dayjs(record.startDate),
@@ -122,19 +122,19 @@ export default function Vouchers() {
 
         try {
             setLoading(true);
-            
+
             // Đảm bảo categoryIds luôn là array
-            const categoryIdsArray = Array.isArray(formData.categoryIds) && formData.categoryIds.length > 0 
+            const categoryIdsArray = Array.isArray(formData.categoryIds) && formData.categoryIds.length > 0
                 ? formData.categoryIds.filter(id => id) // Loại bỏ giá trị null/undefined
                 : [];
-            
+
             console.log('Submitting data:', {
                 ...formData,
                 categoryIds: categoryIdsArray,
                 categoryIdsType: typeof formData.categoryIds,
                 categoryIdsLength: formData.categoryIds?.length
             });
-            
+
             // Đảm bảo tất cả giá trị đều có giá trị hợp lệ
             const data = {
                 code: String(formData.code).trim().toUpperCase(),
@@ -150,20 +150,20 @@ export default function Vouchers() {
                 endDate: formData.endDate.format('YYYY-MM-DD HH:mm:ss'),
                 isActive: formData.isActive !== undefined ? Boolean(formData.isActive) : true
             };
-            
+
             // Đảm bảo categoryIds luôn là array khi gửi
             if (!Array.isArray(data.categoryIds)) {
                 data.categoryIds = [];
             }
 
             console.log('Final data being sent:', JSON.stringify(data, null, 2));
-            
+
             let response;
             if (editingId) {
                 response = await axios.put(`${API_URL}/${editingId}`, data);
                 console.log('Update response:', response.data);
                 console.log('Updated voucher categoryIds:', response.data.voucher?.categoryIds);
-                
+
                 // Kiểm tra xem categoryIds có được trả về không
                 if (response.data.voucher) {
                     console.log('Voucher sau update:', {
@@ -174,14 +174,14 @@ export default function Vouchers() {
                         isArray: Array.isArray(response.data.voucher.categoryIds)
                     });
                 }
-                
+
                 message.success("Cập nhật voucher thành công!");
             } else {
                 response = await axios.post(API_URL, data);
                 console.log('Create response:', response.data);
                 message.success("Thêm voucher thành công!");
             }
-            
+
             // Reset form data trước khi đóng modal
             setFormData({
                 code: "",
@@ -197,23 +197,23 @@ export default function Vouchers() {
                 endDate: null,
                 isActive: true
             });
-            
+
             // Đóng modal và refresh danh sách
             setIsModalOpen(false);
             setEditingId(null);
-            
+
             // Refresh danh sách voucher ngay lập tức
             await fetchVouchers();
-            
+
             console.log('✅ Voucher operation completed successfully');
         } catch (error) {
             console.error('Error in handleAdd:', error);
             console.error('Error response:', error.response?.data);
             console.error('Error status:', error.response?.status);
-            
+
             // Đảm bảo loading state được reset
             setLoading(false);
-            
+
             // Đảm bảo modal vẫn mở nếu có lỗi để user có thể sửa
             if (!error.response) {
                 message.error("Không thể kết nối đến server!");
@@ -508,15 +508,15 @@ export default function Vouchers() {
                             key={`category-select-${editingId || 'new'}-${isModalOpen}`}
                             mode="multiple"
                             value={(() => {
-                                const ids = Array.isArray(formData.categoryIds) 
-                                    ? formData.categoryIds.map(id => String(id)).filter(id => id) 
+                                const ids = Array.isArray(formData.categoryIds)
+                                    ? formData.categoryIds.map(id => String(id)).filter(id => id)
                                     : [];
                                 console.log('Select value rendered:', ids);
                                 return ids;
                             })()}
                             onChange={(value) => {
                                 console.log('CategoryIds onChange triggered:', value);
-                                const cleanValue = Array.isArray(value) 
+                                const cleanValue = Array.isArray(value)
                                     ? value.filter(v => v !== null && v !== undefined && v !== '').map(v => String(v))
                                     : [];
                                 console.log('CategoryIds cleaned:', cleanValue);

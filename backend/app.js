@@ -14,6 +14,8 @@ var shoesRoutes = require("./routes/shoesRoutes"); // 👈 router sản phẩm
 var userRoutes = require('./routes/userRoutes'); // 🆕 user routes
 var orderRoutes = require('./routes/orderRoutes');
 var messageRoutes = require('./routes/messageRoutes');
+var reviewRoutes = require('./routes/reviewRoutes');
+var voucherRoutes = require('./routes/voucherRoutes');
 
 var database = require('./config/db');
 
@@ -45,6 +47,8 @@ app.use("/api/products", shoesRoutes);
 app.use('/api/users', userRoutes); // 🆕 danh sách người dùng
 app.use('/api/orders', orderRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/vouchers', voucherRoutes);
 app.use('/images', express.static(path.join(__dirname, 'public/images'))); // public/images → /images
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
