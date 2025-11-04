@@ -23,6 +23,7 @@ export default function RootLayout() {
         <Stack.Screen name="review/[id]" options={{ title: 'Đánh giá đơn hàng' }} />
         <Stack.Screen name="settings" options={{ title: 'Cài đặt' }} />
         <Stack.Screen name="chat" options={{ title: 'Chat với Admin' }} />
+        <Stack.Screen name="chatAI" options={{ title: 'Tư vấn mua hàng (AI)' }} />
         <Stack.Screen name="changePassword" options={{ title: 'Đổi mật khẩu' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>

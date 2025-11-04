@@ -93,12 +93,7 @@ const ChangePasswordScreen = () => {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => router.back()}
-                    >
-                        <Ionicons name="arrow-back" size={24} color="#222" />
-                    </TouchableOpacity>
+                    <View style={{ width: 40 }} />
                     <Text style={styles.headerTitle}>Đổi mật khẩu</Text>
                     <View style={{ width: 40 }} />
                 </View>
