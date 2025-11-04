@@ -154,32 +154,32 @@ export default function Reviews() {
             <form onSubmit={onSearch} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <input
                     value={query}
-                    onChange={e => { 
-                        const v = e.target.value; 
-                        setQuery(v); 
-                        if (v.trim() === '' && rating === '') { 
-                            setPage(1); 
-                            fetchReviews({ q: '', rating: '', page: 1 }); 
-                        } 
+                    onChange={e => {
+                        const v = e.target.value;
+                        setQuery(v);
+                        if (v.trim() === '' && rating === '') {
+                            setPage(1);
+                            fetchReviews({ q: '', rating: '', page: 1 });
+                        }
                     }}
                     placeholder="Tìm theo tên khách hàng, mã đơn, bình luận..."
                     style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid #ddd', minWidth: 280, flex: 1 }}
                 />
-                <select 
-                    value={rating} 
-                    onChange={e => { 
-                        const rt = e.target.value; 
-                        setRating(rt); 
-                        setPage(1); 
-                    }} 
+                <select
+                    value={rating}
+                    onChange={e => {
+                        const rt = e.target.value;
+                        setRating(rt);
+                        setPage(1);
+                    }}
                     style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid #ddd', minWidth: 150 }}
                 >
                     {RATING_OPTIONS.map(r => (
                         <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                 </select>
-                <button 
-                    type="submit" 
+                <button
+                    type="submit"
                     style={{ padding: '8px 12px', border: 'none', background: '#1677ff', color: '#fff', borderRadius: 6, cursor: 'pointer' }}
                 >
                     Tìm kiếm
@@ -213,7 +213,7 @@ export default function Reviews() {
                                     const orderId = r.orderId?.code || r.orderId?._id || r.orderId || '—';
                                     const products = (r.items || []).slice(0, 2).map((it, idx) => it.name).join(', ');
                                     const moreProducts = (r.items || []).length > 2 ? ` +${(r.items || []).length - 2} sản phẩm khác` : '';
-                                    
+
                                     return (
                                         <tr key={r._id || r.id}>
                                             <td style={td}>
@@ -266,12 +266,12 @@ export default function Reviews() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderTop: '1px solid #eee' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span>Hiển thị</span>
-                        <select 
-                            value={pageSize} 
-                            onChange={e => { 
-                                setPageSize(Number(e.target.value)); 
-                                setPage(1); 
-                            }} 
+                        <select
+                            value={pageSize}
+                            onChange={e => {
+                                setPageSize(Number(e.target.value));
+                                setPage(1);
+                            }}
                             style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd' }}
                         >
                             {pageSizeOptions.map(n => <option key={n} value={n}>{n}</option>)}
@@ -279,17 +279,17 @@ export default function Reviews() {
                         <span>bản ghi/trang</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button 
-                            disabled={page <= 1} 
-                            onClick={() => setPage(p => Math.max(1, p - 1))} 
+                        <button
+                            disabled={page <= 1}
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
                             style={pagerBtn}
                         >
                             &lt;
                         </button>
                         <span>{page}/{totalPages}</span>
-                        <button 
-                            disabled={page >= totalPages} 
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                        <button
+                            disabled={page >= totalPages}
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             style={pagerBtn}
                         >
                             &gt;

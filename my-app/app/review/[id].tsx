@@ -21,7 +21,7 @@ export default function ReviewScreen() {
                 router.replace('/(tabs)/login');
                 return;
             }
-            
+
             // Ưu tiên lấy từ backend để có _id chính xác
             try {
                 const res = await fetch(`${BASE_URL}/orders/${id}`);
@@ -35,7 +35,7 @@ export default function ReviewScreen() {
             } catch (e) {
                 console.log('Fetch from backend failed, trying local:', e);
             }
-            
+
             // Fallback: lấy từ local storage
             const historyKey = `order_history_${user._id}`;
             const historyString = await AsyncStorage.getItem(historyKey);
@@ -93,7 +93,7 @@ export default function ReviewScreen() {
                 });
 
                 const responseData = await res.json();
-                
+
                 if (res.ok) {
                     // Lưu local để đảm bảo (với cả id và _id)
                     const reviewDataWithTime = {
@@ -102,12 +102,12 @@ export default function ReviewScreen() {
                     };
                     const reviewKey1 = `review_${user._id}_${id}`;
                     await AsyncStorage.setItem(reviewKey1, JSON.stringify(reviewDataWithTime));
-                    
+
                     if (backendOrderId !== id) {
                         const reviewKey2 = `review_${user._id}_${backendOrderId}`;
                         await AsyncStorage.setItem(reviewKey2, JSON.stringify(reviewDataWithTime));
                     }
-                    
+
                     Alert.alert('Thành công', 'Cảm ơn bạn đã đánh giá!', [
                         { text: 'OK', onPress: () => router.back() }
                     ]);
@@ -148,7 +148,7 @@ export default function ReviewScreen() {
 
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Đánh giá của bạn</Text>
-                            
+
                             {/* Rating Stars */}
                             <View style={styles.ratingContainer}>
                                 <Text style={styles.ratingLabel}>Điểm đánh giá: {rating > 0 ? `${rating}/5` : '(Chưa chọn)'}</Text>

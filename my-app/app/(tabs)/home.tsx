@@ -48,6 +48,7 @@ export default function HomeScreen() {
     const [user, setUser] = useState<any>(null);
     const [productRatings, setProductRatings] = useState<{ [key: string]: { averageRating: number; totalReviews: number } }>({});
     const [loadingRatings, setLoadingRatings] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
     const bannerRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showOutOfStockDialog, setShowOutOfStockDialog] = useState(false);
@@ -257,7 +258,7 @@ export default function HomeScreen() {
     // Pull to refresh
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([fetchBanners(), fetchProducts(), fetchUser(), fetchCategories()]);
+    await Promise.all([fetchBanners(), fetchProducts(), fetchUser(), fetchCategories(), refreshNotifCount()]);
         // Ratings sẽ tự động fetch khi products thay đổi (useEffect)
         setRefreshing(false);
     };
@@ -471,6 +472,59 @@ export default function HomeScreen() {
         );
     };
 
+  // ===== Notifications (badge on bell) =====
+  const sevenDaysMs = 7 * 24 * 3600 * 1000;
+  const fetchVoucherNewCount = async (): Promise<number> => {
+    try {
+      // lấy mốc đã xem thông báo gần nhất
+      let lastSeenMs = 0;
+      try {
+        const lastSeen = await AsyncStorage.getItem('notifications_last_seen');
+        if (lastSeen) lastSeenMs = new Date(lastSeen).getTime();
+      } catch {}
+      const res = await axios.get(`${BASE_URL}/vouchers`);
+      const list = Array.isArray(res.data) ? res.data : [];
+      const now = Date.now();
+      // Count voucher đang hoạt động và mới hơn mốc đã xem
+      const count = list.filter((v: any) => {
+        const startOk = v.startDate ? new Date(v.startDate).getTime() <= now : true;
+        const endOk = v.endDate ? new Date(v.endDate).getTime() >= now : true;
+        const quantityOk = typeof v.quantity === 'number' && typeof v.usedCount === 'number' ? v.usedCount < v.quantity : true;
+        const isActive = v.isActive !== false;
+        const createdAtMs = v.createdAt ? new Date(v.createdAt).getTime() : 0;
+        const isNew = createdAtMs && createdAtMs > (lastSeenMs || (now - sevenDaysMs));
+        return startOk && endOk && quantityOk && isActive && isNew;
+      }).length;
+      return count;
+    } catch {
+      return 0;
+    }
+  };
+
+  const fetchChatUnreadCount = async (): Promise<number> => {
+    try {
+      const userStr = await AsyncStorage.getItem('user');
+      const u = userStr ? JSON.parse(userStr) : null;
+      const uid = u?._id || u?.id;
+      if (!uid) return 0;
+      const res = await axios.get(`${BASE_URL}/messages/unread/${uid}`);
+      return res?.data?.count || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const refreshNotifCount = async () => {
+    const [vCount, cCount] = await Promise.all([fetchVoucherNewCount(), fetchChatUnreadCount()]);
+    setNotifCount(vCount + cCount);
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshNotifCount();
+    }, [])
+  );
+
     return (
         <View style={styles.container}>
             <FlatList
@@ -512,8 +566,20 @@ export default function HomeScreen() {
                                         <Text style={styles.greetName}>{user?.name || "Guest"}</Text>
                                     </View>
                                 </View>
-                                <TouchableOpacity style={styles.bellBtn}>
+                                <TouchableOpacity
+                                    style={styles.bellBtn}
+                                    onPress={async () => {
+                                        try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch {}
+                                        setNotifCount(0);
+                                        router.push('/notifications');
+                                    }}
+                                >
                                     <Ionicons name="notifications-outline" size={22} color="#222" />
+                                    {notifCount > 0 && (
+                                        <View style={styles.bellBadge}>
+                                            <Text style={styles.bellBadgeText}>{notifCount > 99 ? '99+' : notifCount}</Text>
+                                        </View>
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -728,7 +794,27 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 2,
-        elevation: 2
+        elevation: 2,
+        position: 'relative'
+    },
+    bellBadge: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        minWidth: 16,
+        height: 16,
+        paddingHorizontal: 3,
+        borderRadius: 8,
+        backgroundColor: '#ef4444',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#fff'
+    },
+    bellBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700'
     },
     searchSection: {
         paddingHorizontal: 20,
