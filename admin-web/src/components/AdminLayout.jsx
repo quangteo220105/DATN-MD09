@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
     DashboardOutlined,
+    HomeOutlined,
     ShopOutlined,
     AppstoreOutlined,
     PictureOutlined, // 🆕 icon banner
@@ -19,6 +20,7 @@ import Orders from "./Orders";
 import ChatManager from "./ChatManager";
 import Reviews from "./Reviews";
 import Vouchers from "./Vouchers";
+import Analytics from "./Analytics";
 
 export default function AdminLayout({ onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -27,6 +29,8 @@ export default function AdminLayout({ onLogout }) {
         switch (activeTab) {
             case "dashboard":
                 return <Dashboard />;
+            case "analytics":
+                return <Analytics />;
             case "products":
                 return <Product />;
             case "categories":
@@ -67,6 +71,20 @@ export default function AdminLayout({ onLogout }) {
                     }}
                     onClick={() => setActiveTab("dashboard")}
                     title="Dashboard"
+                >
+                    <HomeOutlined />
+                </div>
+
+                {/* Analytics */}
+                <div
+                    style={{
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        color: activeTab === "analytics" ? "#ff8000" : "#fff",
+                        fontSize: 24,
+                    }}
+                    onClick={() => setActiveTab("analytics")}
+                    title="Thống kê doanh thu"
                 >
                     <DashboardOutlined />
                 </div>

@@ -73,6 +73,7 @@ export default function SettingsScreen() {
                     </View>
                     <SettingsItem icon="notifications-outline" title="Thông báo" onPress={() => router.push('/notifications')} />
                     <SettingsItem icon="chatbubbles-outline" title="Hỗ trợ tư vấn" onPress={() => router.push('/chat')} />
+                    <SettingsItem icon="sparkles-outline" title="Chat với AI tư vấn" onPress={() => router.push('/chatAI')} />
                     <SettingsItem icon="cube-outline" title="Đơn hàng của tôi" onPress={() => router.push('/orders')} />
                 </View>
 

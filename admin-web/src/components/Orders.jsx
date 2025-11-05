@@ -178,11 +178,27 @@ export default function Orders() {
                             ) : (
                                 orders.map((o) => {
                                     const createdAt = o.createdAt ? new Date(o.createdAt).toLocaleString() : '';
+                                    // Parse tên từ địa chỉ nhận hàng (format: "Tên - Số điện thoại\nĐịa chỉ")
+                                    let shippingName = '';
+                                    let shippingPhone = '';
+                                    if (o.address) {
+                                        const parts = o.address.split(' - ');
+                                        if (parts.length > 0) {
+                                            shippingName = parts[0].trim();
+                                            if (parts.length > 1) {
+                                                const phoneAndAddress = parts[1];
+                                                const phoneMatch = phoneAndAddress.match(/^([^\n]+)/);
+                                                if (phoneMatch) shippingPhone = phoneMatch[1].trim();
+                                            }
+                                        }
+                                    }
+                                    const displayName = shippingName || o.customerName || o.name || '—';
+                                    const displayPhone = shippingPhone || o.customerPhone || o.phone || '';
                                     return (
                                         <tr key={o._id || o.id}>
                                             <td style={td}>{o.code || o._id || o.id}</td>
                                             <td style={td}>{createdAt}</td>
-                                            <td style={td}>{o.customerName || o.name || '—'}<div style={{ color: '#888', fontSize: 12 }}>{o.customerPhone || o.phone || ''}</div></td>
+                                            <td style={td}>{displayName}<div style={{ color: '#888', fontSize: 12 }}>{displayPhone}</div></td>
                                             <td style={td}>{(o.total || 0).toLocaleString('vi-VN')} VND</td>
                                             <td style={td}>
                                                 <select value={o.status || ''} onChange={e => updateStatus(o._id || o.id, e.target.value)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
@@ -238,9 +254,31 @@ export default function Orders() {
                                 <div><strong>Trạng thái:</strong> {selected.status}</div>
                             </div>
                             <div>
-                                <div><strong>Tên khách hàng:</strong> {selected.customerName || selected.name || '—'}</div>
-                                <div><strong>Điện thoại:</strong> {selected.customerPhone || selected.phone || '—'}</div>
-                                <div><strong>Địa chỉ:</strong> {selected.address || '—'}</div>
+                                {(() => {
+                                    // Parse tên từ địa chỉ nhận hàng
+                                    let shippingName = '';
+                                    let shippingPhone = '';
+                                    if (selected.address) {
+                                        const parts = selected.address.split(' - ');
+                                        if (parts.length > 0) {
+                                            shippingName = parts[0].trim();
+                                            if (parts.length > 1) {
+                                                const phoneAndAddress = parts[1];
+                                                const phoneMatch = phoneAndAddress.match(/^([^\n]+)/);
+                                                if (phoneMatch) shippingPhone = phoneMatch[1].trim();
+                                            }
+                                        }
+                                    }
+                                    const displayName = shippingName || selected.customerName || selected.name || '—';
+                                    const displayPhone = shippingPhone || selected.customerPhone || selected.phone || '—';
+                                    return (
+                                        <>
+                                            <div><strong>Tên khách hàng:</strong> {displayName}</div>
+                                            <div><strong>Điện thoại:</strong> {displayPhone}</div>
+                                            <div><strong>Địa chỉ:</strong> {selected.address || '—'}</div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                         <div style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>

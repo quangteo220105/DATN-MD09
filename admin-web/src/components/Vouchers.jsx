@@ -378,7 +378,7 @@ export default function Vouchers() {
 
     return (
         <div style={{ padding: 24 }}>
-            <h2>Quản lý Voucher / Mã giảm giá</h2>
+            <h2>Quản lý Voucher</h2>
 
             <Button
                 type="primary"

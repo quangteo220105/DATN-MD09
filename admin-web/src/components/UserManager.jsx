@@ -115,7 +115,7 @@ export default function UserManager() {
         <div style={{ background: "#fff", borderRadius: 16, padding: 22, boxShadow: "0 6px 18px rgba(0,0,0,0.06)" }}>
             <h2 style={{ display: 'flex', alignItems: 'center', margin: 0 }}>
                 <i className="fa fa-users" style={{ color: "#501fcb", marginRight: 12 }} />
-                Danh sách khách hàng đã đăng ký
+                Quản lý tài khoản khách hàng
             </h2>
             {error && <div style={{ color: "#ef4444", marginTop: 8 }}>{error}</div>}
             {false && debugInfo && (

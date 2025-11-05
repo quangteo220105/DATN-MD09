@@ -23,7 +23,10 @@ export default function RootLayout() {
         <Stack.Screen name="order/[id]" options={{ title: 'Chi tiết đơn hàng' }} />
         <Stack.Screen name="review/[id]" options={{ title: 'Đánh giá đơn hàng' }} />
         <Stack.Screen name="settings" options={{ title: 'Cài đặt' }} />
+        <Stack.Screen name="profile" options={{ title: '' }} />
         <Stack.Screen name="chat" options={{ title: 'Hỗ trợ tư vấn' }} />
+        <Stack.Screen name="chatAI" options={{ title: 'Tư vấn mua hàng (AI)' }} />
+        <Stack.Screen name="favorites" options={{ title: 'Yêu thích' }} />
         <Stack.Screen name="changePassword" options={{ title: 'Đổi mật khẩu' }} />
         <Stack.Screen name="notifications" options={{ title: 'Thông báo' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />

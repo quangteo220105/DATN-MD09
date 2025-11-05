@@ -16,6 +16,7 @@ var orderRoutes = require('./routes/orderRoutes');
 var messageRoutes = require('./routes/messageRoutes');
 var reviewRoutes = require('./routes/reviewRoutes');
 var voucherRoutes = require('./routes/voucherRoutes');
+var analyticsRoutes = require('./routes/analyticsRoutes');
 
 var database = require('./config/db');
 
@@ -49,6 +50,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/vouchers', voucherRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/images', express.static(path.join(__dirname, 'public/images'))); // public/images → /images
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 

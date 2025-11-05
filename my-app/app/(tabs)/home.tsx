@@ -103,20 +103,28 @@ export default function HomeScreen() {
 
 
     // Load favorites từ AsyncStorage
-    useEffect(() => {
-        const loadFavorites = async () => {
-            try {
-                const savedFavorites = await AsyncStorage.getItem('favorites');
-                if (savedFavorites) {
-                    const favoritesArray = JSON.parse(savedFavorites);
-                    setFavorites(new Set(favoritesArray));
-                }
-            } catch (error) {
-                console.log('Lỗi load favorites:', error);
+    const loadFavorites = async () => {
+        try {
+            const savedFavorites = await AsyncStorage.getItem('favorites');
+            if (savedFavorites) {
+                const favoritesArray = JSON.parse(savedFavorites);
+                setFavorites(new Set(favoritesArray));
             }
-        };
+        } catch (error) {
+            console.log('Lỗi load favorites:', error);
+        }
+    };
+
+    useEffect(() => {
         loadFavorites();
     }, []);
+
+    // ✅ Reload favorites mỗi khi Home screen được focus (để đồng bộ với favorites.tsx)
+    useFocusEffect(
+        React.useCallback(() => {
+            loadFavorites();
+        }, [])
+    );
 
     // Lấy danh mục
     const fetchCategories = async () => {
@@ -360,6 +368,7 @@ export default function HomeScreen() {
 
             return next;
         });
+        // Không điều hướng; chỉ lưu danh sách yêu thích. Người dùng mở qua tab tim.
     };
 
     const renderProduct = ({ item, index }: any) => {
@@ -697,10 +706,10 @@ export default function HomeScreen() {
             />
             {/* Bottom Nav */}
             <View style={styles.bottomNav}>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/home' as any)}>
                     <Ionicons name="home" size={22} color="black" />
                 </TouchableOpacity>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/favorites' as any)}>
                     <Ionicons name="heart-outline" size={22} color="gray" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => router.push('/(tabs)/cart')}>

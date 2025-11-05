@@ -91,7 +91,6 @@ const ChangePasswordScreen = () => {
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
                 {/* Tiêu đề */}
                 <View style={styles.headerContainer}>
                     <Text style={styles.title}>Quên mật khẩu?</Text>

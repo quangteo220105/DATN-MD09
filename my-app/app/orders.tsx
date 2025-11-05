@@ -355,7 +355,6 @@ export default function OrdersScreen() {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f8f9' }}>
             <View style={{ padding: 13 }}>
-                <Text style={{ fontSize: 21, fontWeight: 'bold', marginBottom: 9, color: '#222' }}>Đơn hàng của tôi</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
                     <View style={{ flexDirection: 'row' }}>
                         {tabs.map((t) => {
