@@ -105,11 +105,12 @@ router.patch('/:id/status', async (req, res) => {
 
     const ord = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
 
-    // Nếu đổi thành "Đã giao hàng" và trạng thái cũ không phải "Đã giao hàng" → trừ stock + tăng voucher usedCount
+    // Nếu đổi thành "Đã giao hàng" và trạng thái cũ không phải "Đã giao hàng" → trừ stock + tăng voucher usedCount + gửi tin nhắn
     if (status === 'Đã giao hàng' && oldOrder.status !== 'Đã giao hàng') {
       const { ProductVariant } = require('../model/Shoes');
       const Product = mongoose.model('Product');
       const Voucher = require('../model/Voucher');
+      const Message = require('../model/Message');
 
       if (ord.voucherCode) {
         const voucher = await Voucher.findOne({ code: ord.voucherCode.toUpperCase() });
@@ -150,6 +151,33 @@ router.patch('/:id/status', async (req, res) => {
         } catch (err) {
           console.error('Error reducing stock:', err);
         }
+      }
+
+      // Tự động gửi tin nhắn thông báo đơn hàng đã giao thành công
+      try {
+        const User = mongoose.model('User');
+        const user = await User.findById(ord.userId);
+        if (user) {
+          const adminId = 'admin_001';
+          const adminName = 'Admin';
+          const messageText = `Đơn hàng ${ord.code || ord._id} của bạn đã được giao thành công! Cảm ơn bạn đã mua sắm tại cửa hàng chúng tôi.`;
+          
+          const notificationMessage = new Message({
+            senderId: adminId,
+            senderName: adminName,
+            senderType: 'admin',
+            receiverId: String(user._id),
+            receiverName: user.name || 'Khách hàng',
+            message: messageText,
+            read: false
+          });
+          
+          await notificationMessage.save();
+          console.log(`✅ Đã gửi tin nhắn thông báo đơn hàng đã giao cho user ${user._id}`);
+        }
+      } catch (msgErr) {
+        console.error('Error sending delivery notification message:', msgErr);
+        // Không throw error để không ảnh hưởng đến việc cập nhật trạng thái đơn hàng
       }
     }
 

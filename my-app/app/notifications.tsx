@@ -6,7 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import { BASE_URL } from '../config/apiConfig';
 
-type NotificationType = 'voucher' | 'chat';
+type NotificationType = 'voucher' | 'chat' | 'order';
 
 interface AppNotification {
     id: string;
@@ -15,6 +15,20 @@ interface AppNotification {
     message: string;
     createdAt: string;
     read?: boolean;
+}
+
+function normalizeStatus(raw?: string) {
+    if (!raw) return 'Chờ xác nhận';
+    const s = String(raw).trim();
+    if (s === 'Đang xử lý' || s.toLowerCase() === 'pending') return 'Chờ xác nhận';
+    if (s.toLowerCase() === 'confirmed') return 'Đã xác nhận';
+    if (s.toLowerCase() === 'shipping' || s === 'Đang vận chuyển') return 'Đang giao hàng';
+    if (s.toLowerCase() === 'delivered') return 'Đã giao hàng';
+    if (s.toLowerCase() === 'cancelled' || s.toLowerCase() === 'canceled') return 'Đã hủy';
+    // Bao quát thêm các biến thể có dấu/không dấu
+    const lower = s.toLowerCase();
+    if (lower.includes('giao')) return 'Đã giao hàng';
+    return s;
 }
 
 export default function NotificationsScreen() {
@@ -66,12 +80,164 @@ export default function NotificationsScreen() {
         }
     };
 
+    const fetchOrderNotifications = async (uid: string | null): Promise<AppNotification[]> => {
+        if (!uid) return [];
+        try {
+            const res = await axios.get(`${BASE_URL}/orders/user/${uid}/list`);
+            // Backend trả về { data: [...], total: ... }
+            const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+            let source = Array.isArray(list) ? list : [];
+
+            // Fallback: nếu API trả rỗng, lấy từ lịch sử local
+            if (source.length === 0) {
+                try {
+                    const historyKey = `order_history_${uid}`;
+                    const historyStr = await AsyncStorage.getItem(historyKey);
+                    const history = historyStr ? JSON.parse(historyStr) : [];
+                    if (Array.isArray(history)) source = history;
+                } catch {}
+            }
+
+            // Debug: log để kiểm tra
+            console.log('[Notifications] Total orders:', source.length);
+            
+            // Lọc đơn hàng đã giao - kiểm tra kỹ hơn
+            const delivered = source.filter((o: any) => {
+                const rawStatus = String(o?.status || '').trim();
+                const normalized = normalizeStatus(rawStatus);
+                // Kiểm tra nhiều cách: normalized status, raw status, hoặc có chứa "giao hàng"
+                const isDelivered = normalized === 'Đã giao hàng' 
+                    || rawStatus === 'Đã giao hàng'
+                    || rawStatus.toLowerCase().includes('giao hàng')
+                    || rawStatus.toLowerCase() === 'delivered';
+                if (isDelivered) {
+                    console.log('[Notifications] Found delivered order:', o._id || o.id, 'Status:', rawStatus, 'Normalized:', normalized);
+                }
+                return isDelivered;
+            });
+
+            console.log('[Notifications] Delivered orders count:', delivered.length);
+
+            // Lấy danh sách đã thông báo (lưu dạng { orderId: lastNotifiedAt })
+            const notifiedKey = `delivered_notified_ids_${uid}`;
+            const existedStr = await AsyncStorage.getItem(notifiedKey);
+            let notifiedMap: Record<string, string> = {};
+            try {
+                const parsed = existedStr ? JSON.parse(existedStr) : {};
+                // Nếu là array cũ, chuyển sang object
+                if (Array.isArray(parsed)) {
+                    parsed.forEach((id: string) => {
+                        // Đặt mốc rất cũ để không chặn thông báo hiện tại
+                        notifiedMap[id] = '1970-01-01T00:00:00.000Z';
+                    });
+                } else if (typeof parsed === 'object') {
+                    notifiedMap = parsed;
+                }
+            } catch {}
+
+            console.log('[Notifications] Already notified IDs count:', Object.keys(notifiedMap).length);
+
+            // Chỉ lấy đơn hàng chưa thông báo HOẶC được cập nhật gần đây (trong 7 ngày)
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            
+            const newDelivered = delivered.filter((o: any) => {
+                const orderId = String(o._id || o.id);
+                const lastNotifiedAt = notifiedMap[orderId];
+                const isNew = !lastNotifiedAt;
+                
+                // Nếu đã thông báo trước đó, kiểm tra xem đơn hàng có được cập nhật gần đây không
+                let shouldNotify = isNew;
+                if (!isNew && o.updatedAt) {
+                    try {
+                        const updatedDate = new Date(o.updatedAt);
+                        const notifiedDate = new Date(lastNotifiedAt);
+                        // Nếu đơn hàng được cập nhật SAU lần thông báo cuối, và trong 7 ngày gần đây
+                        if (updatedDate > notifiedDate && updatedDate >= sevenDaysAgo) {
+                            shouldNotify = true;
+                            console.log('[Notifications] 🔄 Order updated after last notification:', orderId, 'Updated:', o.updatedAt, 'Last notified:', lastNotifiedAt);
+                        }
+                    } catch (e) {
+                        console.error('[Notifications] Error parsing dates:', e);
+                    }
+                } else if (!isNew && !o.updatedAt) {
+                    // Nếu không có updatedAt (một số bản ghi cũ), cho phép thông báo một lần
+                    shouldNotify = true;
+                }
+                
+                if (shouldNotify) {
+                    console.log('[Notifications] ✅ Will notify order:', orderId, 'Status:', o.status, 'UpdatedAt:', o.updatedAt || 'N/A');
+                } else {
+                    console.log('[Notifications] ⏭️ Skip order (already notified):', orderId);
+                }
+                
+                return shouldNotify;
+            });
+
+            console.log('[Notifications] New delivered orders to notify:', newDelivered.length);
+
+            const newOrderNotis: AppNotification[] = newDelivered.map((o: any) => ({
+                id: `order_${o._id || o.id}`,
+                type: 'order',
+                title: 'Đơn hàng đã giao thành công',
+                message: `Đơn ${o.code || o._id || o.id} đã được giao. Cảm ơn bạn!`,
+                createdAt: o.updatedAt || o.deliveredAt || o.createdAt || new Date().toISOString(),
+                read: false,
+            }));
+
+            // Lấy cache thông báo đơn hàng để giữ lại qua các lần refresh
+            const cacheKey = `order_notifications_cache_${uid}`;
+            const cacheStr = await AsyncStorage.getItem(cacheKey);
+            const cached: AppNotification[] = cacheStr ? JSON.parse(cacheStr) : [];
+
+            // Gộp cache + thông báo mới, loại trùng theo id
+            const byId: Record<string, AppNotification> = {};
+            // Ưu tiên trạng thái đã đọc từ cache cũ
+            cached.forEach(n => {
+                byId[n.id] = n;
+            });
+            newOrderNotis.forEach(n => {
+                const existing = byId[n.id];
+                if (existing) {
+                    byId[n.id] = {
+                        ...n,
+                        read: existing.read ?? n.read,
+                        createdAt: n.createdAt || existing.createdAt,
+                    };
+                } else {
+                    byId[n.id] = n;
+                }
+            });
+            const mergedOrderNotis = Object.values(byId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+            // Lưu cache đã gộp để lần refresh sau vẫn còn
+            await AsyncStorage.setItem(cacheKey, JSON.stringify(mergedOrderNotis));
+
+            // Cập nhật danh sách đã thông báo (lưu thời gian thông báo)
+            if (newDelivered.length > 0) {
+                const now = new Date().toISOString();
+                newDelivered.forEach((o: any) => {
+                    const orderId = String(o._id || o.id);
+                    notifiedMap[orderId] = now;
+                });
+                await AsyncStorage.setItem(notifiedKey, JSON.stringify(notifiedMap));
+                console.log('[Notifications] Saved notified IDs with timestamps');
+            }
+
+            return mergedOrderNotis;
+        } catch (e) {
+            console.error('[Notifications] Error fetching order notifications:', e);
+            return [];
+        }
+    };
+
     const fetchChatNotifications = async (uid: string | null): Promise<AppNotification[]> => {
         if (!uid) return [];
         try {
             const res = await axios.get(`${BASE_URL}/messages/unread/${uid}`);
             const count = res?.data?.count || 0;
             const latestAt = res?.data?.latestAt || null;
+            console.log('[Notifications] Chat unread count:', count, 'latestAt:', latestAt);
             if (count > 0) {
                 return [{
                     id: `chat_unread_${uid}`,
@@ -84,6 +250,7 @@ export default function NotificationsScreen() {
             }
             return [];
         } catch (e) {
+            console.error('[Notifications] Error fetching chat notifications:', e);
             return [];
         }
     };
@@ -91,11 +258,12 @@ export default function NotificationsScreen() {
     const refresh = async () => {
         setRefreshing(true);
         const uid = userId || await loadUserId();
-        const [voucherNotis, chatNotis] = await Promise.all([
+        const [voucherNotis, orderNotis, chatNotis] = await Promise.all([
             fetchVoucherNotifications(),
+            fetchOrderNotifications(uid),
             fetchChatNotifications(uid)
         ]);
-        const merged = [...voucherNotis, ...chatNotis].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const merged = [...voucherNotis, ...orderNotis, ...chatNotis].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setNotifications(merged);
         setRefreshing(false);
     };
@@ -105,17 +273,42 @@ export default function NotificationsScreen() {
             await loadUserId();
             await refresh();
         })();
+        // Auto-poll mỗi 3s để bắt kịp thay đổi trạng thái đơn hàng từ Admin nhanh hơn
+        const interval = setInterval(() => {
+            refresh();
+        }, 3000);
+        return () => clearInterval(interval);
     }, []);
 
     useFocusEffect(
         React.useCallback(() => {
             (async () => {
                 // Cập nhật mốc đã xem thông báo để tính voucher mới
-                try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch { }
+                const now = new Date().toISOString();
+                try { await AsyncStorage.setItem('notifications_last_seen', now); } catch { }
+                
+                // Đánh dấu order notifications là đã đọc khi vào màn hình (nhưng KHÔNG đánh dấu chat)
+                try {
+                    const uid = userId || await loadUserId();
+                    if (uid) {
+                        // Đánh dấu order notifications là đã đọc
+                        const cacheKey = `order_notifications_cache_${uid}`;
+                        const cacheStr = await AsyncStorage.getItem(cacheKey);
+                        const cached: AppNotification[] = cacheStr ? JSON.parse(cacheStr) : [];
+                        if (Array.isArray(cached) && cached.length > 0) {
+                            const updated = cached.map((n: any) => ({ ...n, read: true }));
+                            await AsyncStorage.setItem(cacheKey, JSON.stringify(updated));
+                        }
+                        
+                        // KHÔNG đánh dấu tin nhắn chat là đã đọc ở đây - chỉ đánh dấu khi người dùng bấm vào thông báo chat
+                    }
+                } catch {}
+                
                 await refresh();
             })();
         }, [userId])
     );
+
 
     const onPressNotification = async (item: AppNotification) => {
         if (item.type === 'chat') {
@@ -128,6 +321,23 @@ export default function NotificationsScreen() {
             router.push('/chat');
             return;
         }
+        if (item.type === 'order') {
+            try {
+                const uid = userId || await loadUserId();
+                if (uid) {
+                    // cập nhật read=true trong cache để giữ thông báo nhưng đánh dấu đã đọc
+                    const cacheKey = `order_notifications_cache_${uid}`;
+                    const cacheStr = await AsyncStorage.getItem(cacheKey);
+                    const cached: AppNotification[] = cacheStr ? JSON.parse(cacheStr) : [];
+                    const updated = cached.map(n => n.id === item.id ? { ...n, read: true } : n);
+                    await AsyncStorage.setItem(cacheKey, JSON.stringify(updated));
+                    // đồng bộ state hiện tại
+                    setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
+                }
+            } catch {}
+            router.push('/orders');
+            return;
+        }
     };
 
     const renderItem = ({ item }: { item: AppNotification }) => {
@@ -136,8 +346,10 @@ export default function NotificationsScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
                     {item.type === 'chat' ? (
                         <Ionicons name={item.read ? 'chatbubbles-outline' : 'chatbubbles'} size={20} color={item.read ? '#666' : '#0ea5e9'} />
-                    ) : (
+                    ) : item.type === 'voucher' ? (
                         <Ionicons name={item.read ? 'pricetags-outline' : 'pricetags'} size={20} color={item.read ? '#666' : '#22c55e'} />
+                    ) : (
+                        <Ionicons name={item.read ? 'cube-outline' : 'cube'} size={20} color={item.read ? '#666' : '#16a34a'} />
                     )}
                     <View style={{ flex: 1 }}>
                         <Text style={styles.title}>{item.title}</Text>

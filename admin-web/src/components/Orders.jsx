@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const STATUS_OPTIONS = [
     { value: "", label: "Tất cả" },
@@ -8,12 +8,20 @@ const STATUS_OPTIONS = [
     { value: "Đã giao hàng", label: "✅ Đã giao hàng" },
 ];
 
+const STATUS_TOTAL_KEYS = ["Chờ xác nhận", "Đã xác nhận", "Đang giao hàng", "Đã giao hàng"];
+
+const createDefaultStatusTotals = () => STATUS_TOTAL_KEYS.reduce((acc, key) => {
+    acc[key] = 0;
+    return acc;
+}, {});
+
 const pageSizeOptions = [10, 20, 50];
 
 export default function Orders() {
     const [loading, setLoading] = useState(false);
     const [orders, setOrders] = useState([]);
     const [total, setTotal] = useState(0);
+    const [statusTotals, setStatusTotals] = useState(() => createDefaultStatusTotals());
 
     const [query, setQuery] = useState("");
     const [status, setStatus] = useState("");
@@ -22,6 +30,33 @@ export default function Orders() {
 
     const [selected, setSelected] = useState(null);
     const [showModal, setShowModal] = useState(false);
+
+    const collectStatusTotals = async ({ q }) => {
+        const totals = createDefaultStatusTotals();
+        try {
+            const paramsBase = (queryValue) => {
+                const params = new URLSearchParams({ page: "1", limit: "1" });
+                if ((queryValue || "").trim()) params.append("q", (queryValue || "").trim());
+                return params;
+            };
+
+            const results = await Promise.all(STATUS_TOTAL_KEYS.map(async (statusKey) => {
+                const params = paramsBase(q);
+                params.append("status", statusKey);
+                const res = await fetch(`http://localhost:3000/api/orders?${params.toString()}`);
+                const data = await res.json();
+                if (Array.isArray(data)) return [statusKey, data.length];
+                return [statusKey, data?.total ?? (Array.isArray(data?.data) ? data.data.length : 0)];
+            }));
+
+            results.forEach(([key, value]) => {
+                totals[key] = Number.isFinite(value) ? value : 0;
+            });
+        } catch (e) {
+            console.error("Failed to fetch status totals", e);
+        }
+        return totals;
+    };
 
     const fetchOrders = async (override = {}) => {
         try {
@@ -38,12 +73,22 @@ export default function Orders() {
             if ((q || '').trim()) params.append("q", (q || '').trim());
             if (st) params.append("status", st);
 
-            const res = await fetch(`http://localhost:3000/api/orders?${params.toString()}`);
-            const data = await res.json();
-            // Chấp nhận cả hai dạng: {data, total} hoặc mảng thuần
-            const list = Array.isArray(data) ? data : (data.data || []);
-            setOrders(list);
-            setTotal(Array.isArray(data) ? list.length : (data.total || list.length));
+            const listPromise = (async () => {
+                const res = await fetch(`http://localhost:3000/api/orders?${params.toString()}`);
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : (data.data || []);
+                const totalCount = Array.isArray(data) ? list.length : (data.total || list.length);
+                return { list, totalCount };
+            })();
+
+            const [listResult, totals] = await Promise.all([
+                listPromise,
+                collectStatusTotals({ q })
+            ]);
+
+            setOrders(listResult.list);
+            setTotal(listResult.totalCount);
+            setStatusTotals(totals);
         } catch (e) {
             console.error(e);
         } finally {
@@ -108,19 +153,11 @@ export default function Orders() {
         setShowModal(true);
     };
 
-    const statusCounts = useMemo(() => {
-        // Nếu backend có endpoint thống kê, có thể thay bằng fetch
-        const counts = {
-            "Chờ xác nhận": 0,
-            "Đã xác nhận": 0,
-            "Đang giao hàng": 0,
-            "Đã giao hàng": 0,
-        };
-        orders.forEach(o => {
-            if (counts[o.status] !== undefined) counts[o.status] += 1;
-        });
-        return counts;
-    }, [orders]);
+    const getImageUrl = (src) => {
+        if (!src) return '';
+        if (/^https?:\/\//i.test(src)) return src;
+        return `http://localhost:3000${src.startsWith('/') ? '' : '/'}${src}`;
+    };
 
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -148,7 +185,7 @@ export default function Orders() {
 
             {/* Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                {Object.entries(statusCounts).map(([k, v]) => (
+                {Object.entries(statusTotals).map(([k, v]) => (
                     <div key={k} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: 12 }}>
                         <div style={{ fontWeight: 700, marginBottom: 4 }}>{k}</div>
                         <div style={{ color: '#1677ff', fontSize: 20, fontWeight: 700 }}>{v}</div>
@@ -285,6 +322,7 @@ export default function Orders() {
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
+                                        <th style={th}>Ảnh</th>
                                         <th style={th}>Sản phẩm</th>
                                         <th style={th}>Thuộc tính</th>
                                         <th style={th}>SL</th>
@@ -295,6 +333,13 @@ export default function Orders() {
                                 <tbody>
                                     {(selected.items || []).map((it, idx) => (
                                         <tr key={idx}>
+                                            <td style={td}>
+                                                {it.image ? (
+                                                    <img src={getImageUrl(it.image)} alt={it.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }} />
+                                                ) : (
+                                                    <div style={{ width: 56, height: 56, background: '#f5f5f5', borderRadius: 8, border: '1px solid #eee' }} />
+                                                )}
+                                            </td>
                                             <td style={td}>{it.name}</td>
                                             <td style={td}>{[it.size, it.color].filter(Boolean).join(', ')}</td>
                                             <td style={td}>{it.qty}</td>

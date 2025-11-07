@@ -195,7 +195,7 @@ export default function Analytics() {
                             <thead>
                                 <tr style={{ textAlign: 'left', background: '#fafafa' }}>
                                     <th style={{ padding: 8, borderBottom: '1px solid #eee' }}>Khách hàng</th>
-                                    <th style={{ padding: 8, borderBottom: '1px solid #eee' }}>Email</th>
+                                    <th style={{ padding: 8, borderBottom: '1px solid #eee' }}>Số điện thoại</th>
                                     <th style={{ padding: 8, borderBottom: '1px solid #eee' }}>Số đơn</th>
                                     <th style={{ padding: 8, borderBottom: '1px solid #eee' }}>Doanh thu</th>
                                 </tr>
@@ -203,8 +203,8 @@ export default function Analytics() {
                             <tbody>
                                 {topCustomers.map((c, idx) => (
                                     <tr key={idx}>
-                                        <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{c.name || c.userId}</td>
-                                        <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{c.email || '-'}</td>
+                                        <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{c.name || 'Khách hàng'}</td>
+                                        <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{c.phone || '-'}</td>
                                         <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{c.orders}</td>
                                         <td style={{ padding: 8, borderBottom: '1px solid #f0f0f0' }}>{formatCurrency(c.revenue)}</td>
                                     </tr>

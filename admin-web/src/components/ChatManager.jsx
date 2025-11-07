@@ -13,13 +13,23 @@ export default function ChatManager() {
 
     useEffect(() => {
         loadConversations();
+        // Auto-refresh conversations mỗi 5 giây để cập nhật tên người dùng khi họ đổi tên
+        const conversationsInterval = setInterval(() => {
+            loadConversations();
+        }, 5000);
+        
         if (selectedUser) {
             loadMessages();
-            const interval = setInterval(() => {
+            const messagesInterval = setInterval(() => {
                 loadMessages();
             }, 2000); // Refresh mỗi 2 giây
-            return () => clearInterval(interval);
+            return () => {
+                clearInterval(conversationsInterval);
+                clearInterval(messagesInterval);
+            };
         }
+        
+        return () => clearInterval(conversationsInterval);
     }, [selectedUser]);
 
     useEffect(() => {
@@ -29,7 +39,16 @@ export default function ChatManager() {
     const loadConversations = async () => {
         try {
             const response = await axios.get(`${API_URL}/messages/admin/conversations?adminId=${adminId}`);
-            setConversations(response.data);
+            const updatedConversations = response.data;
+            setConversations(updatedConversations);
+            
+            // Cập nhật tên người dùng đang được chọn nếu có thay đổi
+            if (selectedUser && updatedConversations.length > 0) {
+                const updatedUser = updatedConversations.find(c => c._id === selectedUser._id);
+                if (updatedUser && updatedUser.name !== selectedUser.name) {
+                    setSelectedUser({ ...selectedUser, name: updatedUser.name });
+                }
+            }
         } catch (error) {
             console.error("Error loading conversations:", error);
         }

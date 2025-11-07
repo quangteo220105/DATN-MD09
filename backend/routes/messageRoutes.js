@@ -105,6 +105,30 @@ router.get('/admin/conversations', async (req, res) => {
             { $sort: { lastMessageTime: -1 } }
         ]);
 
+        // Fetch tên mới nhất từ User model để đảm bảo tên luôn được cập nhật
+        try {
+            const User = require('../model/User');
+            const userIds = conversations.map(c => c._id).filter(Boolean);
+            if (userIds.length > 0) {
+                const users = await User.find({ _id: { $in: userIds } }, { _id: 1, name: 1 });
+                const usersMap = users.reduce((acc, u) => {
+                    acc[String(u._id)] = u.name;
+                    return acc;
+                }, {});
+                
+                // Cập nhật tên từ User model
+                conversations.forEach(conv => {
+                    const userId = String(conv._id);
+                    if (usersMap[userId]) {
+                        conv.name = usersMap[userId];
+                    }
+                });
+            }
+        } catch (userError) {
+            console.error('Error fetching user names:', userError);
+            // Nếu lỗi, vẫn trả về conversations với tên cũ
+        }
+
         res.json(conversations);
     } catch (error) {
         console.error('GET /api/messages/admin/conversations error:', error);

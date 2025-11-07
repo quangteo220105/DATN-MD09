@@ -63,7 +63,7 @@ export default function Dashboard() {
 
     return (
         <div style={{ padding: 20 }}>
-            <h2>Dashboard</h2>
+            <h2>Tổng quan</h2>
             <Row gutter={16}>
                 <Col span={6}>
                     <Card style={{ textAlign: "left" }} bordered={false}>

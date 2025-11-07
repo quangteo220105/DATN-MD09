@@ -144,6 +144,28 @@ router.get('/top-products', async (req, res) => {
   }
 });
 
+// Helper function to parse address and extract name and phone
+function parseAddress(address) {
+  if (!address || typeof address !== 'string') {
+    return { name: 'Khách hàng', phone: '-' };
+  }
+  
+  // Format: "Tên - Số điện thoại\nĐịa chỉ"
+  const lines = address.split('\n');
+  const firstLine = lines[0] || '';
+  const parts = firstLine.split(' - ');
+  
+  if (parts.length >= 2) {
+    return {
+      name: parts[0].trim() || 'Khách hàng',
+      phone: parts[1].trim() || '-'
+    };
+  }
+  
+  // Fallback: try to extract from customerName and customerPhone if available
+  return { name: 'Khách hàng', phone: '-' };
+}
+
 // GET /api/analytics/top-customers?from=&to=&limit=10
 router.get('/top-customers', async (req, res) => {
   try {
@@ -152,36 +174,47 @@ router.get('/top-customers', async (req, res) => {
     const toDate = parseDate(to, null);
     const match = buildDateMatch(fromDate, toDate);
 
-    const data = await Order.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: '$userId',
-          revenue: { $sum: { $ifNull: ['$total', 0] } },
-          orders: { $sum: 1 },
-          lastOrderAt: { $max: '$createdAt' }
-        }
-      },
-      { $sort: { revenue: -1 } },
-      { $limit: Number(limit) }
-    ]);
-
-    // Try to attach basic user info if available
-    let usersById = {};
-    try {
-      const User = mongoose.model('User');
-      const ids = data.map(d => d._id).filter(Boolean);
-      if (ids.length) {
-        const users = await User.find({ _id: { $in: ids } }, { name: 1, email: 1, phone: 1 });
-        usersById = users.reduce((acc, u) => { acc[String(u._id)] = u; return acc; }, {});
+    // Get orders with address info
+    const orders = await Order.find(match).select('address customerName customerPhone total createdAt');
+    
+    // Group by name and phone from address
+    const customerMap = new Map();
+    
+    orders.forEach(order => {
+      // Parse address to get name and phone
+      const parsed = parseAddress(order.address);
+      const name = order.customerName || parsed.name;
+      const phone = order.customerPhone || parsed.phone;
+      
+      // Use name + phone as key
+      const key = `${name}|${phone}`;
+      
+      if (!customerMap.has(key)) {
+        customerMap.set(key, {
+          name: name,
+          phone: phone,
+          revenue: 0,
+          orders: 0,
+          lastOrderAt: null
+        });
       }
-    } catch {}
+      
+      const customer = customerMap.get(key);
+      customer.revenue += order.total || 0;
+      customer.orders += 1;
+      if (!customer.lastOrderAt || new Date(order.createdAt) > new Date(customer.lastOrderAt)) {
+        customer.lastOrderAt = order.createdAt;
+      }
+    });
+    
+    // Convert to array and sort by revenue
+    const data = Array.from(customerMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, Number(limit));
 
     res.json(data.map(d => ({
-      userId: d._id,
-      name: usersById[String(d._id)]?.name || 'Khách hàng',
-      email: usersById[String(d._id)]?.email || null,
-      phone: usersById[String(d._id)]?.phone || null,
+      name: d.name,
+      phone: d.phone,
       revenue: d.revenue,
       orders: d.orders,
       lastOrderAt: d.lastOrderAt,

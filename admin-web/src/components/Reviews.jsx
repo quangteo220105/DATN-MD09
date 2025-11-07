@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const RATING_OPTIONS = [
     { value: "", label: "Tất cả" },
@@ -11,10 +11,22 @@ const RATING_OPTIONS = [
 
 const pageSizeOptions = [10, 20, 50];
 
+const RATING_VALUES = [5, 4, 3, 2, 1];
+
+const createDefaultRatingStats = () => ({
+    total: 0,
+    average: 0,
+    counts: RATING_VALUES.reduce((acc, rating) => {
+        acc[rating] = 0;
+        return acc;
+    }, {})
+});
+
 export default function Reviews() {
     const [loading, setLoading] = useState(false);
     const [reviews, setReviews] = useState([]);
     const [total, setTotal] = useState(0);
+    const [ratingStats, setRatingStats] = useState(() => createDefaultRatingStats());
 
     const [query, setQuery] = useState("");
     const [rating, setRating] = useState("");
@@ -23,6 +35,48 @@ export default function Reviews() {
 
     const [selected, setSelected] = useState(null);
     const [showModal, setShowModal] = useState(false);
+
+    const collectRatingStats = async ({ q }) => {
+        const stats = createDefaultRatingStats();
+        try {
+            const buildParams = (queryValue, ratingValue) => {
+                const params = new URLSearchParams({ page: "1", limit: "1" });
+                if ((queryValue || "").trim()) params.append("q", (queryValue || "").trim());
+                if (ratingValue !== undefined) params.append("rating", String(ratingValue));
+                return params;
+            };
+
+            const parseTotal = (data) => {
+                if (Array.isArray(data)) return data.length;
+                if (typeof data?.total === 'number') return data.total;
+                const list = Array.isArray(data?.data) ? data.data : [];
+                return list.length;
+            };
+
+            const totalRes = await fetch(`http://localhost:3000/api/reviews?${buildParams(q).toString()}`);
+            const totalData = await totalRes.json();
+            stats.total = parseTotal(totalData);
+
+            const ratingResults = await Promise.all(
+                RATING_VALUES.map(async (ratingValue) => {
+                    const res = await fetch(`http://localhost:3000/api/reviews?${buildParams(q, ratingValue).toString()}`);
+                    const data = await res.json();
+                    return [ratingValue, parseTotal(data)];
+                })
+            );
+
+            let weightedSum = 0;
+            ratingResults.forEach(([ratingValue, count]) => {
+                stats.counts[ratingValue] = Number.isFinite(count) ? count : 0;
+                weightedSum += ratingValue * (Number.isFinite(count) ? count : 0);
+            });
+
+            stats.average = stats.total > 0 ? Number((weightedSum / stats.total).toFixed(1)) : 0;
+        } catch (e) {
+            console.error("Failed to collect rating stats", e);
+        }
+        return stats;
+    };
 
     const fetchReviews = async (override = {}) => {
         try {
@@ -39,11 +93,22 @@ export default function Reviews() {
             if ((q || '').trim()) params.append("q", (q || '').trim());
             if (rt) params.append("rating", rt);
 
-            const res = await fetch(`http://localhost:3000/api/reviews?${params.toString()}`);
-            const data = await res.json();
-            const list = Array.isArray(data) ? data : (data.data || []);
-            setReviews(list);
-            setTotal(Array.isArray(data) ? list.length : (data.total || list.length));
+            const listPromise = (async () => {
+                const res = await fetch(`http://localhost:3000/api/reviews?${params.toString()}`);
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : (data.data || []);
+                const totalCount = Array.isArray(data) ? list.length : (data.total || list.length);
+                return { list, totalCount };
+            })();
+
+            const [listResult, stats] = await Promise.all([
+                listPromise,
+                collectRatingStats({ q })
+            ]);
+
+            setReviews(listResult.list);
+            setTotal(listResult.totalCount);
+            setRatingStats(stats);
         } catch (e) {
             console.error(e);
         } finally {
@@ -106,26 +171,6 @@ export default function Reviews() {
         return <span style={{ display: 'inline-flex', gap: 2 }}>{stars}</span>;
     };
 
-    const ratingStats = useMemo(() => {
-        const stats = {
-            total: reviews.length,
-            average: 0,
-            counts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
-        };
-        if (reviews.length > 0) {
-            let sum = 0;
-            reviews.forEach(r => {
-                const rv = r.rating || 0;
-                sum += rv;
-                if (rv >= 1 && rv <= 5) {
-                    stats.counts[rv] = (stats.counts[rv] || 0) + 1;
-                }
-            });
-            stats.average = (sum / reviews.length).toFixed(1);
-        }
-        return stats;
-    }, [reviews]);
-
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     return (
@@ -140,9 +185,9 @@ export default function Reviews() {
                 </div>
                 <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: 12 }}>
                     <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: '#666' }}>Đánh giá TB</div>
-                    <div style={{ color: '#1677ff', fontSize: 24, fontWeight: 700 }}>{ratingStats.average}</div>
+                    <div style={{ color: '#1677ff', fontSize: 24, fontWeight: 700 }}>{typeof ratingStats.average === 'number' ? ratingStats.average.toFixed(1) : '0.0'}</div>
                 </div>
-                {[5, 4, 3, 2, 1].map(r => (
+                {RATING_VALUES.map(r => (
                     <div key={r} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: 12 }}>
                         <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13, color: '#666' }}>{r} sao</div>
                         <div style={{ color: '#1677ff', fontSize: 20, fontWeight: 700 }}>{ratingStats.counts[r] || 0}</div>
