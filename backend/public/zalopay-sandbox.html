@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZaloPay - Thanh toán</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0068ff 0%, #0048cc 50%, #003399 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated background elements */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: moveBackground 20s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes moveBackground {
+            0% {
+                transform: translate(0, 0);
+            }
+            100% {
+                transform: translate(50px, 50px);
+            }
+        }
+
+        .container {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            max-width: 480px;
+            width: 100%;
+            padding: 0;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Header với gradient */
+        .header {
+            background: linear-gradient(135deg, #0068ff 0%, #0048cc 100%);
+            padding: 32px 32px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .logo-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo-icon {
+            width: 64px;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .logo-icon::before {
+            content: 'ZP';
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: -1px;
+        }
+
+        .logo h1 {
+            color: #ffffff;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .logo p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .content {
+            padding: 32px;
+        }
+
+        /* Merchant info card */
+        .merchant-card {
+            background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(0, 104, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .merchant-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #0068ff 0%, #0048cc 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0, 104, 255, 0.3);
+        }
+
+        .merchant-icon::before {
+            content: '🏪';
+            font-size: 24px;
+        }
+
+        .merchant-info {
+            flex: 1;
+        }
+
+        .merchant-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .merchant-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        /* Amount section */
+        .amount-section {
+            text-align: center;
+            margin: 32px 0;
+            padding: 24px;
+            background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+            border-radius: 20px;
+            border: 2px dashed rgba(0, 104, 255, 0.2);
+        }
+
+        .amount-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .amount-value {
+            font-size: 42px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #0068ff 0%, #0048cc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+            line-height: 1.2;
+        }
+
+        /* Order details card */
+        .order-details {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #e9ecef;
+        }
+
+        .order-details h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .order-details h3::before {
+            content: '📋';
+            font-size: 20px;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .detail-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .detail-value {
+            color: #1a1a1a;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: right;
+            word-break: break-word;
+            flex: 1;
+            margin-left: 16px;
+        }
+
+        /* Action buttons */
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 18px 24px;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.5);
+        }
+
+        .btn-failure {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-failure:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.5);
+        }
+
+        .btn-processing {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-processing:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.5);
+        }
+
+        /* Status message */
+        .status-message {
+            margin-top: 20px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-success {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #16a34a;
+            border: 2px solid #22c55e;
+        }
+
+        .status-failure {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #dc2626;
+            border: 2px solid #ef4444;
+        }
+
+        .status-processing {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #d97706;
+            border: 2px solid #f59e0b;
+        }
+
+        /* Loading spinner */
+        .loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                border-radius: 0;
+                max-width: 100%;
+            }
+
+            .header {
+                padding: 24px 20px 20px;
+            }
+
+            .content {
+                padding: 24px 20px;
+            }
+
+            .amount-value {
+                font-size: 36px;
+            }
+        }
+
+        /* Pulse animation for amount */
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+        }
+
+        .amount-value {
+            animation: pulse 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <div class="logo-icon"></div>
+                <div class="logo">
+                    <h1>ZaloPay</h1>
+                    <p>Sandbox Environment</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="merchant-card">
+                <div class="merchant-icon"></div>
+                <div class="merchant-info">
+                    <div class="merchant-label">Merchant</div>
+                    <div class="merchant-name">ZaloPay Sandbox Merchant</div>
+                </div>
+            </div>
+
+            <div class="amount-section">
+                <div class="amount-label">Số tiền cần thanh toán</div>
+                <div class="amount-value" id="amountValue">0đ</div>
+            </div>
+
+            <div class="order-details">
+                <h3>Chi tiết đơn hàng</h3>
+                <div class="detail-item">
+                    <span class="detail-label">Mã giao dịch:</span>
+                    <span class="detail-value" id="appTransId">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Mô tả:</span>
+                    <span class="detail-value" id="description">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Người dùng:</span>
+                    <span class="detail-value" id="appUser">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Thời gian:</span>
+                    <span class="detail-value" id="appTime">-</span>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-success" onclick="handlePayment('success')">
+                    <span>✅ Thanh toán thành công</span>
+                </button>
+                <button class="btn btn-failure" onclick="handlePayment('failure')">
+                    <span>❌ Thanh toán thất bại</span>
+                </button>
+                <button class="btn btn-processing" onclick="handlePayment('processing')">
+                    <span>⏸️ Đang xử lý</span>
+                </button>
+            </div>
+
+            <div class="status-message" id="statusMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        // Lấy thông tin từ URL query params
+        const urlParams = new URLSearchParams(window.location.search);
+        const appid = urlParams.get('appid') || '2554';
+        const apptransid = urlParams.get('apptransid') || '';
+        const appuser = urlParams.get('appuser') || 'user';
+        const apptime = urlParams.get('apptime') || Date.now();
+        const amount = urlParams.get('amount') || '0';
+        const description = urlParams.get('description') || 'Thanh toan don hang';
+        const embeddata = urlParams.get('embeddata') || '{}';
+
+        // Hiển thị thông tin
+        document.getElementById('appTransId').textContent = apptransid || '-';
+        document.getElementById('description').textContent = decodeURIComponent(description);
+        document.getElementById('appUser').textContent = appuser;
+        document.getElementById('appTime').textContent = new Date(parseInt(apptime)).toLocaleString('vi-VN');
+
+        // Format số tiền
+        const amountNum = parseInt(amount);
+        document.getElementById('amountValue').textContent = amountNum.toLocaleString('vi-VN') + 'đ';
+
+        // Xử lý thanh toán
+        async function handlePayment(status) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.style.display = 'block';
+
+            // Disable buttons
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.style.cursor = 'not-allowed';
+            });
+
+            let message = '';
+            let statusClass = '';
+
+            if (status === 'success') {
+                message = '✅ Thanh toán thành công! Đang gửi callback...';
+                statusClass = 'status-success';
+
+                // Gửi callback về server
+                try {
+                    const callbackData = {
+                        appid: appid,
+                        apptransid: apptransid,
+                        pmcid: 'zalopay',
+                        status: 1, // 1 = thành công
+                        amount: amountNum,
+                        description: description,
+                        timestamp: Date.now(),
+                        mac: generateMAC(appid, apptransid, amountNum, status)
+                    };
+
+                    const response = await fetch('/api/orders/zalopay/callback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(callbackData)
+                    });
+
+                    if (response.ok) {
+                        message = '✅ Thanh toán thành công! Callback đã được gửi về server. Đang quay về app...';
+                        statusMessage.textContent = message;
+                        statusMessage.className = 'status-message ' + statusClass;
+
+                        // Đợi 1.5 giây để người dùng thấy thông báo
+                        setTimeout(() => {
+                            // Nếu đang trong WebView của app
+                            if (window.ReactNativeWebView) {
+                                window.ReactNativeWebView.postMessage(JSON.stringify({
+                                    type: 'payment_success',
+                                    apptransid: apptransid,
+                                    amount: amountNum
+                                }));
+                            } else {
+                                // Nếu mở từ trình duyệt Chrome, mở deep link về app Expo
+                                const deepLink = 'myapp://orders?payment=success';
+
+                                // Hàm mở deep link - thử nhiều cách để đảm bảo hoạt động trên Android emulator
+                                function openApp() {
+                                    console.log('Attempting to open deep link:', deepLink);
+
+                                    // Cách 1: Tạo thẻ <a> và click (hoạt động tốt trên Android)
+                                    try {
+                                        const link = document.createElement('a');
+                                        link.href = deepLink;
+                                        link.style.display = 'none';
+                                        link.setAttribute('target', '_self');
+                                        document.body.appendChild(link);
+                                        link.click();
+
+                                        // Xóa link sau 200ms
+                                        setTimeout(() => {
+                                            if (document.body.contains(link)) {
+                                                document.body.removeChild(link);
+                                            }
+                                        }, 200);
+
+                                        console.log('Deep link opened via <a> tag');
+                                    } catch (e) {
+                                        console.error('Failed to open via <a> tag:', e);
+                                    }
+
+                                    // Cách 2: Thử window.location.href (fallback)
+                                    setTimeout(() => {
+                                        try {
+                                            window.location.href = deepLink;
+                                            console.log('Deep link opened via window.location.href');
+                                        } catch (e) {
+                                            console.error('Failed to open via window.location.href:', e);
+                                        }
+                                    }, 100);
+
+                                    // Cách 3: Thử window.location.replace (fallback cuối cùng)
+                                    setTimeout(() => {
+                                        try {
+                                            window.location.replace(deepLink);
+                                            console.log('Deep link opened via window.location.replace');
+                                        } catch (e) {
+                                            console.error('Failed to open via window.location.replace:', e);
+                                        }
+                                    }, 200);
+                                }
+
+                                // Mở app ngay lập tức
+                                openApp();
+
+                                // Fallback: Nếu không mở được app sau 3 giây, hiển thị thông báo
+                                setTimeout(() => {
+                                    message = '✅ Thanh toán thành công! Vui lòng mở app để xem đơn hàng.';
+                                    statusMessage.textContent = message;
+                                }, 3000);
+                            }
+                        }, 1500);
+                    } else {
+                        message = '⚠️ Thanh toán thành công nhưng callback thất bại. Vui lòng kiểm tra server.';
+                        statusMessage.textContent = message;
+                        statusMessage.className = 'status-message ' + statusClass;
+                    }
+                } catch (error) {
+                    console.error('Callback error:', error);
+                    message = '⚠️ Thanh toán thành công nhưng không thể gửi callback. Vui lòng thử lại.';
+                    statusMessage.textContent = message;
+                    statusMessage.className = 'status-message ' + statusClass;
+                }
+            } else if (status === 'failure') {
+                message = '❌ Thanh toán thất bại!';
+                statusClass = 'status-failure';
+                statusMessage.textContent = message;
+                statusMessage.className = 'status-message ' + statusClass;
+            } else if (status === 'processing') {
+                message = '⏸️ Đang xử lý thanh toán...';
+                statusClass = 'status-processing';
+                statusMessage.textContent = message;
+                statusMessage.className = 'status-message ' + statusClass;
+
+                // Mô phỏng đang xử lý
+                setTimeout(() => {
+                    message = '⏸️ Vui lòng chờ kết quả từ ZaloPay...';
+                    statusMessage.textContent = message;
+                }, 2000);
+            }
+        }
+
+        // Tạo MAC (Message Authentication Code) đơn giản cho sandbox
+        function generateMAC(appid, apptransid, amount, status) {
+            // Trong môi trường thực tế, MAC được tạo bằng HMAC-SHA256 với key1 hoặc key2
+            // Ở đây chỉ tạo một chuỗi đơn giản cho sandbox
+            const key1 = 'sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn';
+            const data = `${appid}|${apptransid}|${amount}|${status}|${Date.now()}`;
+            // Trong thực tế cần dùng crypto để tạo HMAC
+            return btoa(data).substring(0, 32); // Base64 encode đơn giản
+        }
+    </script>
+</body>
+
+</html>

@@ -290,4 +290,112 @@ router.get('/user/:userId/list', async (req, res) => {
   }
 });
 
+// POST /api/orders/zalopay/callback => Xử lý callback từ ZaloPay Sandbox
+router.post('/zalopay/callback', async (req, res) => {
+  try {
+    const { appid, apptransid, pmcid, status, amount, description, timestamp, mac } = req.body;
+    
+    console.log('[ZaloPay Callback] Received:', {
+      appid,
+      apptransid,
+      status,
+      amount,
+      timestamp: new Date(timestamp).toISOString()
+    });
+
+    // Tìm đơn hàng theo apptransid
+    // apptransid format: ${Date.now()}_${orderId}
+    const orderIdMatch = apptransid ? apptransid.split('_').pop() : null;
+    
+    if (!orderIdMatch) {
+      console.error('[ZaloPay Callback] Cannot extract orderId from apptransid:', apptransid);
+      return res.status(400).json({ message: 'Invalid apptransid' });
+    }
+
+    // Tìm đơn hàng theo ID hoặc code
+    let order = null;
+    try {
+      // Thử tìm theo MongoDB _id (nếu orderIdMatch là ObjectId)
+      if (mongoose.Types.ObjectId.isValid(orderIdMatch)) {
+        order = await Order.findById(orderIdMatch);
+      }
+      
+      // Nếu không tìm thấy, thử tìm theo code
+      if (!order) {
+        order = await Order.findOne({ code: orderIdMatch });
+      }
+      
+      // Nếu vẫn không tìm thấy, tìm order ZaloPay gần nhất có trạng thái "Chờ thanh toán"
+      // và kiểm tra xem apptransid có chứa orderId không
+      if (!order) {
+        const recentOrders = await Order.find({ 
+          payment: 'zalopay', 
+          status: { $in: ['Chờ thanh toán', 'Chờ xác nhận'] }
+        })
+          .sort({ createdAt: -1 })
+          .limit(20);
+        
+        // Tìm order có _id hoặc code khớp với orderIdMatch
+        order = recentOrders.find(o => {
+          const orderIdStr = String(o._id);
+          const orderCodeStr = String(o.code || '');
+          return orderIdStr.includes(orderIdMatch) || 
+                 orderCodeStr.includes(orderIdMatch) ||
+                 orderIdMatch.includes(orderIdStr.substring(orderIdStr.length - 8)) ||
+                 orderIdMatch.includes(orderCodeStr);
+        });
+      }
+      
+      // Nếu vẫn không tìm thấy, lấy order ZaloPay mới nhất (fallback)
+      if (!order && apptransid) {
+        const timestamp = apptransid.split('_')[0];
+        const orderTime = new Date(parseInt(timestamp));
+        const timeRange = {
+          $gte: new Date(orderTime.getTime() - 5 * 60 * 1000), // 5 phút trước
+          $lte: new Date(orderTime.getTime() + 5 * 60 * 1000)  // 5 phút sau
+        };
+        order = await Order.findOne({
+          payment: 'zalopay',
+          status: { $in: ['Chờ thanh toán', 'Chờ xác nhận'] },
+          createdAt: timeRange
+        }).sort({ createdAt: -1 });
+      }
+    } catch (err) {
+      console.error('[ZaloPay Callback] Error finding order:', err);
+    }
+
+    if (!order) {
+      console.error('[ZaloPay Callback] Order not found for apptransid:', apptransid);
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Cập nhật trạng thái đơn hàng
+    if (status === 1) {
+      // Thanh toán thành công
+      order.status = 'Đã xác nhận';
+      await order.save();
+      console.log('[ZaloPay Callback] ✅ Order updated to "Đã xác nhận":', order._id);
+    } else {
+      // Thanh toán thất bại
+      order.status = 'Chờ xác nhận';
+      await order.save();
+      console.log('[ZaloPay Callback] ❌ Payment failed, order status unchanged:', order._id);
+    }
+
+    // Trả về response cho ZaloPay
+    res.json({
+      returncode: status === 1 ? 1 : -1,
+      returnmessage: status === 1 ? 'Success' : 'Failed',
+      apptransid: apptransid
+    });
+  } catch (e) {
+    console.error('[ZaloPay Callback] Error:', e);
+    res.status(500).json({ 
+      returncode: -1,
+      returnmessage: 'Server error',
+      apptransid: req.body?.apptransid || ''
+    });
+  }
+});
+
 module.exports = router;

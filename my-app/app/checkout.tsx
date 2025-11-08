@@ -11,7 +11,8 @@ import {
   Platform,
   TextInput,
   Modal,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Linking
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,8 +22,7 @@ import { DOMAIN, BASE_URL } from '../config/apiConfig';
 
 const PAYMENT_METHODS = [
   { key: 'cod', label: 'Thanh toán khi nhận hàng (COD)' },
-  { key: 'momo', label: 'Momo' },
-  { key: 'vnpay', label: 'VNPay' },
+  { key: 'zalopay', label: 'ZaloPay' },
 ];
 
 export default function CheckoutScreen() {
@@ -252,6 +252,54 @@ export default function CheckoutScreen() {
     if (cartTotal > 0) fetchAvailableVouchers(cartTotal);
   };
 
+  // 🟢 Mở ZaloPay sandbox để thanh toán
+  const openZaloPay = async (orderId: string, amount: number, description: string) => {
+    try {
+      const ZALOPAY_APP_ID = '2554';
+      // URL ZaloPay sandbox HTML (file trong public folder của backend)
+      const ZALOPAY_SANDBOX_URL = `${BASE_URL.replace('/api', '')}/zalopay-sandbox.html`;
+      
+      // Tạo transaction ID unique
+      const apptransid = `${Date.now()}_${orderId}`;
+      const apptime = Date.now();
+      const amountRounded = Math.round(amount);
+      
+      // Tạo URL với các tham số cần thiết cho ZaloPay sandbox
+      const params = new URLSearchParams({
+        appid: ZALOPAY_APP_ID,
+        apptransid: apptransid,
+        appuser: userId || 'user',
+        apptime: apptime.toString(),
+        amount: amountRounded.toString(),
+        description: description || 'Thanh toan don hang',
+        item: JSON.stringify(cart.map(i => ({
+          itemid: String(i._id || i.id || ''),
+          itemname: i.name || '',
+          itemprice: Math.round(i.price || 0),
+          itemquantity: i.qty || 1
+        }))),
+        embeddata: JSON.stringify({ orderId }),
+        bankcode: 'zalopayapp'
+      });
+
+      const paymentUrl = `${ZALOPAY_SANDBOX_URL}?${params.toString()}`;
+      
+      console.log('Opening ZaloPay Sandbox URL:', paymentUrl);
+      
+      // Mở URL trong trình duyệt mặc định (Chrome trên Android, Safari trên iOS)
+      const supported = await Linking.canOpenURL(paymentUrl);
+      if (supported) {
+        await Linking.openURL(paymentUrl);
+      } else {
+        // Fallback: thử mở trực tiếp
+        await Linking.openURL(paymentUrl);
+      }
+    } catch (error) {
+      console.error('Error opening ZaloPay:', error);
+      Alert.alert('Lỗi', 'Không thể mở ZaloPay. Vui lòng thử lại!');
+    }
+  };
+
   // 🟢 Xác nhận đơn hàng
   const confirmOrder = async () => {
     if (cart.length === 0) return;
@@ -262,31 +310,13 @@ export default function CheckoutScreen() {
       return;
     }
 
-    const historyKey = `order_history_${user._id}`;
-    const historyString = await AsyncStorage.getItem(historyKey);
-    let history = historyString ? JSON.parse(historyString) : [];
-    history = Array.isArray(history) ? history : [];
-
     const finalTotal = total - voucherDiscount;
+    const orderId = Date.now().toString();
 
-    const newOrder = {
-      id: Date.now(),
-      items: cart,
-      total: finalTotal,
-      originalTotal: total,
-      discount: voucherDiscount,
-      voucherCode: appliedVoucher?.code,
-      address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
-      payment,
-      status: 'Chờ xác nhận',
-      createdAt: new Date().toISOString()
-    };
-    history.unshift(newOrder);
-    await AsyncStorage.setItem(historyKey, JSON.stringify(history));
-
-    // Tạo đơn lên backend
+    // Tạo đơn lên backend trước
+    let backendOrderId = null;
     try {
-      await fetch(`${BASE_URL}/orders`, {
+      const response = await fetch(`${BASE_URL}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -300,28 +330,87 @@ export default function CheckoutScreen() {
             color: i.color,
             qty: i.qty,
             price: i.price,
-            image: i.image
+            image: i.image,
+            discountAmount: i.discountAmount || 0
           })),
           total: finalTotal,
           voucherCode: appliedVoucher?.code || null,
           discount: voucherDiscount,
           address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
           payment,
-          status: 'Chờ xác nhận',
+          status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
         })
       });
+      if (response.ok) {
+        const data = await response.json();
+        backendOrderId = data?._id || data?.id || null;
+      }
     } catch (e) {
-      console.log('POST /orders failed, fallback local only', e);
+      console.log('POST /orders failed', e);
     }
 
-    // Xoá sản phẩm đã thanh toán khỏi giỏ
-    try {
-      const fullCartStr = await AsyncStorage.getItem(`cart_${user._id}`);
-      let fullCart = fullCartStr ? JSON.parse(fullCartStr) : [];
-      fullCart = Array.isArray(fullCart) ? fullCart : [];
-      const remaining = fullCart.filter(i => !i?.checked);
-      await AsyncStorage.setItem(`cart_${user._id}`, JSON.stringify(remaining));
-    } catch { }
+    // Chỉ lưu vào AsyncStorage nếu KHÔNG phải ZaloPay
+    // Với ZaloPay, chỉ lưu khi thanh toán thành công (xử lý trong orders.tsx)
+    if (payment !== 'zalopay') {
+      const historyKey = `order_history_${user._id}`;
+      const historyString = await AsyncStorage.getItem(historyKey);
+      let history = historyString ? JSON.parse(historyString) : [];
+      history = Array.isArray(history) ? history : [];
+
+      const newOrder = {
+        id: backendOrderId || orderId,
+        _id: backendOrderId,
+        items: cart,
+        total: finalTotal,
+        originalTotal: total,
+        discount: voucherDiscount,
+        voucherCode: appliedVoucher?.code,
+        address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+        payment,
+        status: 'Chờ xác nhận',
+        createdAt: new Date().toISOString()
+      };
+      history.unshift(newOrder);
+      await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+    }
+
+    // Nếu là ZaloPay, mở trình duyệt thanh toán
+    if (payment === 'zalopay') {
+      // Sử dụng backendOrderId nếu có, nếu không dùng orderId local
+      const paymentOrderId = backendOrderId || orderId;
+      const orderDescription = `Thanh toan don hang ${paymentOrderId}`;
+      await openZaloPay(paymentOrderId, finalTotal, orderDescription);
+      
+      Alert.alert(
+        'Đang chuyển đến ZaloPay',
+        'Vui lòng hoàn tất thanh toán trên trình duyệt. Sau khi thanh toán thành công, đơn hàng sẽ được cập nhật.',
+        [
+          { 
+            text: 'Xem đơn hàng', 
+            onPress: () => router.replace('/orders') 
+          },
+          { 
+            text: 'Quay về Home', 
+            onPress: () => router.replace('/(tabs)/home'), 
+            style: 'cancel' 
+          },
+        ]
+      );
+    } else {
+      // Xoá sản phẩm đã thanh toán khỏi giỏ (chỉ khi COD)
+      try {
+        const fullCartStr = await AsyncStorage.getItem(`cart_${user._id}`);
+        let fullCart = fullCartStr ? JSON.parse(fullCartStr) : [];
+        fullCart = Array.isArray(fullCart) ? fullCart : [];
+        const remaining = fullCart.filter(i => !i?.checked);
+        await AsyncStorage.setItem(`cart_${user._id}`, JSON.stringify(remaining));
+      } catch { }
+
+      Alert.alert('Thành công', 'Đơn hàng đã được đặt!', [
+        { text: 'Xem trạng thái', onPress: () => router.replace('/orders') },
+        { text: 'Quay về Home', onPress: () => router.replace('/(tabs)/home'), style: 'cancel' },
+      ]);
+    }
 
     // Nếu là buy now, dọn dẹp key tạm để không ảnh hưởng lần sau
     try {
@@ -332,11 +421,6 @@ export default function CheckoutScreen() {
     setAppliedVoucher(null);
     setVoucherDiscount(0);
     setVoucherCode('');
-
-    Alert.alert('Thành công', 'Đơn hàng đã được đặt!', [
-      { text: 'Xem trạng thái', onPress: () => router.replace('/orders') },
-      { text: 'Quay về Home', onPress: () => router.replace('/(tabs)/home'), style: 'cancel' },
-    ]);
   };
 
   // 🟢 Render sản phẩm

@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { BASE_URL, DOMAIN } from '../config/apiConfig';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
 
 const STATUS_ORDER = ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng'] as const;
 
@@ -50,28 +51,194 @@ export default function OrdersScreen() {
             return;
         }
 
+        const historyKey = `order_history_${user._id}`;
+        const historyString = await AsyncStorage.getItem(historyKey);
+        let localHistory = historyString ? JSON.parse(historyString) : [];
+        localHistory = Array.isArray(localHistory) ? localHistory : [];
+
         try {
             const res = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
             const json = await res.json();
-            const list = Array.isArray(json) ? json : json.data || [];
-            if (Array.isArray(list)) {
-                setOrders(list);
+            const backendList = Array.isArray(json) ? json : json.data || [];
+            
+            if (Array.isArray(backendList)) {
+                // Lọc đơn hàng: 
+                // - Với ZaloPay: chỉ lấy đơn hàng đã thanh toán thành công (trạng thái "Đã xác nhận" trở lên)
+                //   hoặc đơn hàng đã có trong AsyncStorage (đã được thêm khi thanh toán thành công)
+                // - Với COD: lấy tất cả
+                const filteredBackendOrders = backendList.filter((order: any) => {
+                    if (order.payment !== 'zalopay') {
+                        // COD: lấy tất cả
+                        return true;
+                    }
+                    
+                    // ZaloPay: chỉ lấy đơn hàng đã thanh toán thành công
+                    const status = normalizeStatus(order.status);
+                    const isPaid = status === 'Đã xác nhận' || 
+                                   status === 'Đang giao hàng' || 
+                                   status === 'Đã giao hàng';
+                    
+                    // Hoặc đơn hàng đã có trong AsyncStorage (đã được thêm khi thanh toán thành công)
+                    const orderId = order._id || order.id;
+                    const existsInLocal = localHistory.some((o: any) => 
+                        (o._id && String(o._id) === String(orderId)) || 
+                        (o.id && String(o.id) === String(orderId))
+                    );
+                    
+                    return isPaid || existsInLocal;
+                });
+                
+                // Merge với local history (ưu tiên local vì có thể có thông tin chi tiết hơn)
+                const localOrderIds = new Set(
+                    localHistory.map((o: any) => String(o._id || o.id))
+                );
+                
+                const backendOnlyOrders = filteredBackendOrders.filter((o: any) => {
+                    const orderId = String(o._id || o.id);
+                    return !localOrderIds.has(orderId);
+                });
+                
+                // Kết hợp: local history trước, sau đó là backend orders chưa có trong local
+                const mergedOrders = [...localHistory, ...backendOnlyOrders];
+                
+                // Sắp xếp theo thời gian tạo (mới nhất trước)
+                mergedOrders.sort((a: any, b: any) => {
+                    const timeA = new Date(a.createdAt || 0).getTime();
+                    const timeB = new Date(b.createdAt || 0).getTime();
+                    return timeB - timeA;
+                });
+                
+                setOrders(mergedOrders);
                 return;
             }
         } catch (e) {
             console.log('Fetch orders failed', e);
         }
 
-        // Fallback lấy từ AsyncStorage
-        const historyKey = `order_history_${user._id}`;
-        const historyString = await AsyncStorage.getItem(historyKey);
-        let history = historyString ? JSON.parse(historyString) : [];
-        history = Array.isArray(history) ? history : [];
-        setOrders(history);
+        // Fallback: chỉ lấy từ AsyncStorage
+        setOrders(localHistory);
     }, [router]);
 
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
     useFocusEffect(React.useCallback(() => { fetchOrders(); }, [fetchOrders]));
+
+    // Xử lý deep linking khi nhận được từ ZaloPay
+    useEffect(() => {
+        // Hàm xử lý khi thanh toán thành công
+        const handlePaymentSuccess = async () => {
+            try {
+                const userString = await AsyncStorage.getItem('user');
+                const user = userString ? JSON.parse(userString) : null;
+                if (!user || !user._id) return;
+
+                // Lấy đơn hàng ZaloPay mới nhất có trạng thái "Đã xác nhận" từ backend
+                // (đơn hàng vừa thanh toán thành công)
+                try {
+                    const res = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
+                    const json = await res.json();
+                    const list = Array.isArray(json) ? json : json.data || [];
+                    
+                    // Tìm đơn hàng ZaloPay mới nhất có trạng thái "Đã xác nhận"
+                    // Chỉ lấy đơn hàng được tạo trong vòng 10 phút gần đây để tránh nhầm với đơn cũ
+                    const now = Date.now();
+                    const tenMinutesAgo = now - 10 * 60 * 1000;
+                    
+                    const zalopayOrders = list.filter((o: any) => {
+                        if (o.payment !== 'zalopay') return false;
+                        const status = normalizeStatus(o.status);
+                        if (status !== 'Đã xác nhận' && status !== 'Chờ xác nhận') return false;
+                        
+                        // Kiểm tra thời gian tạo (chỉ lấy đơn hàng trong vòng 10 phút)
+                        const createdAt = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                        return createdAt >= tenMinutesAgo;
+                    });
+                    
+                    if (zalopayOrders.length > 0) {
+                        // Sắp xếp theo thời gian tạo, lấy đơn mới nhất
+                        zalopayOrders.sort((a: any, b: any) => {
+                            const timeA = new Date(a.createdAt || 0).getTime();
+                            const timeB = new Date(b.createdAt || 0).getTime();
+                            return timeB - timeA;
+                        });
+                        
+                        const latestOrder = zalopayOrders[0];
+                        
+                        // Kiểm tra xem đơn hàng này đã có trong AsyncStorage chưa
+                        const historyKey = `order_history_${user._id}`;
+                        const historyString = await AsyncStorage.getItem(historyKey);
+                        let history = historyString ? JSON.parse(historyString) : [];
+                        history = Array.isArray(history) ? history : [];
+                        
+                        // Kiểm tra xem đơn hàng đã tồn tại chưa (theo _id hoặc id)
+                        const orderId = latestOrder._id || latestOrder.id;
+                        const exists = history.some((o: any) => 
+                            (o._id && String(o._id) === String(orderId)) || 
+                            (o.id && String(o.id) === String(orderId))
+                        );
+                        
+                        // Nếu chưa tồn tại, thêm vào AsyncStorage
+                        if (!exists) {
+                            const orderToAdd = {
+                                id: latestOrder._id || latestOrder.id,
+                                _id: latestOrder._id,
+                                items: latestOrder.items || [],
+                                total: latestOrder.total || 0,
+                                originalTotal: latestOrder.total || 0,
+                                discount: latestOrder.discount || 0,
+                                voucherCode: latestOrder.voucherCode,
+                                voucherAppliedAmount: latestOrder.discount || 0,
+                                address: latestOrder.address || '',
+                                payment: latestOrder.payment || 'zalopay',
+                                status: latestOrder.status || 'Đã xác nhận',
+                                createdAt: latestOrder.createdAt || new Date().toISOString(),
+                                voucher: latestOrder.voucherCode ? { code: latestOrder.voucherCode } : undefined
+                            };
+                            
+                            history.unshift(orderToAdd);
+                            await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+                        }
+                    }
+                } catch (e) {
+                    console.log('Error fetching order after payment success:', e);
+                }
+
+                // Refresh orders để hiển thị đơn hàng mới
+                setTimeout(() => {
+                    fetchOrders();
+                    Alert.alert('Thành công', 'Thanh toán đã được xử lý! Đơn hàng đã được cập nhật.');
+                }, 500);
+            } catch (e) {
+                console.log('Error handling payment success:', e);
+                // Vẫn refresh orders dù có lỗi
+                setTimeout(() => {
+                    fetchOrders();
+                    Alert.alert('Thành công', 'Thanh toán đã được xử lý! Đơn hàng đã được cập nhật.');
+                }, 500);
+            }
+        };
+
+        // Lắng nghe deep link khi app đang mở
+        const subscription = Linking.addEventListener('url', (event) => {
+            const { url } = event;
+            console.log('Deep link received:', url);
+
+            // Kiểm tra nếu có query param payment=success
+            if (url.includes('payment=success')) {
+                handlePaymentSuccess();
+            }
+        });
+
+        // Kiểm tra deep link khi app mở từ trạng thái đóng
+        Linking.getInitialURL().then((url) => {
+            if (url && url.includes('payment=success')) {
+                handlePaymentSuccess();
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [fetchOrders]);
 
     // Stepper hiển thị trạng thái
     const renderStepper = (statusRaw: string) => {

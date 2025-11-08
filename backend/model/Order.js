@@ -22,7 +22,7 @@ const orderSchema = new mongoose.Schema({
   discount: { type: Number, default: 0 }, // Số tiền đã giảm
   address: { type: String },
   payment: { type: String, default: 'cod' },
-  status: { type: String, enum: ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy'], default: 'Chờ xác nhận', index: true },
+  status: { type: String, enum: ['Chờ xác nhận', 'Chờ thanh toán', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy'], default: 'Chờ xác nhận', index: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);
