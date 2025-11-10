@@ -134,7 +134,7 @@ export default function Banner() {
 
     return (
         <div style={{ padding: 24 }}>
-            <h2>Quản lý Banner</h2>
+            <h2>🖼️ Quản lý Banner</h2>
 
             <Button
                 type="primary"

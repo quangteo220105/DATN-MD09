@@ -6,6 +6,51 @@ const router = express.Router();
 // Normalize query
 const normalize = (s = '') => String(s).trim().toLowerCase();
 
+function parseAddressInfo(address, fallbackName = 'Khách hàng', fallbackPhone = '-') {
+  if (!address) return { name: fallbackName, phone: fallbackPhone };
+  if (typeof address === 'object') {
+    return {
+      name: address.name || fallbackName,
+      phone: address.phone || fallbackPhone,
+    };
+  }
+  const text = String(address);
+  // Try JSON
+  if (text.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          name: parsed.name || fallbackName,
+          phone: parsed.phone || fallbackPhone,
+        };
+      }
+    } catch (err) {
+      // ignore parse error
+    }
+  }
+  let name = fallbackName;
+  let phone = fallbackPhone;
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  const firstLine = lines[0] || '';
+  const dashSplit = firstLine.split(/\s*-\s*/);
+  if (dashSplit.length >= 2) {
+    name = dashSplit[0].trim() || name;
+    phone = dashSplit.slice(1).join(' - ').trim() || phone;
+  }
+  const phoneMatch = text.match(/(\+?84|0)(\d[\s\.\-]?){8,10}/);
+  if (phoneMatch) {
+    phone = phoneMatch[0].replace(/[\s\.\-]/g, '');
+    if (phone.startsWith('84') && phone.length >= 11) {
+      phone = '0' + phone.slice(2);
+    }
+  }
+  if ((!name || name === fallbackName) && dashSplit.length === 1 && lines.length > 1) {
+    name = firstLine || name;
+  }
+  return { name: name || fallbackName, phone: phone || fallbackPhone };
+}
+
 // GET /api/orders?q=&status=&page=&limit=
 router.get('/', async (req, res) => {
   try {
@@ -28,7 +73,30 @@ router.get('/', async (req, res) => {
       Order.countDocuments(filters),
     ]);
 
-    res.json({ data, total, page: Number(page), limit: Number(limit) });
+    const mapped = data.map(ord => {
+      const { name, phone } = parseAddressInfo(ord.address, ord.customerName, ord.customerPhone);
+      return {
+        ...ord.toObject(),
+        customerName: name || ord.customerName,
+        customerPhone: phone || ord.customerPhone,
+      };
+    });
+
+    const aggregation = await Order.aggregate([
+      { $match: filters },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const counts = aggregation.reduce((acc, curr) => {
+      acc[curr._id] = curr.count;
+      return acc;
+    }, {});
+
+    res.json({ data: mapped, total, page: Number(page), limit: Number(limit), counts });
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
@@ -161,7 +229,7 @@ router.patch('/:id/status', async (req, res) => {
           const adminId = 'admin_001';
           const adminName = 'Admin';
           const messageText = `Đơn hàng ${ord.code || ord._id} của bạn đã được giao thành công! Cảm ơn bạn đã mua sắm tại cửa hàng chúng tôi.`;
-          
+
           const notificationMessage = new Message({
             senderId: adminId,
             senderName: adminName,
@@ -171,7 +239,7 @@ router.patch('/:id/status', async (req, res) => {
             message: messageText,
             read: false
           });
-          
+
           await notificationMessage.save();
           console.log(`✅ Đã gửi tin nhắn thông báo đơn hàng đã giao cho user ${user._id}`);
         }
@@ -294,7 +362,7 @@ router.get('/user/:userId/list', async (req, res) => {
 router.post('/zalopay/callback', async (req, res) => {
   try {
     const { appid, apptransid, pmcid, status, amount, description, timestamp, mac } = req.body;
-    
+
     console.log('[ZaloPay Callback] Received:', {
       appid,
       apptransid,
@@ -306,7 +374,7 @@ router.post('/zalopay/callback', async (req, res) => {
     // Tìm đơn hàng theo apptransid
     // apptransid format: ${Date.now()}_${orderId}
     const orderIdMatch = apptransid ? apptransid.split('_').pop() : null;
-    
+
     if (!orderIdMatch) {
       console.error('[ZaloPay Callback] Cannot extract orderId from apptransid:', apptransid);
       return res.status(400).json({ message: 'Invalid apptransid' });
@@ -319,33 +387,33 @@ router.post('/zalopay/callback', async (req, res) => {
       if (mongoose.Types.ObjectId.isValid(orderIdMatch)) {
         order = await Order.findById(orderIdMatch);
       }
-      
+
       // Nếu không tìm thấy, thử tìm theo code
       if (!order) {
         order = await Order.findOne({ code: orderIdMatch });
       }
-      
+
       // Nếu vẫn không tìm thấy, tìm order ZaloPay gần nhất có trạng thái "Chờ thanh toán"
       // và kiểm tra xem apptransid có chứa orderId không
       if (!order) {
-        const recentOrders = await Order.find({ 
-          payment: 'zalopay', 
+        const recentOrders = await Order.find({
+          payment: 'zalopay',
           status: { $in: ['Chờ thanh toán', 'Chờ xác nhận'] }
         })
           .sort({ createdAt: -1 })
           .limit(20);
-        
+
         // Tìm order có _id hoặc code khớp với orderIdMatch
         order = recentOrders.find(o => {
           const orderIdStr = String(o._id);
           const orderCodeStr = String(o.code || '');
-          return orderIdStr.includes(orderIdMatch) || 
-                 orderCodeStr.includes(orderIdMatch) ||
-                 orderIdMatch.includes(orderIdStr.substring(orderIdStr.length - 8)) ||
-                 orderIdMatch.includes(orderCodeStr);
+          return orderIdStr.includes(orderIdMatch) ||
+            orderCodeStr.includes(orderIdMatch) ||
+            orderIdMatch.includes(orderIdStr.substring(orderIdStr.length - 8)) ||
+            orderIdMatch.includes(orderCodeStr);
         });
       }
-      
+
       // Nếu vẫn không tìm thấy, lấy order ZaloPay mới nhất (fallback)
       if (!order && apptransid) {
         const timestamp = apptransid.split('_')[0];
@@ -390,7 +458,7 @@ router.post('/zalopay/callback', async (req, res) => {
     });
   } catch (e) {
     console.error('[ZaloPay Callback] Error:', e);
-    res.status(500).json({ 
+    res.status(500).json({
       returncode: -1,
       returnmessage: 'Server error',
       apptransid: req.body?.apptransid || ''

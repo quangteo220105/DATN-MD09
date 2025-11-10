@@ -145,25 +145,69 @@ router.get('/top-products', async (req, res) => {
 });
 
 // Helper function to parse address and extract name and phone
-function parseAddress(address) {
-  if (!address || typeof address !== 'string') {
-    return { name: 'Khách hàng', phone: '-' };
+function parseAddress(address, fallbackName = 'Khách hàng', fallbackPhone = '-') {
+  if (!address) {
+    return { name: fallbackName, phone: fallbackPhone };
   }
-  
-  // Format: "Tên - Số điện thoại\nĐịa chỉ"
-  const lines = address.split('\n');
+
+  if (typeof address === 'object') {
+    const name = address.name || fallbackName;
+    const phone = address.phone || fallbackPhone;
+    return { name, phone };
+  }
+
+  let name = fallbackName;
+  let phone = fallbackPhone;
+
+  // Sometimes address may be JSON string
+  if (typeof address === 'string' && address.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(address);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          name: parsed.name || fallbackName,
+          phone: parsed.phone || fallbackPhone,
+        };
+      }
+    } catch (err) {
+      // ignore JSON parse error, fallback to string parsing
+    }
+  }
+
+  const text = String(address);
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
   const firstLine = lines[0] || '';
-  const parts = firstLine.split(' - ');
-  
-  if (parts.length >= 2) {
-    return {
-      name: parts[0].trim() || 'Khách hàng',
-      phone: parts[1].trim() || '-'
-    };
+
+  // Pattern: "Tên - Số điện thoại"
+  const dashSplit = firstLine.split(/\s*-\s*/);
+  if (dashSplit.length >= 2) {
+    name = dashSplit[0].trim() || name;
+    phone = dashSplit.slice(1).join(' - ').trim() || phone;
   }
-  
-  // Fallback: try to extract from customerName and customerPhone if available
-  return { name: 'Khách hàng', phone: '-' };
+
+  // Extract phone number using regex (Vietnamese formats)
+  const phoneMatch = text.match(/(\+?84|0)(\d[\s\.\-]?){8,10}/);
+  if (phoneMatch) {
+    phone = phoneMatch[0].replace(/[\s\.\-]/g, '');
+    if (phone.startsWith('84') && phone.length >= 11) {
+      phone = '0' + phone.slice(2);
+    }
+  }
+
+  if (!name || name === fallbackName) {
+    // Try labels like "Tên: ..."
+    const nameMatch = text.match(/(Tên|Name)\s*[:\-]\s*(.+)/i);
+    if (nameMatch) {
+      name = nameMatch[2].split('\n')[0].trim() || name;
+    } else if (dashSplit.length === 1 && lines.length > 1) {
+      name = firstLine || name;
+    }
+  }
+
+  return {
+    name: name || fallbackName,
+    phone: phone || fallbackPhone,
+  };
 }
 
 // GET /api/analytics/top-customers?from=&to=&limit=10
@@ -176,19 +220,19 @@ router.get('/top-customers', async (req, res) => {
 
     // Get orders with address info
     const orders = await Order.find(match).select('address customerName customerPhone total createdAt');
-    
+
     // Group by name and phone from address
     const customerMap = new Map();
-    
+
     orders.forEach(order => {
       // Parse address to get name and phone
-      const parsed = parseAddress(order.address);
-      const name = order.customerName || parsed.name;
-      const phone = order.customerPhone || parsed.phone;
-      
+      const parsed = parseAddress(order.address, order.customerName, order.customerPhone);
+      const name = parsed.name || order.customerName || 'Khách hàng';
+      const phone = parsed.phone || order.customerPhone || '-';
+
       // Use name + phone as key
       const key = `${name}|${phone}`;
-      
+
       if (!customerMap.has(key)) {
         customerMap.set(key, {
           name: name,
@@ -198,7 +242,7 @@ router.get('/top-customers', async (req, res) => {
           lastOrderAt: null
         });
       }
-      
+
       const customer = customerMap.get(key);
       customer.revenue += order.total || 0;
       customer.orders += 1;
@@ -206,7 +250,7 @@ router.get('/top-customers', async (req, res) => {
         customer.lastOrderAt = order.createdAt;
       }
     });
-    
+
     // Convert to array and sort by revenue
     const data = Array.from(customerMap.values())
       .sort((a, b) => b.revenue - a.revenue)

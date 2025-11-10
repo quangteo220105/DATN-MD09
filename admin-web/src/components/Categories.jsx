@@ -122,7 +122,7 @@ export default function Categories() {
 
     return (
         <div style={{ padding: 20 }}>
-            <h2>Quản lý danh mục</h2>
+            <h2>🏷️ Quản lý danh mục</h2>
             <Button type="primary" style={{ marginBottom: 16 }} onClick={openAddModal}>
                 Thêm danh mục mới
             </Button>

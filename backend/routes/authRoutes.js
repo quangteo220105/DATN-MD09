@@ -50,6 +50,42 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
     }
 });
 
+// Cập nhật avatar người dùng
+router.put("/update-avatar", upload.single("avatar"), async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) {
+            return res.status(400).json({ message: "Thiếu userId!" });
+        }
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng!" });
+        }
+        if (!req.file) {
+            return res.status(400).json({ message: "Vui lòng chọn ảnh avatar!" });
+        }
+
+        // Lưu đường dẫn avatar mới
+        const avatarPath = `/uploads/${req.file.filename}`;
+        user.avatar = avatarPath;
+        await user.save();
+
+        res.status(200).json({
+            message: "Cập nhật avatar thành công!",
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                avatar: user.avatar,
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Lỗi server!" });
+    }
+});
+
 // Đăng nhập người dùng
 router.post("/login", async (req, res) => {
     try {

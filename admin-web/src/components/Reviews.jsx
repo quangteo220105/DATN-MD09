@@ -175,7 +175,7 @@ export default function Reviews() {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h2 style={{ margin: 0 }}>Quản lý đánh giá</h2>
+            <h2 style={{ margin: 0 }}>⭐ Quản lý đánh giá</h2>
 
             {/* Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>

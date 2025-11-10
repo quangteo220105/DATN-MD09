@@ -9,11 +9,13 @@ import {
     Alert,
     ActivityIndicator
 } from 'react-native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
-import { BASE_URL } from '../config/apiConfig';
+import { BASE_URL, DOMAIN } from '../config/apiConfig';
 
 const phoneRegex = /^(0|\+84)\d{9}$/;
 
@@ -24,6 +26,7 @@ export default function ProfileScreen() {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
+    const [avatarUploading, setAvatarUploading] = useState(false);
 
     useEffect(() => {
         const loadUser = async () => {
@@ -42,6 +45,65 @@ export default function ProfileScreen() {
         };
         loadUser();
     }, []);
+
+    const resolveAvatarUri = (avatarPath?: string | null) => {
+        if (!avatarPath) return null;
+        if (avatarPath.startsWith('http')) return avatarPath;
+        const base = DOMAIN.replace(/\/$/, '');
+        return `${base}${avatarPath.startsWith('/') ? '' : '/'}${avatarPath}`;
+    };
+
+    const onPickAvatar = async () => {
+        try {
+            if (!user) {
+                Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!');
+                return;
+            }
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (permission.status !== 'granted') {
+                Alert.alert('Quyền truy cập', 'Cần quyền truy cập thư viện ảnh để đổi avatar.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: false,
+                quality: 0.85,
+                allowsMultipleSelection: false,
+                exif: false,
+            });
+            if (result.canceled || !result.assets?.length) return;
+            const asset = result.assets[0];
+            if (!asset?.uri) return;
+
+            setAvatarUploading(true);
+            const form = new FormData();
+            form.append('userId', user.id || user._id);
+            const filename = asset.fileName || `avatar_${Date.now()}.jpg`;
+            const mime = asset.mimeType || 'image/jpeg';
+            // @ts-ignore RN FormData file
+            form.append('avatar', { uri: asset.uri, name: filename, type: mime });
+
+            const res = await axios.put(`${BASE_URL}/auth/update-avatar`, form, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            const updated = {
+                ...user,
+                avatar: res.data?.user?.avatar || user.avatar,
+            };
+            setUser(updated);
+            await AsyncStorage.setItem('user', JSON.stringify(updated));
+            Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện.');
+        } catch (e: any) {
+            console.error('upload avatar error', e);
+            Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể cập nhật avatar, vui lòng thử lại!');
+        } finally {
+            setAvatarUploading(false);
+        }
+    };
+
+    const avatarUri = resolveAvatarUri(user?.avatar);
 
     const handleUpdate = async () => {
         // Validate
@@ -92,14 +154,25 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
-            <View style={styles.header}>
-                <View style={{ width: 40 }} />
-                <Text style={styles.headerTitle}>Tài khoản cá nhân</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
             <View style={styles.container}>
                 <View style={styles.form}>
+                    <View style={styles.avatarWrap}>
+                        <Image
+                            source={avatarUri ? { uri: avatarUri } : require('../assets/images/icon.png')}
+                            style={styles.avatar}
+                            contentFit="cover"
+                        />
+                        <TouchableOpacity onPress={onPickAvatar} style={styles.avatarBtn} disabled={avatarUploading}>
+                            {avatarUploading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <>
+                                    <Ionicons name="camera" size={16} color="#fff" />
+                                    <Text style={styles.avatarBtnText}>Đổi ảnh</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Tên</Text>
                         <TextInput
@@ -185,6 +258,34 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 6,
         elevation: 2
+    },
+    avatarWrap: {
+        alignItems: 'center',
+        marginBottom: 16
+    },
+    avatar: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: '#eee',
+        borderWidth: 1,
+        borderColor: '#ddd'
+    },
+    avatarBtn: {
+        marginTop: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#007bff',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20
+    },
+    avatarBtnText: {
+        color: '#fff',
+        marginLeft: 6,
+        fontSize: 12,
+        fontWeight: '600'
     },
     inputGroup: {
         marginBottom: 20

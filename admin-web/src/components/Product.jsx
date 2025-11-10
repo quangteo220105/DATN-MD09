@@ -309,7 +309,7 @@ export default function ManagerDashboard() {
         <div style={styles.page}>
             <div style={styles.mainContent}>
                 <div style={styles.headerRow}>
-                    <span style={styles.sectionTitle}>Quản lý sản phẩm</span>
+                    <span style={styles.sectionTitle}>📦 Quản lý sản phẩm</span>
                     <button style={styles.primaryBtn} onClick={() => setShowModal(true)}>
                         + Thêm sản phẩm
                     </button>

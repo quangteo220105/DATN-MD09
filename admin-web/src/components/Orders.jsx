@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const STATUS_OPTIONS = [
     { value: "", label: "Tất cả" },
@@ -8,20 +8,18 @@ const STATUS_OPTIONS = [
     { value: "Đã giao hàng", label: "✅ Đã giao hàng" },
 ];
 
-const STATUS_TOTAL_KEYS = ["Chờ xác nhận", "Đã xác nhận", "Đang giao hàng", "Đã giao hàng"];
-
-const createDefaultStatusTotals = () => STATUS_TOTAL_KEYS.reduce((acc, key) => {
-    acc[key] = 0;
-    return acc;
-}, {});
-
 const pageSizeOptions = [10, 20, 50];
 
 export default function Orders() {
     const [loading, setLoading] = useState(false);
     const [orders, setOrders] = useState([]);
     const [total, setTotal] = useState(0);
-    const [statusTotals, setStatusTotals] = useState(() => createDefaultStatusTotals());
+    const [statusTotals, setStatusTotals] = useState({
+        "Chờ xác nhận": 0,
+        "Đã xác nhận": 0,
+        "Đang giao hàng": 0,
+        "Đã giao hàng": 0,
+    });
 
     const [query, setQuery] = useState("");
     const [status, setStatus] = useState("");
@@ -31,31 +29,48 @@ export default function Orders() {
     const [selected, setSelected] = useState(null);
     const [showModal, setShowModal] = useState(false);
 
-    const collectStatusTotals = async ({ q }) => {
-        const totals = createDefaultStatusTotals();
-        try {
-            const paramsBase = (queryValue) => {
-                const params = new URLSearchParams({ page: "1", limit: "1" });
-                if ((queryValue || "").trim()) params.append("q", (queryValue || "").trim());
-                return params;
+    const parseAddress = (address, fallbackName = '—', fallbackPhone = '') => {
+        if (!address) return { name: fallbackName, phone: fallbackPhone };
+        if (typeof address === 'object') {
+            return {
+                name: address.name || fallbackName,
+                phone: address.phone || fallbackPhone,
             };
-
-            const results = await Promise.all(STATUS_TOTAL_KEYS.map(async (statusKey) => {
-                const params = paramsBase(q);
-                params.append("status", statusKey);
-                const res = await fetch(`http://localhost:3000/api/orders?${params.toString()}`);
-                const data = await res.json();
-                if (Array.isArray(data)) return [statusKey, data.length];
-                return [statusKey, data?.total ?? (Array.isArray(data?.data) ? data.data.length : 0)];
-            }));
-
-            results.forEach(([key, value]) => {
-                totals[key] = Number.isFinite(value) ? value : 0;
-            });
-        } catch (e) {
-            console.error("Failed to fetch status totals", e);
         }
-        return totals;
+        const text = String(address);
+        if (text.trim().startsWith('{')) {
+            try {
+                const parsed = JSON.parse(text);
+                if (parsed && typeof parsed === 'object') {
+                    return {
+                        name: parsed.name || fallbackName,
+                        phone: parsed.phone || fallbackPhone,
+                    };
+                }
+            } catch (err) {
+                // ignore parse error
+            }
+        }
+        let name = fallbackName;
+        let phone = fallbackPhone;
+        const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+        const firstLine = lines[0] || '';
+        const dashSplit = firstLine.split(/\s*-\s*/);
+        if (dashSplit.length >= 2) {
+            name = dashSplit[0].trim() || name;
+            phone = dashSplit.slice(1).join(' - ').trim() || phone;
+        }
+        const phoneMatch = text.match(/(\+?84|0)(\d[\s.\-]?){8,10}/);
+        if (phoneMatch) {
+            phone = phoneMatch[0].replace(/[\s.\-]/g, '');
+            if (phone.startsWith('84') && phone.length >= 11) {
+                phone = '0' + phone.slice(2);
+            }
+        }
+        if ((!name || name === fallbackName) && dashSplit.length === 1 && lines.length > 1) {
+            name = firstLine || name;
+        }
+        return { name: name || fallbackName, phone: phone || fallbackPhone };
     };
 
     const fetchOrders = async (override = {}) => {
@@ -73,22 +88,25 @@ export default function Orders() {
             if ((q || '').trim()) params.append("q", (q || '').trim());
             if (st) params.append("status", st);
 
-            const listPromise = (async () => {
-                const res = await fetch(`http://localhost:3000/api/orders?${params.toString()}`);
-                const data = await res.json();
-                const list = Array.isArray(data) ? data : (data.data || []);
-                const totalCount = Array.isArray(data) ? list.length : (data.total || list.length);
-                return { list, totalCount };
-            })();
-
-            const [listResult, totals] = await Promise.all([
-                listPromise,
-                collectStatusTotals({ q })
-            ]);
-
-            setOrders(listResult.list);
-            setTotal(listResult.totalCount);
-            setStatusTotals(totals);
+            const res = await fetch(`http://localhost:3000/api/orders?${params.toString()}`);
+            const data = await res.json();
+            // Chấp nhận cả hai dạng: {data, total} hoặc mảng thuần
+            if (Array.isArray(data)) {
+                setOrders(data);
+                setTotal(data.length);
+                setStatusTotals(prev => ({ ...prev }));
+            } else {
+                const list = data.data || [];
+                setOrders(list);
+                setTotal(data.total || list.length);
+                const counts = data.counts || {};
+                setStatusTotals({
+                    "Chờ xác nhận": counts["Chờ xác nhận"] || 0,
+                    "Đã xác nhận": counts["Đã xác nhận"] || 0,
+                    "Đang giao hàng": counts["Đang giao hàng"] || 0,
+                    "Đã giao hàng": counts["Đã giao hàng"] || 0,
+                });
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -115,7 +133,7 @@ export default function Orders() {
                 body: JSON.stringify({ status: nextStatus })
             });
             if (!res.ok) throw new Error('Failed to update status');
-            setOrders(prev => prev.map(o => o._id === orderId ? { ...o, status: nextStatus } : o));
+            await fetchOrders();
         } catch (e) {
             console.error(e);
             alert('Cập nhật trạng thái thất bại');
@@ -133,7 +151,7 @@ export default function Orders() {
                 body: JSON.stringify({ status: 'Đã hủy' })
             });
             if (!res.ok) throw new Error('Failed to cancel order');
-            setOrders(prev => prev.map(o => (o._id || o.id) === (order._id || order.id) ? { ...o, status: 'Đã hủy' } : o));
+            await fetchOrders();
             alert('Đã hủy đơn hàng thành công');
         } catch (e) {
             console.error(e);
@@ -153,17 +171,11 @@ export default function Orders() {
         setShowModal(true);
     };
 
-    const getImageUrl = (src) => {
-        if (!src) return '';
-        if (/^https?:\/\//i.test(src)) return src;
-        return `http://localhost:3000${src.startsWith('/') ? '' : '/'}${src}`;
-    };
-
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h2 style={{ margin: 0 }}>Quản lý đơn hàng</h2>
+            <h2 style={{ margin: 0 }}>📬 Quản lý đơn hàng</h2>
 
             {/* Filters */}
             <form onSubmit={onSearch} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -215,27 +227,12 @@ export default function Orders() {
                             ) : (
                                 orders.map((o) => {
                                     const createdAt = o.createdAt ? new Date(o.createdAt).toLocaleString() : '';
-                                    // Parse tên từ địa chỉ nhận hàng (format: "Tên - Số điện thoại\nĐịa chỉ")
-                                    let shippingName = '';
-                                    let shippingPhone = '';
-                                    if (o.address) {
-                                        const parts = o.address.split(' - ');
-                                        if (parts.length > 0) {
-                                            shippingName = parts[0].trim();
-                                            if (parts.length > 1) {
-                                                const phoneAndAddress = parts[1];
-                                                const phoneMatch = phoneAndAddress.match(/^([^\n]+)/);
-                                                if (phoneMatch) shippingPhone = phoneMatch[1].trim();
-                                            }
-                                        }
-                                    }
-                                    const displayName = shippingName || o.customerName || o.name || '—';
-                                    const displayPhone = shippingPhone || o.customerPhone || o.phone || '';
+                                    const { name, phone } = parseAddress(o.address, o.customerName || o.name || '—', o.customerPhone || o.phone || '');
                                     return (
                                         <tr key={o._id || o.id}>
                                             <td style={td}>{o.code || o._id || o.id}</td>
                                             <td style={td}>{createdAt}</td>
-                                            <td style={td}>{displayName}<div style={{ color: '#888', fontSize: 12 }}>{displayPhone}</div></td>
+                                            <td style={td}>{name || '—'}<div style={{ color: '#888', fontSize: 12 }}>{phone || ''}</div></td>
                                             <td style={td}>{(o.total || 0).toLocaleString('vi-VN')} VND</td>
                                             <td style={td}>
                                                 <select value={o.status || ''} onChange={e => updateStatus(o._id || o.id, e.target.value)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
@@ -292,37 +289,21 @@ export default function Orders() {
                             </div>
                             <div>
                                 {(() => {
-                                    // Parse tên từ địa chỉ nhận hàng
-                                    let shippingName = '';
-                                    let shippingPhone = '';
-                                    if (selected.address) {
-                                        const parts = selected.address.split(' - ');
-                                        if (parts.length > 0) {
-                                            shippingName = parts[0].trim();
-                                            if (parts.length > 1) {
-                                                const phoneAndAddress = parts[1];
-                                                const phoneMatch = phoneAndAddress.match(/^([^\n]+)/);
-                                                if (phoneMatch) shippingPhone = phoneMatch[1].trim();
-                                            }
-                                        }
-                                    }
-                                    const displayName = shippingName || selected.customerName || selected.name || '—';
-                                    const displayPhone = shippingPhone || selected.customerPhone || selected.phone || '—';
+                                    const { name, phone } = parseAddress(selected.address, selected.customerName || selected.name || '—', selected.customerPhone || selected.phone || '—');
                                     return (
                                         <>
-                                            <div><strong>Tên khách hàng:</strong> {displayName}</div>
-                                            <div><strong>Điện thoại:</strong> {displayPhone}</div>
-                                            <div><strong>Địa chỉ:</strong> {selected.address || '—'}</div>
+                                            <div><strong>Tên khách hàng:</strong> {name || '—'}</div>
+                                            <div><strong>Điện thoại:</strong> {phone || '—'}</div>
                                         </>
                                     );
                                 })()}
+                                <div><strong>Địa chỉ:</strong> {selected.address || '—'}</div>
                             </div>
                         </div>
                         <div style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
-                                        <th style={th}>Ảnh</th>
                                         <th style={th}>Sản phẩm</th>
                                         <th style={th}>Thuộc tính</th>
                                         <th style={th}>SL</th>
@@ -334,13 +315,20 @@ export default function Orders() {
                                     {(selected.items || []).map((it, idx) => (
                                         <tr key={idx}>
                                             <td style={td}>
-                                                {it.image ? (
-                                                    <img src={getImageUrl(it.image)} alt={it.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }} />
-                                                ) : (
-                                                    <div style={{ width: 56, height: 56, background: '#f5f5f5', borderRadius: 8, border: '1px solid #eee' }} />
-                                                )}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <img
+                                                        src={
+                                                            it.image?.startsWith('http')
+                                                                ? it.image
+                                                                : `http://localhost:3000/${it.image?.replace(/^\/+/, '')}`
+                                                        }
+                                                        alt={it.name}
+                                                        style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }}
+                                                        onError={(e) => (e.target.src = '/placeholder.png')}
+                                                    />
+                                                    <span>{it.name}</span>
+                                                </div>
                                             </td>
-                                            <td style={td}>{it.name}</td>
                                             <td style={td}>{[it.size, it.color].filter(Boolean).join(', ')}</td>
                                             <td style={td}>{it.qty}</td>
                                             <td style={td}>{(it.price || 0).toLocaleString('vi-VN')} VND</td>

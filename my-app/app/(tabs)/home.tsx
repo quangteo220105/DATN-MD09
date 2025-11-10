@@ -48,11 +48,12 @@ export default function HomeScreen() {
     const [user, setUser] = useState<any>(null);
     const [productRatings, setProductRatings] = useState<{ [key: string]: { averageRating: number; totalReviews: number } }>({});
     const [loadingRatings, setLoadingRatings] = useState(false);
-  const [notifCount, setNotifCount] = useState(0);
+    const [notifCount, setNotifCount] = useState(0);
     const bannerRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showOutOfStockDialog, setShowOutOfStockDialog] = useState(false);
     const searchInputRef = useRef<any>(null);
+    const isSelectingSuggestionRef = useRef(false);
 
     // Lấy thông tin user từ AsyncStorage
     const fetchUser = async () => {
@@ -78,7 +79,7 @@ export default function HomeScreen() {
     const forceLogout = async () => {
         try {
             await AsyncStorage.removeItem('user');
-        } catch {}
+        } catch { }
         router.replace('/(tabs)/login');
     };
 
@@ -95,7 +96,7 @@ export default function HomeScreen() {
                     if (u && u._id) {
                         await AsyncStorage.removeItem(`buy_now_${u._id}`);
                     }
-                } catch {}
+                } catch { }
             })();
         }, [])
     );
@@ -223,7 +224,7 @@ export default function HomeScreen() {
         try {
             setLoadingRatings(true);
             const ratingsMap: { [key: string]: { averageRating: number; totalReviews: number } } = {};
-            
+
             // Fetch ratings song song cho tất cả sản phẩm
             const ratingPromises = productList.map(async (product) => {
                 try {
@@ -241,7 +242,7 @@ export default function HomeScreen() {
                     console.log(`Error fetching rating for product ${product._id}:`, error);
                 }
             });
-            
+
             await Promise.all(ratingPromises);
             setProductRatings(ratingsMap);
         } catch (error) {
@@ -266,7 +267,7 @@ export default function HomeScreen() {
     // Pull to refresh
     const onRefresh = async () => {
         setRefreshing(true);
-    await Promise.all([fetchBanners(), fetchProducts(), fetchUser(), fetchCategories(), refreshNotifCount()]);
+        await Promise.all([fetchBanners(), fetchProducts(), fetchUser(), fetchCategories(), refreshNotifCount()]);
         // Ratings sẽ tự động fetch khi products thay đổi (useEffect)
         setRefreshing(false);
     };
@@ -481,152 +482,152 @@ export default function HomeScreen() {
         );
     };
 
-  // ===== Notifications (badge on bell) =====
-  const sevenDaysMs = 7 * 24 * 3600 * 1000;
-  const getNotificationsLastSeen = async (): Promise<number> => {
-    try {
-      const stored = await AsyncStorage.getItem('notifications_last_seen');
-      if (!stored) return 0;
-      const parsed = new Date(stored);
-      const ms = parsed.getTime();
-      return Number.isFinite(ms) ? ms : 0;
-    } catch {
-      return 0;
-    }
-  };
-
-  const fetchVoucherNewCount = async (lastSeenMs: number): Promise<number> => {
-    try {
-      const res = await axios.get(`${BASE_URL}/vouchers`);
-      const list = Array.isArray(res.data) ? res.data : [];
-      const now = Date.now();
-      
-      // Count voucher đang hoạt động và mới hơn mốc đã xem
-      const count = list.filter((v: any) => {
-        // Kiểm tra điều kiện cơ bản
-        const startOk = v.startDate ? new Date(v.startDate).getTime() <= now : true;
-        const endOk = v.endDate ? new Date(v.endDate).getTime() >= now : true;
-        const quantityOk = typeof v.quantity === 'number' && typeof v.usedCount === 'number' ? v.usedCount < v.quantity : true;
-        const isActive = v.isActive !== false;
-        
-        if (!startOk || !endOk || !quantityOk || !isActive) return false;
-        
-        // Kiểm tra voucher mới: được tạo sau lần xem cuối cùng
-        let createdAtMs = 0;
-        if (v.createdAt) {
-          const parsed = new Date(v.createdAt);
-          if (!isNaN(parsed.getTime())) {
-            createdAtMs = parsed.getTime();
-          }
+    // ===== Notifications (badge on bell) =====
+    const sevenDaysMs = 7 * 24 * 3600 * 1000;
+    const getNotificationsLastSeen = async (): Promise<number> => {
+        try {
+            const stored = await AsyncStorage.getItem('notifications_last_seen');
+            if (!stored) return 0;
+            const parsed = new Date(stored);
+            const ms = parsed.getTime();
+            return Number.isFinite(ms) ? ms : 0;
+        } catch {
+            return 0;
         }
-        
-        // Nếu không có createdAt, bỏ qua
-        if (!createdAtMs) return false;
-        
-        // Kiểm tra nếu lastSeen là thời gian trong tương lai (có thể do lỗi timezone), reset về 7 ngày trước
-        let effectiveLastSeen = lastSeenMs;
-        if (lastSeenMs > now) {
-          console.log('[Voucher Badge] ⚠️ lastSeen is in the future, resetting to 7 days ago');
-          effectiveLastSeen = 0; // Sẽ dùng 7 ngày trước
+    };
+
+    const fetchVoucherNewCount = async (lastSeenMs: number): Promise<number> => {
+        try {
+            const res = await axios.get(`${BASE_URL}/vouchers`);
+            const list = Array.isArray(res.data) ? res.data : [];
+            const now = Date.now();
+
+            // Count voucher đang hoạt động và mới hơn mốc đã xem
+            const count = list.filter((v: any) => {
+                // Kiểm tra điều kiện cơ bản
+                const startOk = v.startDate ? new Date(v.startDate).getTime() <= now : true;
+                const endOk = v.endDate ? new Date(v.endDate).getTime() >= now : true;
+                const quantityOk = typeof v.quantity === 'number' && typeof v.usedCount === 'number' ? v.usedCount < v.quantity : true;
+                const isActive = v.isActive !== false;
+
+                if (!startOk || !endOk || !quantityOk || !isActive) return false;
+
+                // Kiểm tra voucher mới: được tạo sau lần xem cuối cùng
+                let createdAtMs = 0;
+                if (v.createdAt) {
+                    const parsed = new Date(v.createdAt);
+                    if (!isNaN(parsed.getTime())) {
+                        createdAtMs = parsed.getTime();
+                    }
+                }
+
+                // Nếu không có createdAt, bỏ qua
+                if (!createdAtMs) return false;
+
+                // Kiểm tra nếu lastSeen là thời gian trong tương lai (có thể do lỗi timezone), reset về 7 ngày trước
+                let effectiveLastSeen = lastSeenMs;
+                if (lastSeenMs > now) {
+                    console.log('[Voucher Badge] ⚠️ lastSeen is in the future, resetting to 7 days ago');
+                    effectiveLastSeen = 0; // Sẽ dùng 7 ngày trước
+                }
+
+                // Nếu chưa có lastSeen hoặc lastSeen trong tương lai, tính voucher trong 7 ngày gần đây
+                // Nếu có lastSeen hợp lệ, chỉ tính voucher được tạo sau lastSeen
+                const threshold = effectiveLastSeen > 0 ? effectiveLastSeen : (now - sevenDaysMs);
+                const isNew = createdAtMs > threshold;
+
+                // Debug log chi tiết
+                if (isNew) {
+                    console.log('[Voucher Badge] ✅ New voucher:', v.code,
+                        'createdAt:', new Date(createdAtMs).toISOString(),
+                        'threshold:', new Date(threshold).toISOString(),
+                        'diff:', Math.round((createdAtMs - threshold) / 1000 / 60), 'minutes');
+                } else if (createdAtMs > 0) {
+                    console.log('[Voucher Badge] ⏭️ Old voucher:', v.code,
+                        'createdAt:', new Date(createdAtMs).toISOString(),
+                        'threshold:', new Date(threshold).toISOString());
+                }
+
+                return isNew;
+            }).length;
+
+            console.log('[Voucher Badge] Total new vouchers:', count,
+                'lastSeen:', lastSeenMs > 0 ? new Date(lastSeenMs).toISOString() : 'never',
+                'now:', new Date(now).toISOString(),
+                'lastSeen > now?', lastSeenMs > now);
+            return count;
+        } catch (e) {
+            console.error('Error fetching voucher count:', e);
+            return 0;
         }
-        
-        // Nếu chưa có lastSeen hoặc lastSeen trong tương lai, tính voucher trong 7 ngày gần đây
-        // Nếu có lastSeen hợp lệ, chỉ tính voucher được tạo sau lastSeen
-        const threshold = effectiveLastSeen > 0 ? effectiveLastSeen : (now - sevenDaysMs);
-        const isNew = createdAtMs > threshold;
-        
-        // Debug log chi tiết
-        if (isNew) {
-          console.log('[Voucher Badge] ✅ New voucher:', v.code, 
-            'createdAt:', new Date(createdAtMs).toISOString(), 
-            'threshold:', new Date(threshold).toISOString(),
-            'diff:', Math.round((createdAtMs - threshold) / 1000 / 60), 'minutes');
-        } else if (createdAtMs > 0) {
-          console.log('[Voucher Badge] ⏭️ Old voucher:', v.code, 
-            'createdAt:', new Date(createdAtMs).toISOString(), 
-            'threshold:', new Date(threshold).toISOString());
+    };
+
+    const fetchChatUnreadCount = async (): Promise<number> => {
+        try {
+            const userStr = await AsyncStorage.getItem('user');
+            const u = userStr ? JSON.parse(userStr) : null;
+            const uid = u?._id || u?.id;
+            if (!uid) return 0;
+            const res = await axios.get(`${BASE_URL}/messages/unread/${uid}`);
+            return res?.data?.count || 0;
+        } catch {
+            return 0;
         }
-        
-        return isNew;
-      }).length;
-      
-      console.log('[Voucher Badge] Total new vouchers:', count, 
-        'lastSeen:', lastSeenMs > 0 ? new Date(lastSeenMs).toISOString() : 'never',
-        'now:', new Date(now).toISOString(),
-        'lastSeen > now?', lastSeenMs > now);
-      return count;
-    } catch (e) {
-      console.error('Error fetching voucher count:', e);
-      return 0;
-    }
-  };
+    };
 
-  const fetchChatUnreadCount = async (): Promise<number> => {
-    try {
-      const userStr = await AsyncStorage.getItem('user');
-      const u = userStr ? JSON.parse(userStr) : null;
-      const uid = u?._id || u?.id;
-      if (!uid) return 0;
-      const res = await axios.get(`${BASE_URL}/messages/unread/${uid}`);
-      return res?.data?.count || 0;
-    } catch {
-      return 0;
-    }
-  };
-
-  const fetchOrderUnreadCount = async (lastSeenMs: number): Promise<number> => {
-    try {
-      const userStr = await AsyncStorage.getItem('user');
-      const u = userStr ? JSON.parse(userStr) : null;
-      const uid = u?._id || u?.id;
-      if (!uid) return 0;
-      const cacheKey = `order_notifications_cache_${uid}`;
-      const cacheStr = await AsyncStorage.getItem(cacheKey);
-      const cached = cacheStr ? JSON.parse(cacheStr) : [];
-      if (!Array.isArray(cached)) return 0;
-      const now = Date.now();
-      const threshold = lastSeenMs > 0 && lastSeenMs <= now ? lastSeenMs : (now - sevenDaysMs);
-      return cached.filter((n: any) => {
-        if (n?.type !== 'order') return false;
-        if (n?.read) return false;
-        const createdAtMs = n?.createdAt ? new Date(n.createdAt).getTime() : 0;
-        if (!Number.isFinite(createdAtMs) || createdAtMs === 0) {
-          // Nếu thiếu createdAt, fallback: coi như đã đọc khi đã mở màn thông báo
-          return threshold === 0;
+    const fetchOrderUnreadCount = async (lastSeenMs: number): Promise<number> => {
+        try {
+            const userStr = await AsyncStorage.getItem('user');
+            const u = userStr ? JSON.parse(userStr) : null;
+            const uid = u?._id || u?.id;
+            if (!uid) return 0;
+            const cacheKey = `order_notifications_cache_${uid}`;
+            const cacheStr = await AsyncStorage.getItem(cacheKey);
+            const cached = cacheStr ? JSON.parse(cacheStr) : [];
+            if (!Array.isArray(cached)) return 0;
+            const now = Date.now();
+            const threshold = lastSeenMs > 0 && lastSeenMs <= now ? lastSeenMs : (now - sevenDaysMs);
+            return cached.filter((n: any) => {
+                if (n?.type !== 'order') return false;
+                if (n?.read) return false;
+                const createdAtMs = n?.createdAt ? new Date(n.createdAt).getTime() : 0;
+                if (!Number.isFinite(createdAtMs) || createdAtMs === 0) {
+                    // Nếu thiếu createdAt, fallback: coi như đã đọc khi đã mở màn thông báo
+                    return threshold === 0;
+                }
+                return createdAtMs > threshold;
+            }).length;
+        } catch {
+            return 0;
         }
-        return createdAtMs > threshold;
-      }).length;
-    } catch {
-      return 0;
-    }
-  };
+    };
 
-  const refreshNotifCount = async () => {
-    const lastSeenMs = await getNotificationsLastSeen();
-    const [vCount, cCount, oCount] = await Promise.all([
-      fetchVoucherNewCount(lastSeenMs),
-      fetchChatUnreadCount(),
-      fetchOrderUnreadCount(lastSeenMs),
-    ]);
-    setNotifCount(vCount + cCount + oCount);
-  };
+    const refreshNotifCount = async () => {
+        const lastSeenMs = await getNotificationsLastSeen();
+        const [vCount, cCount, oCount] = await Promise.all([
+            fetchVoucherNewCount(lastSeenMs),
+            fetchChatUnreadCount(),
+            fetchOrderUnreadCount(lastSeenMs),
+        ]);
+        setNotifCount(vCount + cCount + oCount);
+    };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      // Refresh ngay khi vào màn hình (bao gồm khi quay lại từ notifications)
-      refreshNotifCount();
-      // Auto-refresh badge mỗi 1.5 giây để cập nhật ngay lập tức khi có voucher mới hoặc tin nhắn mới
-      const interval = setInterval(() => {
+    useFocusEffect(
+        React.useCallback(() => {
+            // Refresh ngay khi vào màn hình (bao gồm khi quay lại từ notifications)
+            refreshNotifCount();
+            // Auto-refresh badge mỗi 1.5 giây để cập nhật ngay lập tức khi có voucher mới hoặc tin nhắn mới
+            const interval = setInterval(() => {
+                refreshNotifCount();
+            }, 1500);
+            return () => clearInterval(interval);
+        }, [])
+    );
+
+    // Thêm useEffect để refresh badge khi component mount hoặc khi quay lại
+    useEffect(() => {
         refreshNotifCount();
-      }, 1500);
-      return () => clearInterval(interval);
-    }, [])
-  );
-
-  // Thêm useEffect để refresh badge khi component mount hoặc khi quay lại
-  useEffect(() => {
-    refreshNotifCount();
-  }, []);
+    }, []);
 
     return (
         <View style={styles.container}>
@@ -672,7 +673,7 @@ export default function HomeScreen() {
                                 <TouchableOpacity
                                     style={styles.bellBtn}
                                     onPress={async () => {
-                                        try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch {}
+                                        try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch { }
                                         // Đánh dấu đã đọc toàn bộ order notifications để badge không lặp lại sau khi vào màn thông báo
                                         try {
                                             const userStr = await AsyncStorage.getItem('user');
@@ -687,7 +688,7 @@ export default function HomeScreen() {
                                                     await AsyncStorage.setItem(cacheKey, JSON.stringify(updated));
                                                 }
                                             }
-                                        } catch {}
+                                        } catch { }
                                         setNotifCount(0);
                                         router.push('/notifications');
                                     }}
@@ -717,8 +718,19 @@ export default function HomeScreen() {
                                         onChangeText={setQuery}
                                         style={styles.searchInput}
                                         placeholderTextColor="#999"
-                                        onFocus={() => setShowSuggestions(!!query.trim())}
-                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                                        onFocus={() => {
+                                            setShowSuggestions(!!query.trim());
+                                            isSelectingSuggestionRef.current = false;
+                                        }}
+                                        onBlur={() => {
+                                            // Chỉ ẩn suggestions nếu không đang chọn suggestion
+                                            setTimeout(() => {
+                                                if (!isSelectingSuggestionRef.current) {
+                                                    setShowSuggestions(false);
+                                                }
+                                                isSelectingSuggestionRef.current = false;
+                                            }, 200);
+                                        }}
                                         returnKeyType="search"
                                         ref={searchInputRef}
                                         autoCapitalize="none"
@@ -728,31 +740,48 @@ export default function HomeScreen() {
                                     />
                                     {query.length > 0 && (
                                         <TouchableOpacity
-                                            onPress={() => {
+                                            onPress={(e) => {
+                                                e.stopPropagation();
                                                 setQuery("");
                                                 setShowSuggestions(false);
+                                                searchInputRef.current?.focus();
                                             }}
                                             style={styles.clearBtn}
-                                            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                                            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                                            activeOpacity={0.7}
                                         >
-                                            <Ionicons name="close-circle" size={18} color="#999" />
+                                            <Ionicons name="close-circle" size={20} color="#999" />
                                         </TouchableOpacity>
                                     )}
                                 </View>
                             </View>
                             {showSuggestions && suggestions.length > 0 && (
                                 <View style={styles.suggestionsPanel}>
-                                    {suggestions.map((s: any) => (
+                                    {suggestions.map((s: any, index: number) => (
                                         <TouchableOpacity
                                             key={s._id}
-                                            style={styles.suggestionItem}
-                                            onPress={() => {
-                                                setShowSuggestions(false);
-                                                setQuery(s.name);
-                                                // Điều hướng tới chi tiết sản phẩm khi chọn gợi ý
-                                                router.push(`/product/${s._id}` as any);
+                                            style={[
+                                                styles.suggestionItem,
+                                                index === suggestions.length - 1 && styles.suggestionItemLast
+                                            ]}
+                                            onPressIn={() => {
+                                                isSelectingSuggestionRef.current = true;
                                             }}
+                                            onPress={() => {
+                                                const selectedName = s.name;
+                                                setQuery(selectedName);
+                                                setShowSuggestions(false);
+                                                isSelectingSuggestionRef.current = false;
+                                                setTimeout(() => {
+                                                    if (searchInputRef.current) {
+                                                        searchInputRef.current.focus();
+                                                        searchInputRef.current.setNativeProps({ text: selectedName });
+                                                    }
+                                                }, 50);
+                                            }}
+                                            activeOpacity={0.7}
                                         >
+                                            <Ionicons name="search-outline" size={16} color="#666" style={{ marginRight: 8 }} />
                                             <Text numberOfLines={1} style={styles.suggestionText}>{s.name}</Text>
                                         </TouchableOpacity>
                                     ))}
@@ -962,6 +991,8 @@ const styles = StyleSheet.create({
     },
     clearBtn: {
         marginLeft: 8,
+        padding: 4,
+        zIndex: 10,
     },
     searchInput: {
         flex: 1,
@@ -988,11 +1019,19 @@ const styles = StyleSheet.create({
     },
     suggestionItem: {
         paddingHorizontal: 14,
-        paddingVertical: 10,
+        paddingVertical: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    suggestionItemLast: {
+        borderBottomWidth: 0,
     },
     suggestionText: {
         fontSize: 14,
-        color: "#333"
+        color: "#333",
+        flex: 1,
     },
     bannerSection: {
         paddingHorizontal: 20,

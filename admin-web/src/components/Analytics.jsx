@@ -38,7 +38,10 @@ export default function Analytics() {
             const [sumJ, revJ, prodJ, custJ] = await Promise.all([summaryRes.json(), revenueRes.json(), topProdRes.json(), topCustRes.json()]);
             setSummary(sumJ || { revenue: 0, ordersCount: 0, productsSold: 0 });
             setSeries(Array.isArray(revJ) ? revJ : []);
-            setTopProducts(Array.isArray(prodJ) ? prodJ : []);
+            const sortedProducts = Array.isArray(prodJ)
+                ? [...prodJ].sort((a, b) => Number(b?.revenue || 0) - Number(a?.revenue || 0))
+                : [];
+            setTopProducts(sortedProducts);
             setTopCustomers(Array.isArray(custJ) ? custJ : []);
 
             // growth: previous period of equal length
@@ -86,7 +89,7 @@ export default function Analytics() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <h2>Thống kê doanh thu</h2>
+            <h2>📊 Thống kê doanh thu</h2>
             <div style={{ background: "#fff", borderRadius: 8, padding: 16 }}>
                 <form onSubmit={onApply} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
                     <div style={{ display: "flex", flexDirection: "column" }}>
