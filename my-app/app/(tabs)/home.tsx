@@ -444,7 +444,9 @@ export default function HomeScreen() {
 
     const renderBanner = () => {
         const bannerWidth = width - 40; // Trừ đi padding (20px mỗi bên)
-        const bannerHeight = 180; // Chiều cao cố định
+        // Banner gốc 1920x600 => tỉ lệ 3.2:1. Giữ tỉ lệ để không bị cắt.
+        const bannerAspect = 1920 / 600; // 3.2
+        const bannerHeight = Math.round(bannerWidth / bannerAspect);
 
         return (
             <View style={styles.bannerContainer}>
@@ -466,7 +468,7 @@ export default function HomeScreen() {
                         <View style={{ width: bannerWidth }}>
                             <Image
                                 source={{ uri: item.image }}
-                                style={[styles.bannerImage, { width: bannerWidth, height: bannerHeight }]}
+                                style={[styles.bannerImage, { width: bannerWidth, height: bannerHeight, borderRadius: 10, overflow: 'hidden' }]}
                                 resizeMode="cover"
                             />
                         </View>
