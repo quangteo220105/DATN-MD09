@@ -280,24 +280,27 @@ export default function ManagerDashboard() {
         }
     };
 
-    // 🟠 Dừng bán sản phẩm (ẩn sản phẩm ở phía người dùng)
-    const stopSellingProduct = async (productId) => {
-        const confirmed = window.confirm("Bạn có chắc muốn dừng bán sản phẩm này?");
+    // 🟠 Toggle trạng thái bán sản phẩm
+    const toggleSellingProduct = async (product) => {
+        const newStatus = !product.isActive;
+        const confirmed = window.confirm(newStatus
+            ? "Bạn có chắc muốn mở bán sản phẩm này?"
+            : "Bạn có chắc muốn dừng bán sản phẩm này?");
         if (!confirmed) return;
 
         try {
-            const res = await fetch(`http://localhost:3000/api/products/${productId}/toggle-status`, {
+            const res = await fetch(`http://localhost:3000/api/products/${product._id}/toggle-status`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isActive: false })
+                body: JSON.stringify({ isActive: newStatus })
             });
             const data = await res.json();
 
             if (res.ok) {
-                alert("✅ Đã dừng bán sản phẩm.");
+                alert(newStatus ? "✅ Đã mở bán sản phẩm." : "✅ Đã dừng bán sản phẩm.");
                 fetchProducts();
             } else {
-                alert(data.message || "❌ Không thể dừng bán sản phẩm!");
+                alert(data.message || "❌ Không thể cập nhật trạng thái sản phẩm!");
             }
         } catch (error) {
             console.error(error);
@@ -383,7 +386,12 @@ export default function ManagerDashboard() {
 
                                         <td style={styles.td}>
                                             <button style={styles.editBtn} onClick={() => handleEditClick(p)}>Sửa</button>
-                                            <button style={styles.stopBtn} onClick={() => stopSellingProduct(p._id)}>Dừng bán</button>
+                                            <button
+                                                style={p.isActive ? styles.stopBtn : styles.resumeBtn}
+                                                onClick={() => toggleSellingProduct(p)}
+                                            >
+                                                {p.isActive ? "Dừng bán" : "Mở bán"}
+                                            </button>
                                         </td>
                                     </tr>
                                 );
@@ -649,6 +657,16 @@ const styles = {
     },
     stopBtn: {
         backgroundColor: "#f59e0b",
+        border: "none",
+        padding: "6px 14px",
+        borderRadius: 6,
+        color: "#fff",
+        cursor: "pointer",
+        minWidth: 96,
+        fontWeight: 600,
+    },
+    resumeBtn: {
+        backgroundColor: "#10b981",
         border: "none",
         padding: "6px 14px",
         borderRadius: 6,

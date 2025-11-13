@@ -90,7 +90,7 @@ export default function OrdersScreen() {
             const res = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
             const json = await res.json();
             const backendList = Array.isArray(json) ? json : json.data || [];
-            
+
             if (Array.isArray(backendList)) {
                 // Lọc đơn hàng: 
                 // - Với ZaloPay: chỉ lấy đơn hàng đã thanh toán thành công (trạng thái "Đã xác nhận" trở lên)
@@ -101,23 +101,23 @@ export default function OrdersScreen() {
                         // COD: lấy tất cả
                         return true;
                     }
-                    
+
                     // ZaloPay: chỉ lấy đơn hàng đã thanh toán thành công
                     const status = normalizeStatus(order.status);
-                    const isPaid = status === 'Đã xác nhận' || 
-                                   status === 'Đang giao hàng' || 
-                                   status === 'Đã giao hàng';
-                    
+                    const isPaid = status === 'Đã xác nhận' ||
+                        status === 'Đang giao hàng' ||
+                        status === 'Đã giao hàng';
+
                     // Hoặc đơn hàng đã có trong AsyncStorage (đã được thêm khi thanh toán thành công)
                     const orderId = order._id || order.id;
-                    const existsInLocal = localHistory.some((o: any) => 
-                        (o._id && String(o._id) === String(orderId)) || 
+                    const existsInLocal = localHistory.some((o: any) =>
+                        (o._id && String(o._id) === String(orderId)) ||
                         (o.id && String(o.id) === String(orderId))
                     );
-                    
+
                     return isPaid || existsInLocal;
                 });
-                
+
                 // Merge với local history (ưu tiên local vì có thể có thông tin chi tiết hơn)
                 const localOrderIds = new Set(
                     localHistory.map((o: any) => String(o._id || o.id))
@@ -134,15 +134,15 @@ export default function OrdersScreen() {
                     const backendOrder = backendOrderMap.get(orderId);
                     return mergeOrderData(localOrder, backendOrder);
                 });
-                
+
                 const backendOnlyOrders = filteredBackendOrders.filter((o: any) => {
                     const orderId = String(o._id || o.id);
                     return !localOrderIds.has(orderId);
                 });
-                
+
                 // Kết hợp: local history trước, sau đó là backend orders chưa có trong local
                 const mergedOrders = [...mergedLocalHistory, ...backendOnlyOrders];
-                
+
                 // Sắp xếp theo thời gian tạo (mới nhất trước)
                 mergedOrders.sort((a: any, b: any) => {
                     const timeA = new Date(a.createdAt || 0).getTime();
@@ -181,22 +181,22 @@ export default function OrdersScreen() {
                     const res = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
                     const json = await res.json();
                     const list = Array.isArray(json) ? json : json.data || [];
-                    
+
                     // Tìm đơn hàng ZaloPay mới nhất có trạng thái "Đã xác nhận"
                     // Chỉ lấy đơn hàng được tạo trong vòng 10 phút gần đây để tránh nhầm với đơn cũ
                     const now = Date.now();
                     const tenMinutesAgo = now - 10 * 60 * 1000;
-                    
+
                     const zalopayOrders = list.filter((o: any) => {
                         if (o.payment !== 'zalopay') return false;
                         const status = normalizeStatus(o.status);
                         if (status !== 'Đã xác nhận' && status !== 'Chờ xác nhận') return false;
-                        
+
                         // Kiểm tra thời gian tạo (chỉ lấy đơn hàng trong vòng 10 phút)
                         const createdAt = o.createdAt ? new Date(o.createdAt).getTime() : 0;
                         return createdAt >= tenMinutesAgo;
                     });
-                    
+
                     if (zalopayOrders.length > 0) {
                         // Sắp xếp theo thời gian tạo, lấy đơn mới nhất
                         zalopayOrders.sort((a: any, b: any) => {
@@ -204,22 +204,22 @@ export default function OrdersScreen() {
                             const timeB = new Date(b.createdAt || 0).getTime();
                             return timeB - timeA;
                         });
-                        
+
                         const latestOrder = zalopayOrders[0];
-                        
+
                         // Kiểm tra xem đơn hàng này đã có trong AsyncStorage chưa
                         const historyKey = `order_history_${user._id}`;
                         const historyString = await AsyncStorage.getItem(historyKey);
                         let history = historyString ? JSON.parse(historyString) : [];
                         history = Array.isArray(history) ? history : [];
-                        
+
                         // Kiểm tra xem đơn hàng đã tồn tại chưa (theo _id hoặc id)
                         const orderId = latestOrder._id || latestOrder.id;
-                        const exists = history.some((o: any) => 
-                            (o._id && String(o._id) === String(orderId)) || 
+                        const exists = history.some((o: any) =>
+                            (o._id && String(o._id) === String(orderId)) ||
                             (o.id && String(o.id) === String(orderId))
                         );
-                        
+
                         // Nếu chưa tồn tại, thêm vào AsyncStorage
                         if (!exists) {
                             const orderToAdd = {
@@ -237,7 +237,7 @@ export default function OrdersScreen() {
                                 createdAt: latestOrder.createdAt || new Date().toISOString(),
                                 voucher: latestOrder.voucherCode ? { code: latestOrder.voucherCode } : undefined
                             };
-                            
+
                             history.unshift(orderToAdd);
                             await AsyncStorage.setItem(historyKey, JSON.stringify(history));
                         }
@@ -392,16 +392,38 @@ export default function OrdersScreen() {
     };
 
     // Tính tổng giảm và thanh toán
-    const calculateOrderDiscount = (item: any) => {
-        const productDiscount = (item.items || []).reduce((sum: number, p: any) => {
-            const disc = Number(p.discountAmount ?? p.discount ?? 0) || 0;
+    const calculateOrderDiscount = (order: any) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+
+        const lineSubtotal = items.reduce((sum: number, p: any) => {
+            const price = Number(p.price ?? 0) || 0;
             const qty = Number(p.qty ?? 1) || 1;
-            return sum + disc * qty;
+            return sum + price * qty;
         }, 0);
 
-        const voucherDiscount = Number(item.voucherAppliedAmount ?? 0) || 0;
-        const total = Number(item.total ?? 0) || 0;
-        const totalPayment = Math.max(0, total - (productDiscount + voucherDiscount));
+        const productDiscount = items.reduce((sum: number, p: any) => {
+            const disc = Number(p.discountAmount ?? p.discount ?? 0) || 0;
+            return sum + disc;
+        }, 0);
+
+        const voucherDiscountCandidates = [
+            order.voucherAppliedAmount,
+            order.discount,
+            order.voucher?.discountApplied,
+        ];
+        const voucherDiscount = voucherDiscountCandidates.reduce((acc: number, val: any) => {
+            const num = Number(val);
+            if (!Number.isFinite(num) || num <= 0) return acc;
+            return Math.max(acc, num);
+        }, 0);
+
+        const referenceTotal = Number(order.originalTotal ?? 0) || lineSubtotal;
+        const storedTotal = Number(order.total ?? 0) || 0;
+        const computedTotal = Math.max(0, referenceTotal - productDiscount - voucherDiscount);
+
+        const totalPayment = storedTotal > 0 && Math.abs(storedTotal - computedTotal) > 1
+            ? storedTotal
+            : computedTotal;
 
         return { productDiscount, voucherDiscount, totalPayment };
     };
@@ -457,22 +479,9 @@ export default function OrdersScreen() {
                     )}
                 </View>
 
-                {/* Giảm giá voucher */}
-                {voucherDiscount > 0 && (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                        <Text style={{ color: '#16a34a', fontSize: 14, flex: 1 }}>
-                            Giảm từ voucher{item.voucher?.code ? ` (${item.voucher.code})` : ''}:
-                        </Text>
-                        <Text style={{ color: '#16a34a', fontSize: 14 }}>
-                            -{voucherDiscount.toLocaleString('vi-VN')} VND
-                        </Text>
-                    </View>
-                )}
-
-                {/* Tổng giảm từ sản phẩm */}
                 {productDiscount > 0 && (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-                        <Text style={{ color: '#16a34a', fontSize: 14 }}>Giảm giá:</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                        <Text style={styles.discountLabel}>Tổng giảm từ sản phẩm</Text>
                         <Text style={{ color: '#16a34a', fontSize: 14 }}>
                             -{productDiscount.toLocaleString('vi-VN')} VND
                         </Text>
@@ -617,4 +626,5 @@ const styles = StyleSheet.create({
     productName: { fontSize: 14, fontWeight: '600', color: '#222' },
     productMeta: { fontSize: 12, color: '#666', marginTop: 2 },
     productPrice: { fontSize: 14, fontWeight: '600', color: '#222' },
+    discountLabel: { fontSize: 14, fontWeight: '600', color: '#111', marginTop: 6 },
 });
