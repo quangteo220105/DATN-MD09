@@ -5,6 +5,63 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from '../../config/apiConfig';
 
+// Hàm parse địa chỉ để lấy tên và số điện thoại
+function parseAddressInfo(address: any, fallbackName = 'Khách hàng', fallbackPhone = '-') {
+    if (!address) return { name: fallbackName, phone: fallbackPhone };
+
+    // Nếu address là object
+    if (typeof address === 'object') {
+        return {
+            name: address.name || fallbackName,
+            phone: address.phone || fallbackPhone,
+        };
+    }
+
+    const text = String(address);
+
+    // Thử parse JSON nếu address là JSON string
+    if (text.trim().startsWith('{')) {
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed && typeof parsed === 'object') {
+                return {
+                    name: parsed.name || fallbackName,
+                    phone: parsed.phone || fallbackPhone,
+                };
+            }
+        } catch (err) {
+            // ignore parse error
+        }
+    }
+
+    let name = fallbackName;
+    let phone = fallbackPhone;
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+    const firstLine = lines[0] || '';
+
+    // Pattern: "Tên - Số điện thoại"
+    const dashSplit = firstLine.split(/\s*-\s*/);
+    if (dashSplit.length >= 2) {
+        name = dashSplit[0].trim() || name;
+        phone = dashSplit.slice(1).join(' - ').trim() || phone;
+    }
+
+    // Extract phone number using regex (Vietnamese formats)
+    const phoneMatch = text.match(/(\+?84|0)(\d[\s\.\-]?){8,10}/);
+    if (phoneMatch) {
+        phone = phoneMatch[0].replace(/[\s\.\-]/g, '');
+        if (phone.startsWith('84') && phone.length >= 11) {
+            phone = '0' + phone.slice(2);
+        }
+    }
+
+    if ((!name || name === fallbackName) && dashSplit.length === 1 && lines.length > 1) {
+        name = firstLine || name;
+    }
+
+    return { name: name || fallbackName, phone: phone || fallbackPhone };
+}
+
 export default function ReviewScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
@@ -130,79 +187,94 @@ export default function ReviewScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f8f9' }}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color="#222" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Đánh giá đơn hàng</Text>
-                <View style={{ width: 24 }} />
-            </View>
-
             <ScrollView contentContainerStyle={styles.container}>
-                {order && (
-                    <>
-                        <View style={styles.orderInfo}>
-                            <Text style={styles.orderLabel}>Mã đơn hàng:</Text>
-                            <Text style={styles.orderValue}>{String(order.id || order._id)}</Text>
-                        </View>
+                {order && (() => {
+                    // Lấy tên và số điện thoại từ địa chỉ nhận hàng
+                    const { name, phone } = parseAddressInfo(
+                        order.address,
+                        'Khách hàng',
+                        '-'
+                    );
+                    const customerName = name;
+                    const customerPhone = phone;
 
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Đánh giá của bạn</Text>
+                    return (
+                        <>
+                            <View style={styles.orderInfo}>
+                                <Text style={styles.orderLabel}>Mã đơn hàng:</Text>
+                                <Text style={styles.orderValue}>{String(order.id || order._id)}</Text>
+                            </View>
 
-                            {/* Rating Stars */}
-                            <View style={styles.ratingContainer}>
-                                <Text style={styles.ratingLabel}>Điểm đánh giá: {rating > 0 ? `${rating}/5` : '(Chưa chọn)'}</Text>
-                                <View style={styles.starsContainer}>
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <TouchableOpacity
-                                            key={star}
-                                            onPress={() => setRating(star)}
-                                            style={styles.starBtn}
-                                        >
-                                            <Ionicons
-                                                name={star <= rating ? "star" : "star-outline"}
-                                                size={36}
-                                                color={star <= rating ? "#f59e0b" : "#ddd"}
-                                            />
-                                        </TouchableOpacity>
+                            <View style={styles.customerInfo}>
+                                <Text style={styles.sectionTitle}>Thông tin khách hàng</Text>
+                                <View style={styles.customerRow}>
+                                    <Text style={styles.customerLabel}>Tên khách hàng:</Text>
+                                    <Text style={styles.customerValue}>{customerName}</Text>
+                                </View>
+                                <View style={styles.customerRow}>
+                                    <Text style={styles.customerLabel}>Số điện thoại:</Text>
+                                    <Text style={styles.customerValue}>{customerPhone}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.section}>
+                                <Text style={styles.sectionTitle}>Đánh giá của bạn</Text>
+
+                                {/* Rating Stars */}
+                                <View style={styles.ratingContainer}>
+                                    <Text style={styles.ratingLabel}>Điểm đánh giá: {rating > 0 ? `${rating}/5` : '(Chưa chọn)'}</Text>
+                                    <View style={styles.starsContainer}>
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <TouchableOpacity
+                                                key={star}
+                                                onPress={() => setRating(star)}
+                                                style={styles.starBtn}
+                                            >
+                                                <Ionicons
+                                                    name={star <= rating ? "star" : "star-outline"}
+                                                    size={36}
+                                                    color={star <= rating ? "#f59e0b" : "#ddd"}
+                                                />
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                    {rating > 0 && (
+                                        <Text style={styles.ratingText}>{rating}/5</Text>
+                                    )}
+                                </View>
+
+                                {/* Comment Input */}
+                                <View style={styles.commentContainer}>
+                                    <Text style={styles.commentLabel}>Nhận xét của bạn:</Text>
+                                    <TextInput
+                                        style={styles.commentInput}
+                                        placeholder="Chia sẻ cảm nhận của bạn về đơn hàng..."
+                                        placeholderTextColor="#999"
+                                        multiline
+                                        numberOfLines={6}
+                                        value={comment}
+                                        onChangeText={setComment}
+                                        textAlignVertical="top"
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Products in order */}
+                            {Array.isArray(order.items) && order.items.length > 0 && (
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>Sản phẩm đã mua</Text>
+                                    {order.items.map((item: any, index: number) => (
+                                        <View key={index} style={styles.productItem}>
+                                            <Text style={styles.productName}>
+                                                {item.name} ({item.size}, {item.color}) x{item.qty}
+                                            </Text>
+                                        </View>
                                     ))}
                                 </View>
-                                {rating > 0 && (
-                                    <Text style={styles.ratingText}>{rating}/5</Text>
-                                )}
-                            </View>
-
-                            {/* Comment Input */}
-                            <View style={styles.commentContainer}>
-                                <Text style={styles.commentLabel}>Nhận xét của bạn:</Text>
-                                <TextInput
-                                    style={styles.commentInput}
-                                    placeholder="Chia sẻ cảm nhận của bạn về đơn hàng..."
-                                    placeholderTextColor="#999"
-                                    multiline
-                                    numberOfLines={6}
-                                    value={comment}
-                                    onChangeText={setComment}
-                                    textAlignVertical="top"
-                                />
-                            </View>
-                        </View>
-
-                        {/* Products in order */}
-                        {Array.isArray(order.items) && order.items.length > 0 && (
-                            <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>Sản phẩm đã mua</Text>
-                                {order.items.map((item: any, index: number) => (
-                                    <View key={index} style={styles.productItem}>
-                                        <Text style={styles.productName}>
-                                            {item.name} ({item.size}, {item.color}) x{item.qty}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                    </>
-                )}
+                            )}
+                        </>
+                    );
+                })()}
 
                 <TouchableOpacity
                     style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
@@ -256,6 +328,32 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: '#222',
+    },
+    customerInfo: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 16,
+        marginBottom: 12,
+    },
+    customerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    customerLabel: {
+        fontSize: 14,
+        color: '#666',
+        flex: 1,
+    },
+    customerValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#222',
+        flex: 2,
+        textAlign: 'right',
     },
     section: {
         backgroundColor: '#fff',

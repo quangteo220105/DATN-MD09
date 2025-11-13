@@ -147,30 +147,63 @@ export default function HomeScreen() {
     }, []);
 
     // Kiểm tra tài khoản còn tồn tại không; nếu bị xoá -> đăng xuất ngay
-    useEffect(() => {
-        if (!user?._id) return;
-        let stop = false;
-        const check = async () => {
-            try {
-                const res = await axios.get(`${BASE_URL}/users/${user._id}`);
-                if (!res?.data?._id) throw new Error('User missing');
-            } catch (err: any) {
-                if (err?.response?.status === 404) {
-                    console.log('Tài khoản đã bị xoá trên server. Thoát ra login...');
-                    forceLogout();
+    // ✅ Chỉ chạy khi Home screen được focus để tránh ảnh hưởng đến các màn khác
+    useFocusEffect(
+        React.useCallback(() => {
+            if (!user?._id) return;
+            let stop = false;
+            const check = async () => {
+                // ✅ Luôn lấy user mới nhất từ AsyncStorage để tránh check user cũ
+                try {
+                    const userData = await AsyncStorage.getItem('user');
+                    if (!userData) {
+                        // Không có user trong storage -> đăng xuất
+                        if (!stop) forceLogout();
+                        return;
+                    }
+                    const currentUser = JSON.parse(userData);
+                    const currentUserId = currentUser?._id || currentUser?.id;
+                    
+                    // ✅ Nếu user trong storage khác với user hiện tại -> cập nhật state
+                    if (currentUserId && currentUserId !== user._id) {
+                        console.log('User changed in storage, updating state...');
+                        setUser(currentUser);
+                        return; // Không check user cũ nữa
+                    }
+                    
+                    // ✅ Chỉ check nếu user ID khớp với user hiện tại
+                    if (!currentUserId || currentUserId !== user._id) {
+                        return;
+                    }
+                    
+                    // Kiểm tra user trên server
+                    const res = await axios.get(`${BASE_URL}/users/${currentUserId}`);
+                    if (!res?.data?._id) {
+                        throw new Error('User missing');
+                    }
+                } catch (err: any) {
+                    if (stop) return;
+                    if (err?.response?.status === 404) {
+                        console.log('Tài khoản đã bị xoá trên server. Thoát ra login...');
+                        forceLogout();
+                    } else if (err?.response?.status === 401) {
+                        // Unauthorized - token hết hạn hoặc không hợp lệ
+                        console.log('Token không hợp lệ. Thoát ra login...');
+                        forceLogout();
+                    }
                 }
-            }
-        };
-        // kiểm tra ngay và đặt interval
-        check();
-        const intervalId = setInterval(() => {
-            if (!stop) check();
-        }, 5000);
-        return () => {
-            stop = true;
-            clearInterval(intervalId);
-        };
-    }, [user?._id]);
+            };
+            // kiểm tra ngay và đặt interval
+            check();
+            const intervalId = setInterval(() => {
+                if (!stop) check();
+            }, 5000);
+            return () => {
+                stop = true;
+                clearInterval(intervalId);
+            };
+        }, [user?._id])
+    );
 
     // Debounce query input for smarter searching
     useEffect(() => {

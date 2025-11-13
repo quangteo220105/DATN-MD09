@@ -22,6 +22,102 @@ const createDefaultRatingStats = () => ({
     }, {})
 });
 
+function normalizeOrderFromReview(review) {
+    if (!review) return null;
+    if (review.orderFetched) return review.orderFetched;
+    if (review.order) return review.order;
+    if (review.orderId && typeof review.orderId === "object") return review.orderId;
+    return null;
+}
+
+const parseAddressInfo = (address, fallbackName = "Khách hàng", fallbackPhone = "-") => {
+    if (!address) return { name: fallbackName, phone: fallbackPhone };
+
+    if (typeof address === "object") {
+        return {
+            name: address.name || fallbackName,
+            phone: address.phone || fallbackPhone,
+        };
+    }
+
+    const text = String(address);
+
+    if (text.trim().startsWith("{")) {
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed && typeof parsed === "object") {
+                return {
+                    name: parsed.name || fallbackName,
+                    phone: parsed.phone || fallbackPhone,
+                };
+            }
+        } catch (err) {
+            /* ignore */
+        }
+    }
+
+    let name = fallbackName;
+    let phone = fallbackPhone;
+    const lines = text.split("\n").map(line => line.trim()).filter(Boolean);
+    const firstLine = lines[0] || "";
+
+    const dashSplit = firstLine.split(/\s*-\s*/);
+    if (dashSplit.length >= 2) {
+        name = dashSplit[0].trim() || name;
+        phone = dashSplit.slice(1).join(" - ").trim() || phone;
+    }
+
+    const phoneMatch = text.match(/(\+?84|0)(\d[\s\.\-]?){8,10}/);
+    if (phoneMatch) {
+        phone = phoneMatch[0].replace(/[\s\.\-]/g, "");
+        if (phone.startsWith("84") && phone.length >= 11) {
+            phone = "0" + phone.slice(2);
+        }
+    }
+
+    if ((!name || name === fallbackName) && dashSplit.length === 1 && lines.length > 1) {
+        name = firstLine || name;
+    }
+
+    return { name: name || fallbackName, phone: phone || fallbackPhone };
+};
+
+const getCustomerInfoFromReview = (review) => {
+    const fallbackName =
+        review.customerName ||
+        review.userId?.name ||
+        review.userName ||
+        review.user?.name ||
+        "Khách hàng";
+
+    const fallbackPhone =
+        review.customerPhone ||
+        review.userId?.phone ||
+        review.user?.phone ||
+        "-";
+
+    const orderInfo = normalizeOrderFromReview(review);
+
+    const addressSource =
+        orderInfo?.address ||
+        orderInfo?.shippingAddress ||
+        review.orderAddress ||
+        review.address ||
+        null;
+
+    const explicitName =
+        orderInfo?.customerName ||
+        orderInfo?.name ||
+        fallbackName;
+
+    const explicitPhone =
+        orderInfo?.customerPhone ||
+        orderInfo?.phone ||
+        fallbackPhone;
+
+    return parseAddressInfo(addressSource, explicitName, explicitPhone);
+};
+
 export default function Reviews() {
     const [loading, setLoading] = useState(false);
     const [reviews, setReviews] = useState([]);
@@ -78,7 +174,47 @@ export default function Reviews() {
         return stats;
     };
 
-    const fetchReviews = async (override = {}) => {
+const fetchOrderDetails = async (orderId, cache) => {
+    if (!orderId) return null;
+    const key = String(orderId);
+    if (cache.has(key)) return cache.get(key);
+    try {
+        const res = await fetch(`http://localhost:3000/api/orders/${key}`);
+        if (res.ok) {
+            const data = await res.json();
+            cache.set(key, data);
+            return data;
+        }
+    } catch (err) {
+        console.error('Failed to fetch order detail', err);
+    }
+    cache.set(key, null);
+    return null;
+};
+
+const enrichReviewsWithOrders = async (reviews) => {
+    const cache = new Map();
+    const enriched = await Promise.all(reviews.map(async (review) => {
+        const existingOrder = normalizeOrderFromReview(review);
+        if (existingOrder && (existingOrder.address || existingOrder.customerName || existingOrder.customerPhone)) {
+            return review;
+        }
+        let orderId = null;
+        if (typeof review.orderId === "string") {
+            orderId = review.orderId;
+        } else if (typeof review.orderId === "object") {
+            orderId = review.orderId?._id || review.orderId?.id || review.orderId?.code || null;
+        } else if (review.order?._id || review.order?.id) {
+            orderId = review.order._id || review.order.id;
+        }
+        const order = await fetchOrderDetails(orderId, cache);
+        if (!order) return review;
+        return { ...review, orderFetched: order };
+    }));
+    return enriched;
+};
+
+const fetchReviews = async (override = {}) => {
         try {
             setLoading(true);
             const q = Object.prototype.hasOwnProperty.call(override, 'q') ? override.q : query;
@@ -106,7 +242,9 @@ export default function Reviews() {
                 collectRatingStats({ q })
             ]);
 
-            setReviews(listResult.list);
+            const enrichedList = await enrichReviewsWithOrders(listResult.list);
+
+            setReviews(enrichedList);
             setTotal(listResult.totalCount);
             setRatingStats(stats);
         } catch (e) {
@@ -149,12 +287,15 @@ export default function Reviews() {
             const res = await fetch(`http://localhost:3000/api/reviews/${review._id || review.id}`);
             if (res.ok) {
                 const data = await res.json();
-                setSelected(data?._id ? data : review);
+                const [enriched] = await enrichReviewsWithOrders([data?._id ? data : review]);
+                setSelected(enriched);
             } else {
-                setSelected(review);
+                const [enriched] = await enrichReviewsWithOrders([review]);
+                setSelected(enriched);
             }
         } catch {
-            setSelected(review);
+            const [enriched] = await enrichReviewsWithOrders([review]);
+            setSelected(enriched);
         }
         setShowModal(true);
     };
@@ -254,7 +395,7 @@ export default function Reviews() {
                             ) : (
                                 reviews.map((r) => {
                                     const createdAt = r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : '';
-                                    const userName = r.userId?.name || r.userName || r.user?.name || 'Khách hàng';
+                                    const { name: userName, phone: userPhone } = getCustomerInfoFromReview(r);
                                     const orderId = r.orderId?.code || r.orderId?._id || r.orderId || '—';
                                     const products = (r.items || []).slice(0, 2).map((it, idx) => it.name).join(', ');
                                     const moreProducts = (r.items || []).length > 2 ? ` +${(r.items || []).length - 2} sản phẩm khác` : '';
@@ -269,8 +410,8 @@ export default function Reviews() {
                                             </td>
                                             <td style={td}>
                                                 <div style={{ fontWeight: 500 }}>{userName}</div>
-                                                {r.userId?.phone && (
-                                                    <div style={{ color: '#888', fontSize: 12 }}>{r.userId.phone}</div>
+                                                {userPhone && userPhone !== '-' && (
+                                                    <div style={{ color: '#888', fontSize: 12 }}>{userPhone}</div>
                                                 )}
                                             </td>
                                             <td style={td}>
@@ -354,8 +495,15 @@ export default function Reviews() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                             <div>
                                 <div><strong>Đánh giá:</strong> {renderStars(selected.rating || 0)} <span style={{ fontWeight: 600 }}>({selected.rating || 0}/5)</span></div>
-                                <div style={{ marginTop: 8 }}><strong>Tên khách hàng:</strong> {selected.userId?.name || selected.userName || selected.user?.name || '—'}</div>
-                                <div><strong>Điện thoại:</strong> {selected.userId?.phone || selected.user?.phone || '—'}</div>
+                                {(() => {
+                                    const { name, phone } = getCustomerInfoFromReview(selected);
+                                    return (
+                                        <>
+                                            <div style={{ marginTop: 8 }}><strong>Tên khách hàng:</strong> {name || '—'}</div>
+                                            <div><strong>Điện thoại:</strong> {phone && phone !== '-' ? phone : '—'}</div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                             <div>
                                 <div><strong>Mã đơn hàng:</strong> {selected.orderId?.code || selected.orderId?._id || selected.orderId || '—'}</div>

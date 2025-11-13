@@ -37,6 +37,36 @@ function normalizeStatus(raw?: string) {
     return STATUS_INFO[s] ? s : 'Chờ xác nhận';
 }
 
+function mergeOrderData(localOrder: any, backendOrder: any) {
+    if (!backendOrder) return localOrder;
+
+    const mergedId = localOrder?.id || backendOrder?._id || backendOrder?.id;
+
+    const merged = {
+        ...localOrder,
+        ...backendOrder,
+        id: mergedId,
+        _id: backendOrder?._id || localOrder?._id,
+        items: Array.isArray(backendOrder?.items) && backendOrder.items.length > 0
+            ? backendOrder.items
+            : (localOrder?.items || []),
+        status: backendOrder?.status ?? localOrder?.status,
+        payment: backendOrder?.payment ?? localOrder?.payment,
+        total: backendOrder?.total ?? localOrder?.total,
+        discount: backendOrder?.discount ?? localOrder?.discount,
+        voucherCode: backendOrder?.voucherCode ?? localOrder?.voucherCode,
+        voucherAppliedAmount: backendOrder?.discount ?? localOrder?.voucherAppliedAmount,
+        address: backendOrder?.address ?? localOrder?.address,
+        createdAt: backendOrder?.createdAt ?? localOrder?.createdAt,
+    };
+
+    if (!merged.voucher && merged.voucherCode) {
+        merged.voucher = { code: merged.voucherCode };
+    }
+
+    return merged;
+}
+
 export default function OrdersScreen() {
     const [orders, setOrders] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<string>('Tất cả');
@@ -92,6 +122,18 @@ export default function OrdersScreen() {
                 const localOrderIds = new Set(
                     localHistory.map((o: any) => String(o._id || o.id))
                 );
+
+                const backendOrderMap = new Map<string, any>();
+                filteredBackendOrders.forEach((order: any) => {
+                    const orderId = String(order._id || order.id);
+                    backendOrderMap.set(orderId, order);
+                });
+
+                const mergedLocalHistory = localHistory.map((localOrder: any) => {
+                    const orderId = String(localOrder._id || localOrder.id);
+                    const backendOrder = backendOrderMap.get(orderId);
+                    return mergeOrderData(localOrder, backendOrder);
+                });
                 
                 const backendOnlyOrders = filteredBackendOrders.filter((o: any) => {
                     const orderId = String(o._id || o.id);
@@ -99,7 +141,7 @@ export default function OrdersScreen() {
                 });
                 
                 // Kết hợp: local history trước, sau đó là backend orders chưa có trong local
-                const mergedOrders = [...localHistory, ...backendOnlyOrders];
+                const mergedOrders = [...mergedLocalHistory, ...backendOnlyOrders];
                 
                 // Sắp xếp theo thời gian tạo (mới nhất trước)
                 mergedOrders.sort((a: any, b: any) => {
@@ -107,7 +149,9 @@ export default function OrdersScreen() {
                     const timeB = new Date(b.createdAt || 0).getTime();
                     return timeB - timeA;
                 });
-                
+
+                await AsyncStorage.setItem(historyKey, JSON.stringify(mergedLocalHistory));
+
                 setOrders(mergedOrders);
                 return;
             }

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { LinearGradient } from 'expo-linear-gradient';
 import axios from "axios";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -67,122 +68,201 @@ const ForgotPasswordScreen = () => {
     };
 
     return (
-        <View style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* 🔙 Nút quay lại */}
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.replace("/(tabs)/login")}
+        <LinearGradient
+            colors={['#667eea', '#764ba2', '#f093fb']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradient}
+        >
+            {/* 🔙 Nút quay lại - Đặt bên ngoài ScrollView để không bị che */}
+            <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.replace("/(tabs)/login")}
+            >
+                <Ionicons name="arrow-back" size={20} color="#667eea" />
+                <Text style={styles.backText}>Quay lại</Text>
+            </TouchableOpacity>
+
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardView}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                 >
-                    <Ionicons name="arrow-back" size={20} color="#1a1a1a" />
-                    <Text style={styles.backText}>Quay lại</Text>
-                </TouchableOpacity>
+                    <View style={styles.container}>
+                        <View style={styles.card}>
+                            {/* 🖼 Ảnh minh họa */}
+                            <View style={styles.imageContainer}>
+                                <Image
+                                    source={require("../../assets/images/forgotPassword.png")}
+                                    style={styles.image}
+                                    resizeMode="contain"
+                                />
+                            </View>
 
-                {/* 🖼 Ảnh minh họa */}
-                <View style={styles.imageContainer}>
-                    <Image
-                        source={require("../../assets/images/forgotPassword.png")}
-                        style={styles.image}
-                        resizeMode="contain"
-                    />
-                </View>
+                            {/* Tiêu đề */}
+                            <View style={styles.headerContainer}>
+                                <Text style={styles.title}>Quên mật khẩu</Text>
+                                <Text style={styles.subtitle}>
+                                    Nhập email để nhận mã xác nhận và đặt lại mật khẩu mới
+                                </Text>
+                            </View>
 
-                {/* Tiêu đề */}
-                <View style={styles.headerContainer}>
-                    <Text style={styles.title}>Quên mật khẩu</Text>
-                    <Text style={styles.subtitle}>
-                        Nhập email để nhận mã xác nhận và đặt lại mật khẩu mới
-                    </Text>
-                </View>
+                            {/* Form */}
+                            <View style={styles.formContainer}>
+                                {/* Email Input */}
+                                <View style={styles.inputWrapper}>
+                                    <Ionicons name="mail-outline" size={20} color="#667eea" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Nhập email của bạn"
+                                        placeholderTextColor="#999"
+                                        keyboardType="email-address"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </View>
 
-                {/* Form */}
-                <View style={styles.formContainer}>
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Email</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nhập email của bạn"
-                            placeholderTextColor="#999"
-                            keyboardType="email-address"
-                            value={email}
-                            onChangeText={setEmail}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
+                                {/* Gửi mã xác nhận Button */}
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    disabled={loading}
+                                    onPress={handleSendCode}
+                                    style={styles.button}
+                                >
+                                    {loading ? (
+                                        <LinearGradient
+                                            colors={['#667eea', '#764ba2']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.buttonGradient}
+                                        >
+                                            <ActivityIndicator color="#fff" />
+                                        </LinearGradient>
+                                    ) : (
+                                        <LinearGradient
+                                            colors={['#667eea', '#764ba2']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.buttonGradient}
+                                        >
+                                            <Text style={styles.buttonText}>Gửi mã xác nhận</Text>
+                                        </LinearGradient>
+                                    )}
+                                </TouchableOpacity>
+
+                                {/* Mã xác nhận Input */}
+                                <View style={styles.inputWrapper}>
+                                    <Ionicons name="key-outline" size={20} color="#667eea" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Nhập mã xác nhận"
+                                        placeholderTextColor="#999"
+                                        value={resetCode}
+                                        onChangeText={setResetCode}
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+
+                                {/* Mật khẩu mới Input */}
+                                <View style={styles.inputWrapper}>
+                                    <Ionicons name="lock-closed-outline" size={20} color="#667eea" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Nhập mật khẩu mới"
+                                        placeholderTextColor="#999"
+                                        secureTextEntry
+                                        value={newPassword}
+                                        onChangeText={setNewPassword}
+                                    />
+                                </View>
+
+                                {/* Đổi mật khẩu Button */}
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    disabled={loading}
+                                    onPress={handleResetPassword}
+                                    style={styles.button}
+                                >
+                                    {loading ? (
+                                        <LinearGradient
+                                            colors={['#667eea', '#764ba2']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.buttonGradient}
+                                        >
+                                            <ActivityIndicator color="#fff" />
+                                        </LinearGradient>
+                                    ) : (
+                                        <LinearGradient
+                                            colors={['#667eea', '#764ba2']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.buttonGradient}
+                                        >
+                                            <Text style={styles.buttonText}>Đổi mật khẩu</Text>
+                                        </LinearGradient>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     </View>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.primaryButton]}
-                        onPress={handleSendCode}
-                        disabled={loading}
-                    >
-                        <Text style={styles.buttonText}>
-                            {loading ? "Đang gửi..." : "Gửi mã xác nhận"}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Mã xác nhận</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nhập mã xác nhận"
-                            placeholderTextColor="#999"
-                            value={resetCode}
-                            onChangeText={setResetCode}
-                            autoCapitalize="none"
-                        />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Mật khẩu mới</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nhập mật khẩu mới"
-                            placeholderTextColor="#999"
-                            secureTextEntry
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                        />
-                    </View>
-
-                    <TouchableOpacity
-                        style={[styles.button, styles.secondaryButton]}
-                        onPress={handleResetPassword}
-                        disabled={loading}
-                    >
-                        <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-                            {loading ? "Đang cập nhật..." : "Đổi mật khẩu"}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </LinearGradient>
     );
 };
 
 export default ForgotPasswordScreen;
 
 const styles = StyleSheet.create({
-    container: {
+    gradient: {
         flex: 1,
-        backgroundColor: "#f8f9fa"
+    },
+    keyboardView: {
+        flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingTop: 60,
-        paddingBottom: 40,
+        justifyContent: 'center',
+        paddingVertical: 20,
+        paddingTop: 80, // Thêm padding top để tránh card che nút quay lại
+    },
+    container: {
+        flex: 1,
+        padding: 20,
+        justifyContent: 'center',
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 24,
+        marginHorizontal: 16,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 10,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
     },
     headerContainer: {
         alignItems: "center",
         marginBottom: 32
     },
     title: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: "bold",
         textAlign: "center",
         marginBottom: 8,
-        color: "#1a1a1a"
+        color: "#1a1a1a",
+        letterSpacing: 0.5,
     },
     subtitle: {
         fontSize: 16,
@@ -196,71 +276,58 @@ const styles = StyleSheet.create({
         marginBottom: 24
     },
     image: {
-        width: 200,
-        height: 200,
+        width: 180,
+        height: 180,
     },
     formContainer: {
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        padding: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 4
+        marginTop: 8,
     },
-    inputContainer: {
-        marginBottom: 20
-    },
-    inputLabel: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#333",
-        marginBottom: 8
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: "#e1e5e9",
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#e0e0e0',
         borderRadius: 12,
         paddingHorizontal: 16,
+        backgroundColor: '#f8f9fa',
+        minHeight: 56,
+        marginBottom: 16,
+    },
+    inputIcon: {
+        marginRight: 12,
+    },
+    input: {
+        flex: 1,
         paddingVertical: 14,
         fontSize: 16,
-        color: "#1a1a1a",
-        backgroundColor: "#fff",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1
+        color: '#1a1a1a',
     },
     button: {
-        paddingVertical: 16,
-        paddingHorizontal: 24,
         borderRadius: 12,
         marginTop: 8,
-        marginBottom: 12,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3
+        marginBottom: 16,
+        overflow: 'hidden',
+        shadowColor: '#667eea',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
     },
-    primaryButton: {
-        backgroundColor: "#1a1a1a"
-    },
-    secondaryButton: {
-        backgroundColor: "#f0f0f0",
-        borderWidth: 1,
-        borderColor: "#e1e5e9"
+    buttonGradient: {
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     buttonText: {
-        textAlign: "center",
-        fontWeight: "600",
-        fontSize: 16,
-        color: "#fff"
-    },
-    secondaryButtonText: {
-        color: "#1a1a1a"
+        color: '#fff',
+        textAlign: 'center',
+        fontWeight: 'bold',
+        fontSize: 18,
+        letterSpacing: 0.5,
     },
     // 🟢 Nút quay lại
     backButton: {
@@ -270,20 +337,20 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: "#fff",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
         borderRadius: 20,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-        zIndex: 10
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 10, // Tăng elevation để hiển thị trên cùng
+        zIndex: 1000 // Tăng zIndex để đảm bảo luôn hiển thị trên cùng
     },
     backText: {
-        color: "#1a1a1a",
+        color: "#667eea",
         fontSize: 16,
-        fontWeight: "500",
-        marginLeft: 5,
+        fontWeight: "600",
+        marginLeft: 6,
     },
 });

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     Pressable,
     StyleSheet,
@@ -9,8 +9,12 @@ import {
     View,
     ActivityIndicator,
     Image,
-    Alert
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { BASE_URL } from '../../config/apiConfig';
@@ -22,6 +26,37 @@ const phoneRegex = /^(0|\+84)\d{9}$/;
 
 const RegisterScreen = () => {
     const router = useRouter();
+
+    // ✅ Clear user cũ khi vào màn đăng ký để tránh bị redirect bởi logic check user
+    useEffect(() => {
+        const clearOldUser = async () => {
+            try {
+                // Chỉ clear nếu user đã bị xóa (check trên server)
+                const userData = await AsyncStorage.getItem('user');
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    const userId = user?._id || user?.id;
+                    if (userId) {
+                        try {
+                            // Kiểm tra xem user còn tồn tại không
+                            await axios.get(`${BASE_URL}/users/${userId}`);
+                            // Nếu user còn tồn tại, không clear (để user có thể đăng nhập)
+                        } catch (err: any) {
+                            // Nếu user không tồn tại (404) hoặc lỗi khác, clear user cũ
+                            if (err?.response?.status === 404) {
+                                console.log('Clearing deleted user from storage...');
+                                await AsyncStorage.removeItem('user');
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                // Ignore errors when clearing
+                console.log('Error clearing old user:', error);
+            }
+        };
+        clearOldUser();
+    }, []);
 
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
@@ -159,193 +194,406 @@ const RegisterScreen = () => {
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Đăng ký</Text>
-            {/* Họ tên */}
-            <View
-                style={[
-                    styles.inputWrapper,
-                    touched.name && !nameValid && { borderColor: '#ff4d4f' },
-                    nameValid && { borderColor: '#000' },
-                ]}
+        <LinearGradient
+            colors={['#667eea', '#764ba2', '#f093fb']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradient}
+        >
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardView}
             >
-                <TextInput
-                    style={styles.input}
-                    placeholder="Họ và tên"
-                    placeholderTextColor="#aaa"
-                    value={name}
-                    onChangeText={setName}
-                    onBlur={() => setTouched(t => ({ ...t, name: true }))}
-                />
-                {name.length > 0 && (
-                    <Ionicons
-                        name={nameValid ? 'checkmark-circle-outline' : 'alert-circle-outline'}
-                        size={22}
-                        color={nameValid ? '#000' : '#ff4d4f'}
-                    />
-                )}
-            </View>
-            {touched.name && !nameValid && (
-                <Text style={styles.error}>Vui lòng nhập tên hợp lệ</Text>
-            )}
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.container}>
+                        <View style={styles.card}>
+                            <Text style={styles.title}>Đăng ký</Text>
+                            <Text style={styles.subtitle}>Tạo tài khoản mới của bạn</Text>
 
-            {/* Số điện thoại */}
-            <View
-                style={[
-                    styles.inputWrapper,
-                    touched.phone && !phoneValid && { borderColor: '#ff4d4f' },
-                    phoneValid && { borderColor: '#000' },
-                ]}
-            >
-                <TextInput
-                    style={styles.input}
-                    placeholder="Số điện thoại"
-                    placeholderTextColor="#aaa"
-                    keyboardType="phone-pad"
-                    value={phone}
-                    onChangeText={setPhone}
-                    onBlur={() => setTouched(t => ({ ...t, phone: true }))}
-                />
-                {phone.length > 0 && (
-                    <Ionicons
-                        name={phoneValid ? 'checkmark-circle-outline' : 'alert-circle-outline'}
-                        size={22}
-                        color={phoneValid ? '#000' : '#ff4d4f'}
-                    />
-                )}
-            </View>
-            {touched.phone && !phoneValid && (
-                <Text style={styles.error}>Số điện thoại không hợp lệ</Text>
-            )}
+                            {/* Họ tên */}
+                            <View style={styles.inputContainer}>
+                                <View
+                                    style={[
+                                        styles.inputWrapper,
+                                        touched.name && !nameValid && { borderColor: '#ff4d4f', borderWidth: 2 },
+                                        name.length > 0 && nameValid && { borderColor: '#30c48d', borderWidth: 2 },
+                                    ]}
+                                >
+                                    <Ionicons name="person-outline" size={20} color="#667eea" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Họ và tên"
+                                        placeholderTextColor="#999"
+                                        value={name}
+                                        onChangeText={setName}
+                                        onBlur={() => setTouched(t => ({ ...t, name: true }))}
+                                    />
+                                    {name.length > 0 && (
+                                        <Ionicons
+                                            name={nameValid ? 'checkmark-circle' : 'alert-circle'}
+                                            size={22}
+                                            color={nameValid ? '#30c48d' : '#ff4d4f'}
+                                        />
+                                    )}
+                                </View>
+                                {touched.name && !nameValid && (
+                                    <Text style={styles.error}>Vui lòng nhập tên hợp lệ</Text>
+                                )}
+                            </View>
 
-            {/* Email */}
-            <View
-                style={[
-                    styles.inputWrapper,
-                    touched.email && !emailValid && { borderColor: '#ff4d4f' },
-                    emailValid && { borderColor: '#000' },
-                ]}
-            >
-                <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor="#aaa"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={email}
-                    onChangeText={setEmail}
-                    onBlur={() => setTouched(t => ({ ...t, email: true }))}
-                />
-                {email.length > 0 && (
-                    <Ionicons
-                        name={emailValid ? 'checkmark-circle-outline' : 'alert-circle-outline'}
-                        size={22}
-                        color={emailValid ? '#000' : '#ff4d4f'}
-                    />
-                )}
-            </View>
-            {touched.email && !emailValid && (
-                <Text style={styles.error}>Vui lòng nhập đúng định dạng email</Text>
-            )}
+                            {/* Số điện thoại */}
+                            <View style={styles.inputContainer}>
+                                <View
+                                    style={[
+                                        styles.inputWrapper,
+                                        touched.phone && !phoneValid && { borderColor: '#ff4d4f', borderWidth: 2 },
+                                        phone.length > 0 && phoneValid && { borderColor: '#30c48d', borderWidth: 2 },
+                                    ]}
+                                >
+                                    <Ionicons name="call-outline" size={20} color="#667eea" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Số điện thoại"
+                                        placeholderTextColor="#999"
+                                        keyboardType="phone-pad"
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        onBlur={() => setTouched(t => ({ ...t, phone: true }))}
+                                    />
+                                    {phone.length > 0 && (
+                                        <Ionicons
+                                            name={phoneValid ? 'checkmark-circle' : 'alert-circle'}
+                                            size={22}
+                                            color={phoneValid ? '#30c48d' : '#ff4d4f'}
+                                        />
+                                    )}
+                                </View>
+                                {touched.phone && !phoneValid && (
+                                    <Text style={styles.error}>Số điện thoại không hợp lệ</Text>
+                                )}
+                            </View>
 
-            {/* Mật khẩu */}
-            <View
-                style={[
-                    styles.inputWrapper,
-                    touched.password && !passwordValid && { borderColor: '#ff4d4f' },
-                    passwordValid && { borderColor: '#000' },
-                ]}
-            >
-                <TextInput
-                    style={styles.input}
-                    placeholder="Mật khẩu"
-                    placeholderTextColor="#aaa"
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                    onBlur={() => setTouched(t => ({ ...t, password: true }))}
-                />
-                <Pressable onPress={() => setShowPassword(v => !v)} style={{ marginRight: 8 }}>
-                    <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={22} color="#333" />
-                </Pressable>
-            </View>
-            {touched.password && !passwordValid && (
-                <Text style={styles.error}>Mật khẩu phải có ít nhất 6 ký tự</Text>
-            )}
+                            {/* Email */}
+                            <View style={styles.inputContainer}>
+                                <View
+                                    style={[
+                                        styles.inputWrapper,
+                                        touched.email && !emailValid && { borderColor: '#ff4d4f', borderWidth: 2 },
+                                        email.length > 0 && emailValid && { borderColor: '#30c48d', borderWidth: 2 },
+                                    ]}
+                                >
+                                    <Ionicons name="mail-outline" size={20} color="#667eea" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Email"
+                                        placeholderTextColor="#999"
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                                    />
+                                    {email.length > 0 && (
+                                        <Ionicons
+                                            name={emailValid ? 'checkmark-circle' : 'alert-circle'}
+                                            size={22}
+                                            color={emailValid ? '#30c48d' : '#ff4d4f'}
+                                        />
+                                    )}
+                                </View>
+                                {touched.email && !emailValid && (
+                                    <Text style={styles.error}>Vui lòng nhập đúng định dạng email</Text>
+                                )}
+                            </View>
 
-            {/* Avatar Selection */}
-            <View style={styles.avatarSection}>
-                <Text style={styles.avatarLabel}>Ảnh đại diện (tùy chọn)</Text>
-                <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
-                    {avatar ? (
-                        <Image source={{ uri: avatar }} style={styles.avatarImage} />
-                    ) : (
-                        <View style={styles.avatarPlaceholder}>
-                            <Ionicons name="camera-outline" size={40} color="#ccc" />
-                            <Text style={styles.avatarPlaceholderText}>Chọn ảnh</Text>
+                            {/* Mật khẩu */}
+                            <View style={styles.inputContainer}>
+                                <View
+                                    style={[
+                                        styles.inputWrapper,
+                                        touched.password && !passwordValid && { borderColor: '#ff4d4f', borderWidth: 2 },
+                                        password.length > 0 && passwordValid && { borderColor: '#30c48d', borderWidth: 2 },
+                                    ]}
+                                >
+                                    <Ionicons name="lock-closed-outline" size={20} color="#667eea" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Mật khẩu"
+                                        placeholderTextColor="#999"
+                                        secureTextEntry={!showPassword}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                                    />
+                                    <Pressable onPress={() => setShowPassword(v => !v)} style={styles.eyeIcon}>
+                                        <Ionicons 
+                                            name={showPassword ? 'eye' : 'eye-off'} 
+                                            size={22} 
+                                            color="#667eea" 
+                                        />
+                                    </Pressable>
+                                    {password.length > 0 && (
+                                        <Ionicons
+                                            name={passwordValid ? 'checkmark-circle' : 'alert-circle'}
+                                            size={22}
+                                            color={passwordValid ? '#30c48d' : '#ff4d4f'}
+                                            style={{ marginLeft: 8 }}
+                                        />
+                                    )}
+                                </View>
+                                {touched.password && !passwordValid && (
+                                    <Text style={styles.error}>Mật khẩu phải có ít nhất 6 ký tự</Text>
+                                )}
+                            </View>
+
+                            {/* Avatar Selection */}
+                            <View style={styles.avatarSection}>
+                                <Text style={styles.avatarLabel}>Ảnh đại diện (tùy chọn)</Text>
+                                <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
+                                    {avatar ? (
+                                        <View style={styles.avatarImageWrapper}>
+                                            <Image source={{ uri: avatar }} style={styles.avatarImage} />
+                                            <View style={styles.avatarEditBadge}>
+                                                <Ionicons name="camera" size={16} color="#fff" />
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <View style={styles.avatarPlaceholder}>
+                                            <Ionicons name="camera-outline" size={40} color="#667eea" />
+                                            <Text style={styles.avatarPlaceholderText}>Chọn ảnh</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Nút đăng ký */}
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                disabled={!canSubmit || loading}
+                                onPress={handleRegister}
+                                style={[
+                                    styles.button,
+                                    (!canSubmit || loading) && styles.buttonDisabled
+                                ]}
+                            >
+                                {loading ? (
+                                    <LinearGradient
+                                        colors={['#667eea', '#764ba2']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.buttonGradient}
+                                    >
+                                        <ActivityIndicator color="#fff" />
+                                    </LinearGradient>
+                                ) : (
+                                    <LinearGradient
+                                        colors={canSubmit ? ['#667eea', '#764ba2'] : ['#b5b5b5', '#999']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.buttonGradient}
+                                    >
+                                        <Text style={styles.buttonText}>Đăng ký</Text>
+                                    </LinearGradient>
+                                )}
+                            </TouchableOpacity>
+
+                            {/* Chuyển sang đăng nhập */}
+                            <View style={styles.loginPrompt}>
+                                <Text style={styles.normalText}>Đã có tài khoản?</Text>
+                                <TouchableOpacity onPress={() => router.push('/(tabs)/login')}>
+                                    <Text style={styles.registerLink}> Đăng nhập</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    )}
-                </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-                style={[styles.button, (!canSubmit || loading) && { backgroundColor: '#ccc' }]}
-                activeOpacity={0.8}
-                disabled={!canSubmit || loading}
-                onPress={handleRegister}
-            >
-                {loading ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.buttonText}>Đăng ký</Text>
-                )}
-            </TouchableOpacity>
-
-            <View style={styles.loginPrompt}>
-                <Text style={{ color: '#000' }}>Đã có tài khoản? </Text>
-                <TouchableOpacity onPress={() => router.push('/(tabs)/login')}>
-                    <Text style={styles.registerLink}>Đăng nhập</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </LinearGradient>
     );
 };
 
 export default RegisterScreen;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20, justifyContent: 'center', backgroundColor: '#fff' },
-    title: { fontSize: 26, fontWeight: 'bold', marginBottom: 25, textAlign: 'center', color: '#000' },
+    gradient: {
+        flex: 1,
+    },
+    keyboardView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        paddingVertical: 20,
+    },
+    container: {
+        flex: 1,
+        padding: 20,
+        justifyContent: 'center',
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 24,
+        marginHorizontal: 16,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 10,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    title: {
+        fontSize: 32,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        textAlign: 'center',
+        color: '#1a1a1a',
+        letterSpacing: 0.5,
+    },
+    subtitle: {
+        fontSize: 16,
+        textAlign: 'center',
+        color: '#666',
+        marginBottom: 24,
+    },
+    inputContainer: {
+        marginBottom: 16,
+    },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#d9d9d9',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        marginBottom: 10,
-        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: '#e0e0e0',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#f8f9fa',
+        minHeight: 56,
     },
-    input: { flex: 1, paddingVertical: 12, fontSize: 16, color: '#000' },
-    button: { backgroundColor: '#000', padding: 15, borderRadius: 8, marginTop: 8 },
-    buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: 16 },
-    error: { color: '#ff4d4f', marginBottom: 10 },
-    loginPrompt: { flexDirection: 'row', justifyContent: 'center', marginTop: 25 },
-    registerLink: { color: '#000', fontWeight: 'bold', marginLeft: 4 },
-    avatarSection: { marginBottom: 15 },
-    avatarLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: '#000' },
-    avatarContainer: { alignSelf: 'center' },
-    avatarImage: { width: 100, height: 100, borderRadius: 50 },
+    inputIcon: {
+        marginRight: 12,
+    },
+    input: {
+        flex: 1,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: '#1a1a1a',
+    },
+    eyeIcon: {
+        marginRight: 8,
+        padding: 4,
+    },
+    button: {
+        borderRadius: 12,
+        marginTop: 8,
+        overflow: 'hidden',
+        shadowColor: '#667eea',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    buttonGradient: {
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    buttonDisabled: {
+        shadowOpacity: 0,
+        elevation: 0,
+    },
+    buttonText: {
+        color: '#fff',
+        textAlign: 'center',
+        fontWeight: 'bold',
+        fontSize: 18,
+        letterSpacing: 0.5,
+    },
+    error: {
+        color: '#ff4d4f',
+        fontSize: 13,
+        marginTop: 6,
+        marginLeft: 4,
+    },
+    avatarSection: {
+        marginBottom: 20,
+        marginTop: 8,
+    },
+    avatarLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 12,
+        color: '#1a1a1a',
+        textAlign: 'center',
+    },
+    avatarContainer: {
+        alignSelf: 'center',
+    },
+    avatarImageWrapper: {
+        position: 'relative',
+    },
+    avatarImage: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        borderWidth: 3,
+        borderColor: '#667eea',
+    },
+    avatarEditBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#667eea',
+        borderRadius: 20,
+        width: 36,
+        height: 36,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#fff',
+    },
     avatarPlaceholder: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: '#f0f0f0',
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: '#f8f9fa',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#ddd',
-        borderStyle: 'dashed'
+        borderColor: '#667eea',
+        borderStyle: 'dashed',
     },
-    avatarPlaceholderText: { marginTop: 5, color: '#999', fontSize: 12 },
+    avatarPlaceholderText: {
+        marginTop: 8,
+        color: '#667eea',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    loginPrompt: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 24,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#e0e0e0',
+    },
+    normalText: {
+        color: '#666',
+        fontSize: 15,
+    },
+    registerLink: {
+        color: '#667eea',
+        fontWeight: 'bold',
+        fontSize: 15,
+    },
 });
