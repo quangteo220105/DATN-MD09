@@ -34,7 +34,7 @@ const LoginScreen = () => {
   const passwordValid = useMemo(() => password.length >= 6, [password]);
   const canSubmit = emailValid && passwordValid;
 
-  const handleLogin = async () => {
+    const handleLogin = async () => {
     if (!canSubmit) return;
     setLoading(true);
 
@@ -47,6 +47,13 @@ const LoginScreen = () => {
       // Nếu login thành công, response.data.user chứa thông tin user
       const user = response.data.user;
       console.log('User info:', user);
+
+      // Kiểm tra tài khoản có bị khóa không
+      if (user.isLocked) {
+        alert('Tài khoản này đã bị khóa!');
+        setLoading(false);
+        return;
+      }
 
       // Lưu thông tin user vào AsyncStorage
       let fixedUser = { ...user };
@@ -61,7 +68,8 @@ const LoginScreen = () => {
     } catch (error: any) {
       console.log('Login error:', error.response || error.message);
       if (error.response) {
-        alert(error.response.data.message);
+        const errorMessage = error.response.data?.message || 'Có lỗi xảy ra. Vui lòng thử lại!';
+        alert(errorMessage);
       } else {
         alert('Có lỗi xảy ra. Vui lòng thử lại!');
       }

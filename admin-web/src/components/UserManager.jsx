@@ -96,18 +96,20 @@ export default function UserManager() {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("Bạn chắc chắn muốn xoá tài khoản này?")) return;
+    const handleToggleLock = async (id, currentLockStatus) => {
+        const action = currentLockStatus ? "mở khóa" : "khóa";
+        if (!window.confirm(`Bạn chắc chắn muốn ${action} tài khoản này?`)) return;
         try {
             const token = localStorage.getItem("token");
-            const res = await fetch(`${BASE_URL}/api/users/${id}`, {
-                method: "DELETE",
+            const res = await fetch(`${BASE_URL}/api/users/${id}/toggle-lock`, {
+                method: "PATCH",
                 headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             await fetchList();
+            alert(`${action === "khóa" ? "Khóa" : "Mở khóa"} tài khoản thành công!`);
         } catch (e) {
-            alert("Xoá thất bại, vui lòng thử lại!");
+            alert(`${action === "khóa" ? "Khóa" : "Mở khóa"} thất bại, vui lòng thử lại!`);
         }
     };
 
@@ -132,42 +134,61 @@ export default function UserManager() {
                             <th style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Email</th>
                             <th style={{ textAlign: 'center', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Số điện thoại</th>
                             <th style={{ textAlign: 'center', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Ngày đăng ký</th>
+                            <th style={{ textAlign: 'center', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Trạng thái</th>
                             <th style={{ textAlign: 'center', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan={6} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Đang tải...</td></tr>
+                            <tr><td colSpan={7} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Đang tải...</td></tr>
                         ) : users.length === 0 ? (
-                            <tr><td colSpan={6} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Chưa có tài khoản nào</td></tr>
+                            <tr><td colSpan={7} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Chưa có tài khoản nào</td></tr>
                         ) : (
-                            users.map((u, idx) => (
-                                <tr key={u._id || u.id || idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fbfdff' }}>
-                                    <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 60 }}>{idx + 1}</td>
-                                    <td style={{ textAlign: 'left', padding: '12px 14px', color: '#0f172a', borderBottom: '1px solid #eef2f7', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name || u.fullName || "—"}</td>
-                                    <td style={{ textAlign: 'left', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', maxWidth: 260, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email || "—"}</td>
-                                    <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 160 }}>{u.phone || u.phoneNumber || "—"}</td>
-                                    <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 160 }}>{formatViDate(getRegistrationDate(u))}</td>
-                                    <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 120 }}>
-                                        <button
-                                            style={{
-                                                background: "linear-gradient(180deg,#ff6066,#ff4b52)",
-                                                border: "none",
-                                                borderRadius: 10,
-                                                color: "#fff",
-                                                padding: "8px 14px",
+                            users.map((u, idx) => {
+                                const isLocked = u.isLocked === true;
+                                return (
+                                    <tr key={u._id || u.id || idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fbfdff' }}>
+                                        <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 60 }}>{idx + 1}</td>
+                                        <td style={{ textAlign: 'left', padding: '12px 14px', color: '#0f172a', borderBottom: '1px solid #eef2f7', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name || u.fullName || "—"}</td>
+                                        <td style={{ textAlign: 'left', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', maxWidth: 260, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email || "—"}</td>
+                                        <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 160 }}>{u.phone || u.phoneNumber || "—"}</td>
+                                        <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 160 }}>{formatViDate(getRegistrationDate(u))}</td>
+                                        <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 120 }}>
+                                            <span style={{ 
+                                                color: isLocked ? '#ef4444' : '#22c55e', 
                                                 fontWeight: 700,
-                                                cursor: "pointer",
-                                                boxShadow: '0 6px 12px rgba(255,91,97,0.25)',
-                                                transition: 'transform 0.08s ease-in-out',
-                                            }}
-                                            onClick={() => handleDelete(u._id || u.id)}
-                                            onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.98)'; }}
-                                            onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                                        >Xóa</button>
-                                    </td>
-                                </tr>
-                            ))
+                                                fontSize: 13
+                                            }}>
+                                                {isLocked ? '🔒 Đã khóa' : '✅ Hoạt động'}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 120 }}>
+                                            <button
+                                                style={{
+                                                    background: isLocked 
+                                                        ? "linear-gradient(180deg,#22c55e,#16a34a)" 
+                                                        : "linear-gradient(180deg,#ff6066,#ff4b52)",
+                                                    border: "none",
+                                                    borderRadius: 10,
+                                                    color: "#fff",
+                                                    padding: "8px 14px",
+                                                    fontWeight: 700,
+                                                    cursor: "pointer",
+                                                    boxShadow: isLocked 
+                                                        ? '0 6px 12px rgba(34,197,94,0.25)' 
+                                                        : '0 6px 12px rgba(255,91,97,0.25)',
+                                                    transition: 'transform 0.08s ease-in-out',
+                                                }}
+                                                onClick={() => handleToggleLock(u._id || u.id, isLocked)}
+                                                onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.98)'; }}
+                                                onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                                            >
+                                                {isLocked ? 'Mở khóa' : 'Khóa tài khoản'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

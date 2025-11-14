@@ -438,7 +438,7 @@ const fetchReviews = async (override = {}) => {
                                             <td style={td}>
                                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                                     <button onClick={() => openDetail(r)} style={btnLink}>Chi tiết</button>
-                                                    <button onClick={() => handleDelete(r._id || r.id)} style={{ ...btnLink, color: '#ef4444' }}>Xóa</button>
+                                                    {/* Nút xóa đã được ẩn */}
                                                 </div>
                                             </td>
                                         </tr>

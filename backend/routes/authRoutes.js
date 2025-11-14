@@ -97,6 +97,11 @@ router.post("/login", async (req, res) => {
             return res.status(400).json({ message: "Email không tồn tại!" });
         }
 
+        // Kiểm tra tài khoản có bị khóa không
+        if (user.isLocked) {
+            return res.status(403).json({ message: "Tài khoản này đã bị khóa!" });
+        }
+
         // So sánh mật khẩu
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
@@ -112,6 +117,7 @@ router.post("/login", async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 avatar: user.avatar,
+                isLocked: user.isLocked || false,
             },
         });
     } catch (error) {

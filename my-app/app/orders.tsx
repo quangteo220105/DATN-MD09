@@ -58,6 +58,9 @@ function mergeOrderData(localOrder: any, backendOrder: any) {
         voucherAppliedAmount: backendOrder?.discount ?? localOrder?.voucherAppliedAmount,
         address: backendOrder?.address ?? localOrder?.address,
         createdAt: backendOrder?.createdAt ?? localOrder?.createdAt,
+        shippingDate: backendOrder?.shippingDate ?? localOrder?.shippingDate,
+        deliveredDate: backendOrder?.deliveredDate ?? localOrder?.deliveredDate,
+        cancelledDate: backendOrder?.cancelledDate ?? localOrder?.cancelledDate,
     };
 
     if (!merged.voucher && merged.voucherCode) {
@@ -235,6 +238,9 @@ export default function OrdersScreen() {
                                 payment: latestOrder.payment || 'zalopay',
                                 status: latestOrder.status || 'Đã xác nhận',
                                 createdAt: latestOrder.createdAt || new Date().toISOString(),
+                                shippingDate: latestOrder.shippingDate || null,
+                                deliveredDate: latestOrder.deliveredDate || null,
+                                cancelledDate: latestOrder.cancelledDate || null,
                                 voucher: latestOrder.voucherCode ? { code: latestOrder.voucherCode } : undefined
                             };
 
@@ -372,7 +378,11 @@ export default function OrdersScreen() {
 
         setOrders(prevOrders => {
             const newOrders = prevOrders.map(o =>
-                (o.id === orderId || o._id === orderId) ? { ...o, status: 'Đã hủy' } : o
+                (o.id === orderId || o._id === orderId) ? { 
+                    ...o, 
+                    status: 'Đã hủy',
+                    cancelledDate: new Date().toISOString() // Lưu thời gian hủy
+                } : o
             );
             const historyKey = `order_history_${user._id}`;
             AsyncStorage.setItem(historyKey, JSON.stringify(newOrders));
@@ -430,15 +440,35 @@ export default function OrdersScreen() {
 
     // Render từng đơn hàng
     const renderItem = ({ item }: { item: any }) => {
-        const created = item.createdAt ? new Date(item.createdAt).toLocaleString() : '';
+        const created = item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : '';
+        const shippingDate = item.shippingDate ? new Date(item.shippingDate).toLocaleString('vi-VN') : null;
+        const deliveredDate = item.deliveredDate ? new Date(item.deliveredDate).toLocaleString('vi-VN') : null;
+        const cancelledDate = item.cancelledDate ? new Date(item.cancelledDate).toLocaleString('vi-VN') : null;
         const status = normalizeStatus(item.status);
         const { productDiscount, voucherDiscount, totalPayment } = calculateOrderDiscount(item);
 
         return (
             <View style={styles.card}>
                 {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={styles.date}>{created}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.date}>Đặt hàng: {created}</Text>
+                        {shippingDate && (
+                            <Text style={[styles.date, { color: '#f59e0b', fontSize: 12, marginTop: 4 }]}>
+                                🚚 Bắt đầu giao: {shippingDate}
+                            </Text>
+                        )}
+                        {deliveredDate && (
+                            <Text style={[styles.date, { color: '#22c55e', fontSize: 12, marginTop: 4 }]}>
+                                ✅ Hoàn thành: {deliveredDate}
+                            </Text>
+                        )}
+                        {cancelledDate && (
+                            <Text style={[styles.date, { color: '#ef4444', fontSize: 12, marginTop: 4 }]}>
+                                ❌ Đã hủy: {cancelledDate}
+                            </Text>
+                        )}
+                    </View>
                     <Text style={[styles.badge, { color: STATUS_INFO[status].color }]}>
                         {STATUS_INFO[status].emoji} {status}
                     </Text>

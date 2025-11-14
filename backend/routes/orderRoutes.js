@@ -171,7 +171,67 @@ router.patch('/:id/status', async (req, res) => {
     const oldOrder = await Order.findById(orderId);
     if (!oldOrder) return res.status(404).json({ message: 'Not found' });
 
-    const ord = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
+    // Trình tự trạng thái đơn hàng (theo thứ tự)
+    const STATUS_SEQUENCE = [
+      'Chờ xác nhận',
+      'Đã xác nhận',
+      'Đang giao hàng',
+      'Đã giao hàng'
+    ];
+
+    // Kiểm tra nếu đơn đã hủy hoặc đã giao hàng, không cho phép thay đổi (trừ khi hủy)
+    if (oldOrder.status === 'Đã hủy' && status !== 'Đã hủy') {
+      return res.status(400).json({ message: 'Không thể thay đổi trạng thái đơn hàng đã hủy' });
+    }
+    if (oldOrder.status === 'Đã giao hàng' && status !== 'Đã giao hàng') {
+      return res.status(400).json({ message: 'Không thể thay đổi trạng thái đơn hàng đã giao' });
+    }
+
+    // Cho phép hủy đơn ở bất kỳ trạng thái nào (trước khi giao hàng)
+    if (status === 'Đã hủy') {
+      const updateData = { 
+        status,
+        cancelledDate: new Date() // Lưu thời gian hủy đơn
+      };
+      const ord = await Order.findByIdAndUpdate(orderId, updateData, { new: true });
+      return res.json({ message: 'Đã hủy đơn hàng thành công', order: ord });
+    }
+
+    // Kiểm tra trình tự trạng thái
+    const oldIndex = STATUS_SEQUENCE.indexOf(oldOrder.status);
+    const newIndex = STATUS_SEQUENCE.indexOf(status);
+
+    // Nếu trạng thái cũ hoặc mới không nằm trong trình tự, cho phép (để tương thích với các trạng thái khác)
+    if (oldIndex === -1 || newIndex === -1) {
+      const ord = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
+      return res.json({ message: 'Cập nhật trạng thái thành công', order: ord });
+    }
+
+    // Chỉ cho phép chuyển sang trạng thái tiếp theo hoặc giữ nguyên
+    if (newIndex !== oldIndex && newIndex !== oldIndex + 1) {
+      return res.status(400).json({ 
+        message: `Không thể chuyển từ "${oldOrder.status}" sang "${status}". Chỉ có thể chuyển sang trạng thái tiếp theo trong trình tự.` 
+      });
+    }
+
+    // Chuẩn bị dữ liệu cập nhật
+    const updateData = { status };
+    
+    // Cập nhật thời gian khi chuyển sang "Đang giao hàng"
+    if (status === 'Đang giao hàng' && oldOrder.status !== 'Đang giao hàng') {
+      updateData.shippingDate = new Date();
+    }
+    
+    // Cập nhật thời gian khi chuyển sang "Đã giao hàng"
+    if (status === 'Đã giao hàng' && oldOrder.status !== 'Đã giao hàng') {
+      updateData.deliveredDate = new Date();
+      // Nếu chưa có shippingDate, đặt luôn (trường hợp nhảy bước)
+      if (!oldOrder.shippingDate) {
+        updateData.shippingDate = new Date();
+      }
+    }
+
+    const ord = await Order.findByIdAndUpdate(orderId, updateData, { new: true });
 
     // Nếu đổi thành "Đã giao hàng" và trạng thái cũ không phải "Đã giao hàng" → trừ stock + tăng voucher usedCount + gửi tin nhắn
     if (status === 'Đã giao hàng' && oldOrder.status !== 'Đã giao hàng') {

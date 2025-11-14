@@ -16,6 +16,7 @@ interface CartItem {
     qty: number;
     checked: boolean;
     categoryId?: string;
+    stock?: number; // Số lượng tồn kho
 }
 
 export default function CartScreen() {
@@ -95,8 +96,15 @@ export default function CartScreen() {
     const changeQty = (id: string, color: string, size: string, d: number) => {
         const newCart = cart.map(item => {
             if (item.id === id && item.color === color && item.size === size) {
-                const newQty = Math.max(1, item.qty + d);
-                return { ...item, qty: newQty };
+                const newQty = item.qty + d;
+                // Kiểm tra stock nếu có
+                if (item.stock !== undefined && newQty > item.stock) {
+                    Alert.alert('Thông báo', `Số lượng tồn kho không đủ. Chỉ còn ${item.stock} sản phẩm.`);
+                    return item; // Giữ nguyên số lượng cũ
+                }
+                // Đảm bảo số lượng tối thiểu là 1
+                const finalQty = Math.max(1, newQty);
+                return { ...item, qty: finalQty };
             }
             return item;
         });
@@ -211,7 +219,25 @@ export default function CartScreen() {
                 <TouchableOpacity
                     style={[styles.payBtn, !hasChecked && { backgroundColor: '#aaa' }]}
                     disabled={!hasChecked}
-                    onPress={() => router.push('/checkout')}
+                    onPress={async () => {
+                        // Kiểm tra stock trước khi chuyển đến checkout
+                        const checkedItems = cart.filter(item => item.checked);
+                        const itemsExceedStock = checkedItems.filter(item => 
+                            item.stock !== undefined && item.qty > item.stock
+                        );
+                        
+                        if (itemsExceedStock.length > 0) {
+                            const itemNames = itemsExceedStock.map(item => 
+                                `${item.name} (${item.size}, ${item.color})`
+                            ).join('\n');
+                            Alert.alert(
+                                'Thông báo', 
+                                `Số lượng tồn kho không đủ cho các sản phẩm sau:\n${itemNames}\n\nVui lòng điều chỉnh số lượng.`
+                            );
+                            return;
+                        }
+                        router.push('/checkout');
+                    }}
                 >
                     <Text style={styles.payBtnText}>Thanh toán</Text>
                 </TouchableOpacity>

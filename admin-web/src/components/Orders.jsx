@@ -8,6 +8,35 @@ const STATUS_OPTIONS = [
     { value: "Đã giao hàng", label: "✅ Đã giao hàng" },
 ];
 
+// Trình tự trạng thái đơn hàng (theo thứ tự)
+const STATUS_SEQUENCE = [
+    "Chờ xác nhận",
+    "Đã xác nhận",
+    "Đang giao hàng",
+    "Đã giao hàng"
+];
+
+// Lấy các trạng thái có thể chuyển từ trạng thái hiện tại
+const getAvailableStatuses = (currentStatus) => {
+    if (!currentStatus || currentStatus === "Đã hủy" || currentStatus === "Đã giao hàng") {
+        // Nếu đã hủy hoặc đã giao hàng, không thể chuyển trạng thái
+        return [currentStatus];
+    }
+    
+    const currentIndex = STATUS_SEQUENCE.indexOf(currentStatus);
+    if (currentIndex === -1) {
+        // Nếu trạng thái không nằm trong trình tự, chỉ giữ nguyên
+        return [currentStatus];
+    }
+    
+    // Trả về trạng thái hiện tại và trạng thái tiếp theo
+    const available = [currentStatus];
+    if (currentIndex < STATUS_SEQUENCE.length - 1) {
+        available.push(STATUS_SEQUENCE[currentIndex + 1]);
+    }
+    return available;
+};
+
 const pageSizeOptions = [10, 20, 50];
 
 export default function Orders() {
@@ -125,18 +154,29 @@ export default function Orders() {
         fetchOrders({ q: query, status, page: 1 });
     };
 
-    const updateStatus = async (orderId, nextStatus) => {
+    const updateStatus = async (orderId, nextStatus, currentStatus) => {
+        // Kiểm tra xem có thể chuyển sang trạng thái này không
+        const availableStatuses = getAvailableStatuses(currentStatus);
+        if (!availableStatuses.includes(nextStatus)) {
+            alert(`Không thể chuyển từ "${currentStatus}" sang "${nextStatus}". Chỉ có thể chuyển sang trạng thái tiếp theo trong trình tự.`);
+            return;
+        }
+        
         try {
             const res = await fetch(`http://localhost:3000/api/orders/${orderId}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: nextStatus })
             });
-            if (!res.ok) throw new Error('Failed to update status');
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Failed to update status');
+            }
             await fetchOrders();
+            alert('Cập nhật trạng thái thành công!');
         } catch (e) {
             console.error(e);
-            alert('Cập nhật trạng thái thất bại');
+            alert(e.message || 'Cập nhật trạng thái thất bại');
         }
     };
 
@@ -145,6 +185,7 @@ export default function Orders() {
             return;
         }
         try {
+            // Backend sẽ tự động lưu cancelledDate khi nhận status 'Đã hủy'
             const res = await fetch(`http://localhost:3000/api/orders/${order._id || order.id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -226,19 +267,49 @@ export default function Orders() {
                                 <tr><td colSpan={6} style={{ padding: 16, textAlign: 'center' }}>Chưa có dữ liệu</td></tr>
                             ) : (
                                 orders.map((o) => {
-                                    const createdAt = o.createdAt ? new Date(o.createdAt).toLocaleString() : '';
+                                    const createdAt = o.createdAt ? new Date(o.createdAt).toLocaleString('vi-VN') : '';
+                                    const shippingDate = o.shippingDate ? new Date(o.shippingDate).toLocaleString('vi-VN') : '—';
+                                    const deliveredDate = o.deliveredDate ? new Date(o.deliveredDate).toLocaleString('vi-VN') : '—';
+                                    const cancelledDate = o.cancelledDate ? new Date(o.cancelledDate).toLocaleString('vi-VN') : '—';
                                     const { name, phone } = parseAddress(o.address, o.customerName || o.name || '—', o.customerPhone || o.phone || '');
                                     return (
                                         <tr key={o._id || o.id}>
                                             <td style={td}>{o.code || o._id || o.id}</td>
-                                            <td style={td}>{createdAt}</td>
+                                            <td style={td}>
+                                                <div>{createdAt}</div>
+                                                {o.shippingDate && (
+                                                    <div style={{ color: '#f59e0b', fontSize: 11, marginTop: 4 }}>
+                                                        🚚 Giao: {shippingDate}
+                                                    </div>
+                                                )}
+                                                {o.deliveredDate && (
+                                                    <div style={{ color: '#22c55e', fontSize: 11, marginTop: 4 }}>
+                                                        ✅ Hoàn thành: {deliveredDate}
+                                                    </div>
+                                                )}
+                                                {o.cancelledDate && (
+                                                    <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>
+                                                        ❌ Đã hủy: {cancelledDate}
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td style={td}>{name || '—'}<div style={{ color: '#888', fontSize: 12 }}>{phone || ''}</div></td>
                                             <td style={td}>{(o.total || 0).toLocaleString('vi-VN')} VND</td>
                                             <td style={td}>
-                                                <select value={o.status || ''} onChange={e => updateStatus(o._id || o.id, e.target.value)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd' }}>
-                                                    {STATUS_OPTIONS.filter(s => s.value !== '').map(s => (
-                                                        <option key={s.value} value={s.value}>{s.label}</option>
-                                                    ))}
+                                                <select 
+                                                    value={o.status || 'Chờ xác nhận'} 
+                                                    onChange={e => updateStatus(o._id || o.id, e.target.value, o.status || 'Chờ xác nhận')} 
+                                                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd' }}
+                                                    disabled={o.status === 'Đã hủy' || o.status === 'Đã giao hàng'}
+                                                >
+                                                    {getAvailableStatuses(o.status || 'Chờ xác nhận').map(status => {
+                                                        const option = STATUS_OPTIONS.find(s => s.value === status);
+                                                        return option ? (
+                                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                                        ) : (
+                                                            <option key={status} value={status}>{status}</option>
+                                                        );
+                                                    })}
                                                 </select>
                                             </td>
                                             <td style={td}>
@@ -284,8 +355,23 @@ export default function Orders() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                             <div>
                                 <div><strong>Mã đơn:</strong> {selected.code || selected._id || selected.id}</div>
-                                <div><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleString() : ''}</div>
+                                <div><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleString('vi-VN') : ''}</div>
                                 <div><strong>Trạng thái:</strong> {selected.status}</div>
+                                {selected.shippingDate && (
+                                    <div style={{ marginTop: 8, color: '#f59e0b' }}>
+                                        <strong>🚚 Bắt đầu giao hàng:</strong> {new Date(selected.shippingDate).toLocaleString('vi-VN')}
+                                    </div>
+                                )}
+                                {selected.deliveredDate && (
+                                    <div style={{ marginTop: 8, color: '#22c55e' }}>
+                                        <strong>✅ Hoàn thành giao hàng:</strong> {new Date(selected.deliveredDate).toLocaleString('vi-VN')}
+                                    </div>
+                                )}
+                                {selected.cancelledDate && (
+                                    <div style={{ marginTop: 8, color: '#ef4444' }}>
+                                        <strong>❌ Đã hủy:</strong> {new Date(selected.cancelledDate).toLocaleString('vi-VN')}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 {(() => {

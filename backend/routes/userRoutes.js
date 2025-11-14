@@ -26,7 +26,26 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id - xoá người dùng
+// PATCH /api/users/:id/toggle-lock - Khóa/Mở khóa tài khoản
+router.patch('/:id/toggle-lock', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng!' });
+    
+    // Đảo ngược trạng thái khóa
+    user.isLocked = !user.isLocked;
+    await user.save();
+    
+    const message = user.isLocked ? 'Đã khóa tài khoản thành công!' : 'Đã mở khóa tài khoản thành công!';
+    res.json({ message, user: { ...user.toObject(), password: undefined } });
+  } catch (err) {
+    console.error('PATCH /api/users/:id/toggle-lock error:', err);
+    res.status(500).json({ message: 'Lỗi server!' });
+  }
+});
+
+// DELETE /api/users/:id - xoá người dùng (giữ lại để tương thích)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;

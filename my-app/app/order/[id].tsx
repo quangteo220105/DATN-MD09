@@ -62,7 +62,10 @@ export default function OrderDetailScreen() {
     useFocusEffect(React.useCallback(() => { loadOrder(); }, [id]));
 
     const status = normalizeStatus(order?.status);
-    const created = order?.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+    const created = order?.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : '';
+    const shippingDate = order?.shippingDate ? new Date(order.shippingDate).toLocaleString('vi-VN') : null;
+    const deliveredDate = order?.deliveredDate ? new Date(order.deliveredDate).toLocaleString('vi-VN') : null;
+    const cancelledDate = order?.cancelledDate ? new Date(order.cancelledDate).toLocaleString('vi-VN') : null;
 
     const currentIndex = useMemo(() => Math.max(0, STATUS_ORDER.indexOf(status as any)), [status]);
 
@@ -160,7 +163,11 @@ export default function OrderDetailScreen() {
                             console.log('PATCH /orders/:id/status failed', e);
                         }
                     }
-                    history = history.map((o: any) => (String(o.id || o._id) === String(id) ? { ...o, status: 'Đã hủy' } : o));
+                    history = history.map((o: any) => (String(o.id || o._id) === String(id) ? { 
+                        ...o, 
+                        status: 'Đã hủy',
+                        cancelledDate: new Date().toISOString() // Lưu thời gian hủy
+                    } : o));
                     await AsyncStorage.setItem(historyKey, JSON.stringify(history));
                     const updated = history.find((o: any) => String(o.id || o._id) === String(id));
                     setOrder(updated || null);
@@ -195,7 +202,22 @@ export default function OrderDetailScreen() {
                 <View style={styles.header}>
                     <View style={{ flex: 1, marginRight: 8 }}>
                         <Text style={styles.orderCode}>Mã đơn: {String(order.id || order._id)}</Text>
-                        <Text style={styles.meta}>Ngày tạo: {created}</Text>
+                        <Text style={styles.meta}>Đặt hàng: {created}</Text>
+                        {shippingDate && (
+                            <Text style={[styles.meta, { color: '#f59e0b', marginTop: 4 }]}>
+                                🚚 Bắt đầu giao: {shippingDate}
+                            </Text>
+                        )}
+                        {deliveredDate && (
+                            <Text style={[styles.meta, { color: '#22c55e', marginTop: 4 }]}>
+                                ✅ Hoàn thành: {deliveredDate}
+                            </Text>
+                        )}
+                        {cancelledDate && (
+                            <Text style={[styles.meta, { color: '#ef4444', marginTop: 4 }]}>
+                                ❌ Đã hủy: {cancelledDate}
+                            </Text>
+                        )}
                     </View>
                     <View style={[styles.statusPill, { borderColor: STATUS_INFO[status].color }]}>
                         <Text style={[styles.statusBadge, { color: STATUS_INFO[status].color }]} numberOfLines={1}>

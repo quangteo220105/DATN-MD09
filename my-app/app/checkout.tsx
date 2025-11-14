@@ -310,6 +310,68 @@ export default function CheckoutScreen() {
       return;
     }
 
+    // Kiểm tra stock trước khi thanh toán
+    try {
+      const stockCheckPromises = cart.map(async (item) => {
+        try {
+          // Lấy thông tin sản phẩm từ API để kiểm tra stock hiện tại
+          const productResponse = await fetch(`${BASE_URL}/products/${item.id}`);
+          if (!productResponse.ok) return null;
+          const productData = await productResponse.json();
+          
+          // Tìm variant tương ứng
+          const variant = productData.variants?.find(
+            (v: any) => v.color === item.color && v.size === item.size
+          );
+          
+          if (variant && item.qty > variant.stock) {
+            return {
+              name: item.name,
+              size: item.size,
+              color: item.color,
+              requestedQty: item.qty,
+              availableStock: variant.stock
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error('Error checking stock for item:', error);
+          return null;
+        }
+      });
+      
+      const stockIssues = (await Promise.all(stockCheckPromises)).filter(issue => issue !== null);
+      
+      if (stockIssues.length > 0) {
+        const issueMessages = stockIssues.map(issue => 
+          `${issue.name} (${issue.size}, ${issue.color}): Yêu cầu ${issue.requestedQty}, còn ${issue.availableStock}`
+        ).join('\n');
+        
+        Alert.alert(
+          'Thông báo',
+          `Số lượng tồn kho không đủ:\n\n${issueMessages}\n\nVui lòng điều chỉnh số lượng và thử lại.`
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('Error validating stock:', error);
+      // Nếu không kiểm tra được stock từ API, kiểm tra stock đã lưu trong cart
+      const itemsExceedStock = cart.filter(item => 
+        item.stock !== undefined && item.qty > item.stock
+      );
+      
+      if (itemsExceedStock.length > 0) {
+        const itemNames = itemsExceedStock.map(item => 
+          `${item.name} (${item.size}, ${item.color}): Yêu cầu ${item.qty}, còn ${item.stock}`
+        ).join('\n');
+        Alert.alert(
+          'Thông báo',
+          `Số lượng tồn kho không đủ:\n\n${itemNames}\n\nVui lòng điều chỉnh số lượng và thử lại.`
+        );
+        return;
+      }
+    }
+
     const finalTotal = total - voucherDiscount;
     const orderId = Date.now().toString();
 

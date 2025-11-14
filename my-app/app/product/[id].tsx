@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import { DOMAIN, BASE_URL } from '../../config/apiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -54,6 +55,22 @@ export default function ProductDetailScreen() {
     const [loadingRating, setLoadingRating] = useState(false);
 
     const scrollViewRef = useRef<ScrollView>(null);
+
+    // Khi quay lại màn chi tiết từ Checkout, đảm bảo xoá trạng thái buy-now tạm
+    useFocusEffect(
+        React.useCallback(() => {
+            const clearBuyNow = async () => {
+                try {
+                    const userString = await AsyncStorage.getItem('user');
+                    const user = userString ? JSON.parse(userString) : null;
+                    if (user && user._id) {
+                        await AsyncStorage.removeItem(`buy_now_${user._id}`);
+                    }
+                } catch { }
+            };
+            clearBuyNow();
+        }, [])
+    );
 
     // Load product details
     useEffect(() => {
@@ -187,7 +204,14 @@ export default function ProductDetailScreen() {
             const idx = cart.findIndex((item: any) => item.id === product._id && item.color === selectedVariant.color && item.size === selectedVariant.size);
 
             if (idx > -1) {
-                cart[idx].qty = (cart[idx].qty || 1) + 1;
+                // Kiểm tra stock trước khi tăng số lượng
+                const currentQty = cart[idx].qty || 1;
+                if (selectedVariant.stock !== undefined && currentQty + 1 > selectedVariant.stock) {
+                    Alert.alert('Thông báo', `Số lượng tồn kho không đủ. Chỉ còn ${selectedVariant.stock} sản phẩm.`);
+                    return;
+                }
+                cart[idx].qty = currentQty + 1;
+                cart[idx].stock = selectedVariant.stock; // Cập nhật stock
             } else {
                 cart.push({
                     id: product._id,
@@ -199,6 +223,7 @@ export default function ProductDetailScreen() {
                     categoryId: product.categoryId,
                     qty: 1,
                     checked: true,
+                    stock: selectedVariant.stock, // Lưu stock
                 });
             }
 
@@ -231,22 +256,21 @@ export default function ProductDetailScreen() {
                 return;
             }
 
-            const cartKey = `cart_${user._id}`;
-            const cart = [
-                {
-                    id: product._id,
-                    name: product.name,
-                    image: selectedVariant.image,
-                    size: selectedVariant.size,
-                    color: selectedVariant.color,
-                    price: selectedVariant.currentPrice,
-                    qty: 1,
-                    checked: true,
-                    categoryId: product.categoryId,
-                },
-            ];
-
-            await AsyncStorage.setItem(cartKey, JSON.stringify(cart));
+            // Lưu riêng sản phẩm "Mua ngay" để không ghi đè giỏ hàng
+            const buyNowKey = `buy_now_${user._id}`;
+            const item = {
+                id: product._id,
+                name: product.name,
+                image: selectedVariant.image,
+                size: selectedVariant.size,
+                color: selectedVariant.color,
+                price: selectedVariant.currentPrice,
+                qty: 1,
+                checked: true,
+                categoryId: product.categoryId,
+                stock: selectedVariant.stock, // Lưu stock
+            };
+            await AsyncStorage.setItem(buyNowKey, JSON.stringify(item));
             router.push('/checkout');
         } catch (e) {
             Alert.alert('Lỗi', 'Không thể thực hiện mua ngay');
@@ -281,6 +305,10 @@ export default function ProductDetailScreen() {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
+                <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
+                    <Ionicons name="arrow-back" size={24} color="#222" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Chi tiết sản phẩm</Text>
                 <TouchableOpacity style={styles.headerBtn} onPress={toggleFavorite}>
                     <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#ff4757' : '#222'} />
                 </TouchableOpacity>

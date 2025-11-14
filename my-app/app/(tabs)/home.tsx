@@ -52,8 +52,10 @@ export default function HomeScreen() {
     const bannerRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showOutOfStockDialog, setShowOutOfStockDialog] = useState(false);
+    const [showLockedDialog, setShowLockedDialog] = useState(false);
     const searchInputRef = useRef<any>(null);
     const isSelectingSuggestionRef = useRef(false);
+    const lockCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Lấy thông tin user từ AsyncStorage
     const fetchUser = async () => {
@@ -127,12 +129,14 @@ export default function HomeScreen() {
         }, [])
     );
 
-    // Lấy danh mục
+    // Lấy danh mục (chỉ lấy danh mục đang hiển thị - isActive = true)
     const fetchCategories = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`${BASE_URL}/categories`);
-            const data = res.data.map((c: any, i: number) => ({ name: c.name, id: c._id }));
+            const res = await axios.get(`${BASE_URL}/categories?active=true`);
+            const data = res.data
+                .filter((c: any) => c.isActive !== false) // Lọc thêm để đảm bảo chỉ lấy danh mục đang hiển thị
+                .map((c: any, i: number) => ({ name: c.name, id: c._id }));
             setCategories([{ name: "Tất cả", id: "all" }, ...data]);
         } catch (error) {
             console.log("Lỗi lấy danh mục:", (error as Error).message);
@@ -181,6 +185,27 @@ export default function HomeScreen() {
                     if (!res?.data?._id) {
                         throw new Error('User missing');
                     }
+                    
+                    // Kiểm tra tài khoản có bị khóa không
+                    if (res.data.isLocked === true) {
+                        console.log('Tài khoản đã bị khóa. Sẽ hiển thị dialog sau 3 giây...');
+                        // Hủy timeout cũ nếu có
+                        if (lockCheckTimeoutRef.current) {
+                            clearTimeout(lockCheckTimeoutRef.current);
+                        }
+                        // Đặt timeout 3 giây để hiển thị dialog
+                        lockCheckTimeoutRef.current = setTimeout(() => {
+                            if (!stop) {
+                                setShowLockedDialog(true);
+                            }
+                        }, 3000);
+                    } else {
+                        // Nếu tài khoản không bị khóa, hủy timeout nếu có
+                        if (lockCheckTimeoutRef.current) {
+                            clearTimeout(lockCheckTimeoutRef.current);
+                            lockCheckTimeoutRef.current = null;
+                        }
+                    }
                 } catch (err: any) {
                     if (stop) return;
                     if (err?.response?.status === 404) {
@@ -201,6 +226,11 @@ export default function HomeScreen() {
             return () => {
                 stop = true;
                 clearInterval(intervalId);
+                // Hủy timeout khi component unmount
+                if (lockCheckTimeoutRef.current) {
+                    clearTimeout(lockCheckTimeoutRef.current);
+                    lockCheckTimeoutRef.current = null;
+                }
             };
         }, [user?._id])
     );
@@ -909,6 +939,30 @@ export default function HomeScreen() {
                             onPress={() => setShowOutOfStockDialog(false)}
                         >
                             <Text style={styles.dialogButtonText}>Đóng</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
+            {/* Account Locked Dialog */}
+            {showLockedDialog && (
+                <View style={styles.dialogOverlay}>
+                    <View style={styles.dialogContainer}>
+                        <View style={styles.dialogIcon}>
+                            <Ionicons name="lock-closed" size={48} color="#ef4444" />
+                        </View>
+                        <Text style={styles.dialogTitle}>Tài khoản đã bị khóa</Text>
+                        <Text style={styles.dialogMessage}>
+                            Tài khoản của bạn đã bị khóa bởi quản trị viên. Vui lòng liên hệ với bộ phận hỗ trợ để được giải quyết.
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.dialogButton}
+                            onPress={async () => {
+                                setShowLockedDialog(false);
+                                await forceLogout();
+                            }}
+                        >
+                            <Text style={styles.dialogButtonText}>Xác nhận</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

@@ -23,6 +23,9 @@ const orderSchema = new mongoose.Schema({
   address: { type: String },
   payment: { type: String, default: 'cod' },
   status: { type: String, enum: ['Chờ xác nhận', 'Chờ thanh toán', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy'], default: 'Chờ xác nhận', index: true },
+  shippingDate: { type: Date, default: null }, // Thời gian bắt đầu giao hàng
+  deliveredDate: { type: Date, default: null }, // Thời gian hoàn thành giao hàng
+  cancelledDate: { type: Date, default: null }, // Thời gian hủy đơn hàng
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

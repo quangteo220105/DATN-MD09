@@ -75,20 +75,21 @@ export default function Categories() {
         }
     };
 
-    // Xóa danh mục
-    const handleDelete = async (record) => {
-        if (!window.confirm(`Bạn có chắc muốn xóa danh mục "${record.name}"?`)) return;
+    // Ẩn/Hiện danh mục
+    const handleToggleVisibility = async (record) => {
+        const action = record.isActive ? "ẩn" : "hiển thị";
+        if (!window.confirm(`Bạn có chắc muốn ${action} danh mục "${record.name}"?`)) return;
 
         try {
-            const res = await fetch(`http://localhost:3000/api/categories/${record._id}`, {
-                method: "DELETE",
+            const res = await fetch(`http://localhost:3000/api/categories/${record._id}/toggle-visibility`, {
+                method: "PATCH",
             });
-            if (!res.ok) throw new Error("Xóa thất bại!");
-            message.success("Xóa thành công!");
+            if (!res.ok) throw new Error(`${action === "ẩn" ? "Ẩn" : "Hiển thị"} thất bại!`);
+            message.success(`${action === "ẩn" ? "Ẩn" : "Hiển thị"} danh mục thành công!`);
             fetchCategories();
         } catch (error) {
             console.error(error);
-            message.error("Xóa thất bại!");
+            message.error(`${action === "ẩn" ? "Ẩn" : "Hiển thị"} thất bại!`);
         }
     };
 
@@ -104,6 +105,15 @@ export default function Categories() {
             key: "description",
         },
         {
+            title: "Trạng thái",
+            key: "status",
+            render: (_, record) => (
+                <span style={{ color: record.isActive ? "#52c41a" : "#ff4d4f", fontWeight: "bold" }}>
+                    {record.isActive ? "Hiển thị" : "Đã ẩn"}
+                </span>
+            ),
+        },
+        {
             title: "Thao tác",
             key: "action",
             render: (_, record) => (
@@ -111,8 +121,14 @@ export default function Categories() {
                     <Button type="primary" size="small" style={{ height: 32 }} onClick={() => openEditModal(record)}>
                         Sửa
                     </Button>
-                    <Button type="primary" danger size="small" style={{ height: 32 }} onClick={() => handleDelete(record)}>
-                        Xóa
+                    <Button 
+                        type="primary" 
+                        danger={record.isActive} 
+                        size="small" 
+                        style={{ height: 32 }} 
+                        onClick={() => handleToggleVisibility(record)}
+                    >
+                        {record.isActive ? "Ẩn danh mục" : "Hiển thị"}
                     </Button>
                 </div>
             ),

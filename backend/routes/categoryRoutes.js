@@ -2,10 +2,15 @@ const express = require("express");
 const router = express.Router();
 const Category = require("../model/Category"); // ⚠️ đổi đúng đường dẫn nếu bạn để trong /models/
 
-// 🟢 Lấy tất cả danh mục
+// 🟢 Lấy tất cả danh mục (có thể lọc theo isActive)
 router.get("/", async (req, res) => {
     try {
-        const categories = await Category.find().sort({ createdAt: -1 });
+        const { active } = req.query; // ?active=true để chỉ lấy danh mục đang hiển thị
+        let query = {};
+        if (active === 'true') {
+            query = { isActive: true };
+        }
+        const categories = await Category.find(query).sort({ createdAt: -1 });
         res.status(200).json(categories);
     } catch (error) {
         console.error("❌ Lỗi lấy danh mục:", error.message);
@@ -27,7 +32,7 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ message: "Danh mục đã tồn tại!" });
         }
 
-        const newCategory = new Category({ name, description });
+        const newCategory = new Category({ name, description, isActive: true });
         await newCategory.save();
 
         res.status(201).json({ message: "Thêm danh mục thành công!", category: newCategory });
@@ -58,18 +63,23 @@ router.put("/:id", async (req, res) => {
     }
 });
 
-// 🔴 Xóa danh mục
-router.delete("/:id", async (req, res) => {
+// 🔴 Ẩn/Hiện danh mục (thay vì xóa)
+router.patch("/:id/toggle-visibility", async (req, res) => {
     try {
         const { id } = req.params;
 
-        const deleted = await Category.findByIdAndDelete(id);
-        if (!deleted) return res.status(404).json({ message: "Không tìm thấy danh mục!" });
+        const category = await Category.findById(id);
+        if (!category) return res.status(404).json({ message: "Không tìm thấy danh mục!" });
 
-        res.status(200).json({ message: "Xóa danh mục thành công!" });
+        // Đảo ngược trạng thái isActive
+        category.isActive = !category.isActive;
+        await category.save();
+
+        const message = category.isActive ? "Hiển thị danh mục thành công!" : "Ẩn danh mục thành công!";
+        res.status(200).json({ message, category });
     } catch (error) {
-        console.error("❌ Lỗi xóa danh mục:", error.message);
-        res.status(500).json({ message: "Không thể xóa danh mục!" });
+        console.error("❌ Lỗi cập nhật trạng thái danh mục:", error.message);
+        res.status(500).json({ message: "Không thể cập nhật trạng thái danh mục!" });
     }
 });
 
