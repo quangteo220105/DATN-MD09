@@ -12,6 +12,7 @@ export default function Analytics() {
     const [topProducts, setTopProducts] = useState([]);
     const [topCustomers, setTopCustomers] = useState([]);
     const [growth, setGrowth] = useState({ current: { revenue: 0, orders: 0 }, previous: { revenue: 0, orders: 0 }, revenueChangePct: 0, ordersChangePct: 0 });
+    const [inventoryCost, setInventoryCost] = useState({ totalCost: 0, totalStock: 0, totalVariants: 0 });
 
     const dateInputStyle = { padding: 8, border: "1px solid #ddd", borderRadius: 6 };
     const labelStyle = { fontSize: 12, color: "#666" };
@@ -29,13 +30,14 @@ export default function Analytics() {
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [summaryRes, revenueRes, topProdRes, topCustRes] = await Promise.all([
+            const [summaryRes, revenueRes, topProdRes, topCustRes, inventoryRes] = await Promise.all([
                 fetch(`http://localhost:3000/api/analytics/summary?${buildQuery()}`),
                 fetch(`http://localhost:3000/api/analytics/revenue?${buildQuery({ groupBy })}`),
                 fetch(`http://localhost:3000/api/analytics/top-products?${buildQuery({ limit: 10 })}`),
                 fetch(`http://localhost:3000/api/analytics/top-customers?${buildQuery({ limit: 10 })}`),
+                fetch(`http://localhost:3000/api/analytics/inventory-cost`),
             ]);
-            const [sumJ, revJ, prodJ, custJ] = await Promise.all([summaryRes.json(), revenueRes.json(), topProdRes.json(), topCustRes.json()]);
+            const [sumJ, revJ, prodJ, custJ, invJ] = await Promise.all([summaryRes.json(), revenueRes.json(), topProdRes.json(), topCustRes.json(), inventoryRes.json()]);
             setSummary(sumJ || { revenue: 0, ordersCount: 0, productsSold: 0 });
             setSeries(Array.isArray(revJ) ? revJ : []);
             const sortedProducts = Array.isArray(prodJ)
@@ -43,6 +45,7 @@ export default function Analytics() {
                 : [];
             setTopProducts(sortedProducts);
             setTopCustomers(Array.isArray(custJ) ? custJ : []);
+            setInventoryCost(invJ || { totalCost: 0, totalStock: 0, totalVariants: 0 });
 
             // growth: previous period of equal length
             const fromDate = from ? new Date(from) : null;
@@ -114,7 +117,7 @@ export default function Analytics() {
                 </form>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                 <div style={{ background: "#fff", borderRadius: 8, padding: 16 }}>
                     <div style={{ color: "#666", fontSize: 12 }}>Doanh thu</div>
                     <div style={{ fontWeight: 700, fontSize: 22 }}>{formatCurrency(summary.revenue)}</div>
@@ -132,6 +135,13 @@ export default function Analytics() {
                 <div style={{ background: "#fff", borderRadius: 8, padding: 16 }}>
                     <div style={{ color: "#666", fontSize: 12 }}>Sản phẩm bán ra</div>
                     <div style={{ fontWeight: 700, fontSize: 22 }}>{summary.productsSold}</div>
+                </div>
+                <div style={{ background: "#fff", borderRadius: 8, padding: 16 }}>
+                    <div style={{ color: "#666", fontSize: 12 }}>Tổng giá nhập hàng tồn</div>
+                    <div style={{ fontWeight: 700, fontSize: 22 }}>{formatCurrency(inventoryCost.totalCost)}</div>
+                    <div style={{ color: "#666", fontSize: 11, marginTop: 4 }}>
+                        {inventoryCost.totalStock} sản phẩm • {inventoryCost.totalVariants} biến thể
+                    </div>
                 </div>
             </div>
 

@@ -18,6 +18,7 @@ import { BASE_URL, DOMAIN } from "../../config/apiConfig";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import ProductFilter, { FilterState } from '../../components/ProductFilter';
 
 const { width } = Dimensions.get("window");
 const ITEM_MARGIN = 8; // khoảng cách giữa 2 cột
@@ -53,9 +54,29 @@ export default function HomeScreen() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showOutOfStockDialog, setShowOutOfStockDialog] = useState(false);
     const [showLockedDialog, setShowLockedDialog] = useState(false);
+    const [showFilter, setShowFilter] = useState(false);
+    const [activeFilters, setActiveFilters] = useState<FilterState>({
+        selectedCategory: 'Tất cả',
+        selectedBrand: 'Tất cả',
+        priceRange: { min: 0, max: 10000000 },
+        minRating: 0,
+    });
     const searchInputRef = useRef<any>(null);
     const isSelectingSuggestionRef = useRef(false);
     const lockCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const normalizeText = (text: string) =>
+        (text || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/\p{Diacritic}+/gu, "");
+
+    const brands = useMemo(() => {
+        const brandSet = new Set<string>();
+        products.forEach(p => {
+            if (p.brand) brandSet.add(p.brand);
+        });
+        return Array.from(brandSet).sort();
+    }, [products]);
 
     // Lấy thông tin user từ AsyncStorage
     const fetchUser = async () => {
@@ -105,13 +126,22 @@ export default function HomeScreen() {
 
 
 
-    // Load favorites từ AsyncStorage
+    // Load favorites từ AsyncStorage theo user ID
     const loadFavorites = async () => {
         try {
-            const savedFavorites = await AsyncStorage.getItem('favorites');
+            // Lấy user hiện tại
+            const userStr = await AsyncStorage.getItem('user');
+            const currentUser = userStr ? JSON.parse(userStr) : null;
+            const userId = currentUser?._id || currentUser?.id;
+            
+            // Nếu không có user, dùng key 'favorites_guest'
+            const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
+            const savedFavorites = await AsyncStorage.getItem(favoritesKey);
             if (savedFavorites) {
                 const favoritesArray = JSON.parse(savedFavorites);
                 setFavorites(new Set(favoritesArray));
+            } else {
+                setFavorites(new Set());
             }
         } catch (error) {
             console.log('Lỗi load favorites:', error);
@@ -121,6 +151,11 @@ export default function HomeScreen() {
     useEffect(() => {
         loadFavorites();
     }, []);
+
+    // ✅ Reload favorites khi user thay đổi
+    useEffect(() => {
+        loadFavorites();
+    }, [user?._id]);
 
     // ✅ Reload favorites mỗi khi Home screen được focus (để đồng bộ với favorites.tsx)
     useFocusEffect(
@@ -167,25 +202,25 @@ export default function HomeScreen() {
                     }
                     const currentUser = JSON.parse(userData);
                     const currentUserId = currentUser?._id || currentUser?.id;
-                    
+
                     // ✅ Nếu user trong storage khác với user hiện tại -> cập nhật state
                     if (currentUserId && currentUserId !== user._id) {
                         console.log('User changed in storage, updating state...');
                         setUser(currentUser);
                         return; // Không check user cũ nữa
                     }
-                    
+
                     // ✅ Chỉ check nếu user ID khớp với user hiện tại
                     if (!currentUserId || currentUserId !== user._id) {
                         return;
                     }
-                    
+
                     // Kiểm tra user trên server
                     const res = await axios.get(`${BASE_URL}/users/${currentUserId}`);
                     if (!res?.data?._id) {
                         throw new Error('User missing');
                     }
-                    
+
                     // Kiểm tra tài khoản có bị khóa không
                     if (res.data.isLocked === true) {
                         console.log('Tài khoản đã bị khóa. Sẽ hiển thị dialog sau 3 giây...');
@@ -354,29 +389,43 @@ export default function HomeScreen() {
         return () => clearInterval(interval);
     }, [banners]);
 
-    // Utility: remove Vietnamese diacritics and lowercase
-    const normalizeText = (text: string) =>
-        (text || "")
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/\p{Diacritic}+/gu, "");
-
     // Lọc sản phẩm theo search & brand (thông minh, bỏ dấu)
     const filtered = useMemo(() => {
         const q = normalizeText(debouncedQuery.trim());
-        const selectedCategory = categories.find(c => c.name === brand);
 
         return products.filter((p) => {
-            // ✅ Chỉ hiển thị sản phẩm đang bán (isActive = true)
-            // Sản phẩm đã ngừng bán sẽ không xuất hiện ở Home
+            // Chỉ hiển thị sản phẩm đang bán
             if (!p.isActive) return false;
 
             // Lọc theo danh mục
-            if (brand !== "Tất cả" && selectedCategory && selectedCategory.id !== "all") {
-                if (p.categoryId !== selectedCategory.id) return false;
+            if (activeFilters.selectedCategory !== "Tất cả") {
+                const selectedCategory = categories.find(c => c.name === activeFilters.selectedCategory);
+                if (selectedCategory && selectedCategory.id !== "all") {
+                    if (p.categoryId !== selectedCategory.id) return false;
+                }
             }
 
-            // Lọc theo tìm kiếm nâng cao
+            // Lọc theo thương hiệu
+            if (activeFilters.selectedBrand !== "Tất cả") {
+                if (p.brand !== activeFilters.selectedBrand) return false;
+            }
+
+            // Lọc theo khoảng giá
+            const minPrice = p.variants?.reduce((min: number, v: any) =>
+                Math.min(min, v.currentPrice || Infinity), Infinity) || 0;
+            if (minPrice < activeFilters.priceRange.min || minPrice > activeFilters.priceRange.max) {
+                return false;
+            }
+
+            // Lọc theo đánh giá
+            if (activeFilters.minRating > 0) {
+                const rating = productRatings[p._id];
+                if (!rating || rating.averageRating < activeFilters.minRating) {
+                    return false;
+                }
+            }
+
+            // Lọc theo tìm kiếm
             if (!q) return true;
 
             const name = normalizeText(p.name);
@@ -395,7 +444,7 @@ export default function HomeScreen() {
                 variantsText.includes(q)
             );
         });
-    }, [debouncedQuery, brand, products, categories]);
+    }, [debouncedQuery, activeFilters, products, categories, productRatings]);
 
     // Gợi ý nhanh dưới thanh tìm kiếm
     const suggestions = useMemo(() => {
@@ -419,19 +468,31 @@ export default function HomeScreen() {
     }, [debouncedQuery, products]);
 
     const toggleFav = async (id: string) => {
-        setFavorites((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
-                next.add(id);
-            }
+        try {
+            // Lấy user hiện tại
+            const userStr = await AsyncStorage.getItem('user');
+            const currentUser = userStr ? JSON.parse(userStr) : null;
+            const userId = currentUser?._id || currentUser?.id;
+            
+            // Nếu không có user, dùng key 'favorites_guest'
+            const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
+            
+            setFavorites((prev) => {
+                const next = new Set(prev);
+                if (next.has(id)) {
+                    next.delete(id);
+                } else {
+                    next.add(id);
+                }
 
-            // Lưu favorites vào AsyncStorage
-            AsyncStorage.setItem('favorites', JSON.stringify(Array.from(next)));
+                // Lưu favorites vào AsyncStorage theo user ID
+                AsyncStorage.setItem(favoritesKey, JSON.stringify(Array.from(next)));
 
-            return next;
-        });
+                return next;
+            });
+        } catch (error) {
+            console.log('Lỗi toggle favorite:', error);
+        }
         // Không điều hướng; chỉ lưu danh sách yêu thích. Người dùng mở qua tab tim.
     };
 
@@ -548,6 +609,7 @@ export default function HomeScreen() {
     };
 
     // ===== Notifications (badge on bell) =====
+    // Chỉ fetch notifications khi có user đăng nhập
     const sevenDaysMs = 7 * 24 * 3600 * 1000;
     const getNotificationsLastSeen = async (): Promise<number> => {
         try {
@@ -668,6 +730,11 @@ export default function HomeScreen() {
     };
 
     const refreshNotifCount = async () => {
+        // Guest mode: không fetch notifications
+        if (!user?._id) {
+            setNotifCount(0);
+            return;
+        }
         const lastSeenMs = await getNotificationsLastSeen();
         const [vCount, cCount, oCount] = await Promise.all([
             fetchVoucherNewCount(lastSeenMs),
@@ -679,6 +746,11 @@ export default function HomeScreen() {
 
     useFocusEffect(
         React.useCallback(() => {
+            // Guest mode: không fetch notifications
+            if (!user?._id) {
+                setNotifCount(0);
+                return;
+            }
             // Refresh ngay khi vào màn hình (bao gồm khi quay lại từ notifications)
             refreshNotifCount();
             // Auto-refresh badge mỗi 1.5 giây để cập nhật ngay lập tức khi có voucher mới hoặc tin nhắn mới
@@ -686,13 +758,13 @@ export default function HomeScreen() {
                 refreshNotifCount();
             }, 1500);
             return () => clearInterval(interval);
-        }, [])
+        }, [user?._id])
     );
 
     // Thêm useEffect để refresh badge khi component mount hoặc khi quay lại
     useEffect(() => {
         refreshNotifCount();
-    }, []);
+    }, [user?._id]);
 
     return (
         <View style={styles.container}>
@@ -738,6 +810,11 @@ export default function HomeScreen() {
                                 <TouchableOpacity
                                     style={styles.bellBtn}
                                     onPress={async () => {
+                                        // Guest mode: chuyển sang login khi click vào notifications
+                                        if (!user?._id) {
+                                            router.push('/(tabs)/login');
+                                            return;
+                                        }
                                         try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch { }
                                         // Đánh dấu đã đọc toàn bộ order notifications để badge không lặp lại sau khi vào màn thông báo
                                         try {
@@ -759,7 +836,7 @@ export default function HomeScreen() {
                                     }}
                                 >
                                     <Ionicons name="notifications-outline" size={22} color="#222" />
-                                    {notifCount > 0 && (
+                                    {user?._id && notifCount > 0 && (
                                         <View style={styles.bellBadge}>
                                             <Text style={styles.bellBadgeText}>{notifCount > 99 ? '99+' : notifCount}</Text>
                                         </View>
@@ -788,7 +865,6 @@ export default function HomeScreen() {
                                             isSelectingSuggestionRef.current = false;
                                         }}
                                         onBlur={() => {
-                                            // Chỉ ẩn suggestions nếu không đang chọn suggestion
                                             setTimeout(() => {
                                                 if (!isSelectingSuggestionRef.current) {
                                                     setShowSuggestions(false);
@@ -819,7 +895,16 @@ export default function HomeScreen() {
                                         </TouchableOpacity>
                                     )}
                                 </View>
+
+                                {/* ✅ NÚT FILTER MỚI */}
+                                <TouchableOpacity
+                                    style={styles.filterBtn}
+                                    onPress={() => setShowFilter(true)}
+                                >
+                                    <Ionicons name="options-outline" size={22} color="#fff" />
+                                </TouchableOpacity>
                             </View>
+
                             {showSuggestions && suggestions.length > 0 && (
                                 <View style={styles.suggestionsPanel}>
                                     {suggestions.map((s: any, index: number) => (
@@ -882,10 +967,17 @@ export default function HomeScreen() {
                                     {categories.map((category, i) => (
                                         <TouchableOpacity
                                             key={`${category.id}-${i}`}
-                                            style={[styles.brandChip, brand === category.name && styles.brandChipActive]}
-                                            onPress={() => setBrand(category.name)}
+                                            style={[styles.brandChip, activeFilters.selectedCategory === category.name && styles.brandChipActive]}
+                                            onPress={() => {
+                                                setBrand(category.name);
+                                                // Cập nhật activeFilters để lọc sản phẩm
+                                                setActiveFilters(prev => ({
+                                                    ...prev,
+                                                    selectedCategory: category.name
+                                                }));
+                                            }}
                                         >
-                                            <Text style={[styles.brandText, brand === category.name && styles.brandTextActive]}>{category.name}</Text>
+                                            <Text style={[styles.brandText, activeFilters.selectedCategory === category.name && styles.brandTextActive]}>{category.name}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </ScrollView>
@@ -967,6 +1059,17 @@ export default function HomeScreen() {
                     </View>
                 </View>
             )}
+            {/* Product Filter Modal */}
+            <ProductFilter
+                visible={showFilter}
+                onClose={() => setShowFilter(false)}
+                onApply={(filters) => {
+                    setActiveFilters(filters);
+                    setBrand(filters.selectedCategory);
+                }}
+                categories={categories}
+                brands={brands}
+            />
         </View>
     );
 }
@@ -1403,5 +1506,18 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
         textAlign: "center"
-    }
+    },
+    filterBtn: {
+        backgroundColor: "#ff4757",
+        width: 44,
+        height: 44,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 3,
+    },
 });

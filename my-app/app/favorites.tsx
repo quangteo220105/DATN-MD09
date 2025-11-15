@@ -12,10 +12,32 @@ export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [products, setProducts] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  // Load user info
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('user');
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          setUser(u);
+        }
+      } catch { }
+    };
+    loadUser();
+  }, []);
 
   const loadFavorites = async () => {
     try {
-      const saved = await AsyncStorage.getItem('favorites');
+      // Lấy user hiện tại
+      const userStr = await AsyncStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const userId = currentUser?._id || currentUser?.id;
+      
+      // Nếu không có user, dùng key 'favorites_guest'
+      const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
+      const saved = await AsyncStorage.getItem(favoritesKey);
       const arr = saved ? JSON.parse(saved) : [];
       setFavorites(new Set(Array.isArray(arr) ? arr : []));
     } catch { }
@@ -34,6 +56,11 @@ export default function FavoritesScreen() {
     loadProducts();
   }, []);
 
+  // ✅ Reload favorites khi user thay đổi
+  useEffect(() => {
+    loadFavorites();
+  }, [user?._id]);
+
   // ✅ Reload favorites mỗi khi màn hình được focus (để đồng bộ với home.tsx)
   useFocusEffect(
     React.useCallback(() => {
@@ -50,10 +77,22 @@ export default function FavoritesScreen() {
   const data = useMemo(() => products.filter(p => favorites.has(p._id)), [products, favorites]);
 
   const removeFromFavorites = async (id: string) => {
-    const next = new Set(favorites);
-    next.delete(id);
-    setFavorites(next);
-    await AsyncStorage.setItem('favorites', JSON.stringify(Array.from(next)));
+    try {
+      // Lấy user hiện tại
+      const userStr = await AsyncStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const userId = currentUser?._id || currentUser?.id;
+      
+      // Nếu không có user, dùng key 'favorites_guest'
+      const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
+      
+      const next = new Set(favorites);
+      next.delete(id);
+      setFavorites(next);
+      await AsyncStorage.setItem(favoritesKey, JSON.stringify(Array.from(next)));
+    } catch (error) {
+      console.log('Lỗi xóa favorite:', error);
+    }
   };
 
   const renderItem = ({ item }: any) => {
@@ -78,13 +117,6 @@ export default function FavoritesScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.push('/(tabs)/home')}
-        >
-          <Ionicons name="arrow-back" size={22} color="#222" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Yêu thích</Text>
         <Text style={styles.headerCount}>{data.length} sản phẩm</Text>
       </View>
       <FlatList

@@ -27,26 +27,26 @@ export default function Dashboard() {
         const fetchDashboard = async () => {
             setLoading(true);
             try {
-                const [prodRes, orderRes, usersRes, summaryRes, revenueRes, topCustRes] = await Promise.all([
-                    fetch("http://localhost:3000/api/products"),
+                const [variantsRes, orderRes, customersRes, summaryRes, revenueRes, topCustRes] = await Promise.all([
+                    fetch("http://localhost:3000/api/analytics/product-variants-count"),
                     fetch("http://localhost:3000/api/orders?page=1&limit=1"),
-                    fetch("http://localhost:3000/api/users"),
+                    fetch("http://localhost:3000/api/analytics/unique-customers-count"),
                     fetch(`http://localhost:3000/api/analytics/summary?from=${startOfMonth.toISOString()}&to=${endOfMonth.toISOString()}`),
                     fetch(`http://localhost:3000/api/analytics/revenue?from=${startOfYear.toISOString()}&to=${endOfYear.toISOString()}&groupBy=month`),
                     fetch(`http://localhost:3000/api/analytics/top-customers?from=${startOfYear.toISOString()}&to=${endOfYear.toISOString()}&limit=5`),
                 ]);
 
-                const products = await prodRes.json();
+                const variants = await variantsRes.json();
                 const ordersPayload = await orderRes.json();
-                const users = await usersRes.json();
+                const customers = await customersRes.json();
                 const summary = await summaryRes.json();
                 const revenue = await revenueRes.json();
                 const topCust = await topCustRes.json();
 
                 setKpi({
-                    products: Array.isArray(products) ? products.length : (products?.data?.length || 0),
+                    products: Number(variants?.count || 0),
                     orders: Number(ordersPayload?.total || (Array.isArray(ordersPayload) ? ordersPayload.length : 0)),
-                    customers: Array.isArray(users) ? users.length : (users?.data?.length || 0),
+                    customers: Number(customers?.count || 0),
                     monthRevenue: Number(summary?.revenue || 0),
                 });
                 setSeries(Array.isArray(revenue) ? revenue : []);

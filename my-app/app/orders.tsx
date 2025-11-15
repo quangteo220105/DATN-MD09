@@ -155,6 +155,37 @@ export default function OrdersScreen() {
 
                 await AsyncStorage.setItem(historyKey, JSON.stringify(mergedLocalHistory));
 
+                // 🟢 Xóa sản phẩm khỏi giỏ hàng nếu đơn hàng đã giao thành công
+                const deliveredOrders = mergedOrders.filter((o: any) => normalizeStatus(o.status) === 'Đã giao hàng');
+                if (deliveredOrders.length > 0) {
+                    const cartKey = `cart_${user._id}`;
+                    const cartString = await AsyncStorage.getItem(cartKey);
+                    let cart = cartString ? JSON.parse(cartString) : [];
+                    cart = Array.isArray(cart) ? cart : [];
+
+                    // Lấy danh sách productId + size + color từ các đơn hàng đã giao
+                    const deliveredItems = new Set<string>();
+                    deliveredOrders.forEach((order: any) => {
+                        if (Array.isArray(order.items)) {
+                            order.items.forEach((item: any) => {
+                                const key = `${item.productId || item._id || item.id}_${item.size}_${item.color}`;
+                                deliveredItems.add(key);
+                            });
+                        }
+                    });
+
+                    // Lọc bỏ các sản phẩm đã giao khỏi giỏ hàng
+                    const updatedCart = cart.filter((cartItem: any) => {
+                        const key = `${cartItem.productId || cartItem._id || cartItem.id}_${cartItem.size}_${cartItem.color}`;
+                        return !deliveredItems.has(key);
+                    });
+
+                    // Chỉ cập nhật nếu có thay đổi
+                    if (updatedCart.length !== cart.length) {
+                        await AsyncStorage.setItem(cartKey, JSON.stringify(updatedCart));
+                    }
+                }
+
                 setOrders(mergedOrders);
                 return;
             }
@@ -378,8 +409,8 @@ export default function OrdersScreen() {
 
         setOrders(prevOrders => {
             const newOrders = prevOrders.map(o =>
-                (o.id === orderId || o._id === orderId) ? { 
-                    ...o, 
+                (o.id === orderId || o._id === orderId) ? {
+                    ...o,
                     status: 'Đã hủy',
                     cancelledDate: new Date().toISOString() // Lưu thời gian hủy
                 } : o

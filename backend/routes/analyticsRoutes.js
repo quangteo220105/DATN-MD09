@@ -309,6 +309,82 @@ router.get('/growth', async (req, res) => {
   }
 });
 
+// GET /api/analytics/inventory-cost - Tính tổng giá nhập của tất cả biến thể đang bán
+router.get('/inventory-cost', async (req, res) => {
+  try {
+    const { ProductVariant } = require('../model/Shoes');
+
+    // Tính tổng giá nhập của tất cả variants đang có trong kho
+    const [result] = await ProductVariant.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalCost: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$originalPrice', 0] },
+                { $ifNull: ['$stock', 0] }
+              ]
+            }
+          },
+          totalStock: { $sum: { $ifNull: ['$stock', 0] } },
+          totalVariants: { $sum: 1 }
+        }
+      }
+    ]);
+
+    res.json({
+      totalCost: result?.totalCost || 0,
+      totalStock: result?.totalStock || 0,
+      totalVariants: result?.totalVariants || 0
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/analytics/product-variants-count - Đếm tổng số biến thể sản phẩm
+router.get('/product-variants-count', async (req, res) => {
+  try {
+    const { ProductVariant } = require('../model/Shoes');
+    const count = await ProductVariant.countDocuments();
+    res.json({ count });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/analytics/unique-customers-count - Đếm số khách hàng duy nhất từ địa chỉ đơn hàng
+router.get('/unique-customers-count', async (req, res) => {
+  try {
+    // Lấy tất cả đơn hàng có địa chỉ
+    const orders = await Order.find({ address: { $exists: true, $ne: '' } })
+      .select('address customerName customerPhone');
+
+    // Tạo Set để lưu khách hàng duy nhất (dựa trên name + phone)
+    const uniqueCustomers = new Set();
+
+    orders.forEach(order => {
+      const parsed = parseAddress(order.address, order.customerName, order.customerPhone);
+      const name = parsed.name || order.customerName || 'Khách hàng';
+      const phone = parsed.phone || order.customerPhone || '';
+
+      // Chỉ đếm nếu có số điện thoại (để tránh trùng lặp)
+      if (phone && phone !== '-') {
+        const key = `${name}|${phone}`;
+        uniqueCustomers.add(key);
+      }
+    });
+
+    res.json({ count: uniqueCustomers.size });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
 
 

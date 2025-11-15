@@ -120,15 +120,24 @@ export default function ProductDetailScreen() {
         fetchRating();
     }, [id]);
 
-    // Load favorites
+    // Load favorites theo user ID
     useEffect(() => {
         const loadFavorites = async () => {
             try {
-                const savedFavorites = await AsyncStorage.getItem('favorites');
+                // Lấy user hiện tại
+                const userStr = await AsyncStorage.getItem('user');
+                const currentUser = userStr ? JSON.parse(userStr) : null;
+                const userId = currentUser?._id || currentUser?.id;
+                
+                // Nếu không có user, dùng key 'favorites_guest'
+                const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
+                const savedFavorites = await AsyncStorage.getItem(favoritesKey);
                 if (savedFavorites) {
                     const favoritesArray = JSON.parse(savedFavorites);
                     setFavorites(new Set(favoritesArray));
                     setIsFavorite(favoritesArray.includes(id));
+                } else {
+                    setIsFavorite(false);
                 }
             } catch (error) {
                 console.log('Lỗi load favorites:', error);
@@ -139,13 +148,21 @@ export default function ProductDetailScreen() {
 
     const toggleFavorite = async () => {
         try {
+            // Lấy user hiện tại
+            const userStr = await AsyncStorage.getItem('user');
+            const currentUser = userStr ? JSON.parse(userStr) : null;
+            const userId = currentUser?._id || currentUser?.id;
+            
+            // Nếu không có user, dùng key 'favorites_guest'
+            const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
+            
             const newFavorites = new Set(favorites);
             if (isFavorite) newFavorites.delete(id as string);
             else newFavorites.add(id as string);
 
             setFavorites(newFavorites);
             setIsFavorite(!isFavorite);
-            await AsyncStorage.setItem('favorites', JSON.stringify(Array.from(newFavorites)));
+            await AsyncStorage.setItem(favoritesKey, JSON.stringify(Array.from(newFavorites)));
         } catch (error) {
             console.log('Lỗi toggle favorite:', error);
         }
@@ -192,7 +209,14 @@ export default function ProductDetailScreen() {
             const userString = await AsyncStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
             if (!user?._id) {
-                Alert.alert('Lỗi', 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
+                Alert.alert(
+                    'Đăng nhập',
+                    'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!',
+                    [
+                        { text: 'Hủy', style: 'cancel' },
+                        { text: 'Đăng nhập', onPress: () => router.push('/(tabs)/login') }
+                    ]
+                );
                 return;
             }
 
@@ -252,7 +276,14 @@ export default function ProductDetailScreen() {
             const userString = await AsyncStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
             if (!user?._id) {
-                Alert.alert('Lưu ý', 'Vui lòng đăng nhập để mua ngay');
+                Alert.alert(
+                    'Đăng nhập',
+                    'Vui lòng đăng nhập để mua ngay sản phẩm này!',
+                    [
+                        { text: 'Hủy', style: 'cancel' },
+                        { text: 'Đăng nhập', onPress: () => router.push('/(tabs)/login') }
+                    ]
+                );
                 return;
             }
 
@@ -305,10 +336,6 @@ export default function ProductDetailScreen() {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="#222" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Chi tiết sản phẩm</Text>
                 <TouchableOpacity style={styles.headerBtn} onPress={toggleFavorite}>
                     <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#ff4757' : '#222'} />
                 </TouchableOpacity>

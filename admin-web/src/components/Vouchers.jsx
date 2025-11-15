@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Modal, message, Popconfirm, Spin, Input, Select, DatePicker, Switch, Tag } from "antd";
-import { DeleteOutlined, PlusOutlined, EditOutlined } from "@ant-design/icons";
+import { Table, Button, Modal, message, Spin, Input, Select, DatePicker, Switch, Tag } from "antd";
+import { PlusOutlined, EditOutlined } from "@ant-design/icons";
 import axios from "axios";
 import dayjs from "dayjs";
 
@@ -227,15 +227,7 @@ export default function Vouchers() {
         }
     };
 
-    const handleDelete = async (id) => {
-        try {
-            await axios.delete(`${API_URL}/${id}`);
-            message.success("Xóa voucher thành công!");
-            fetchVouchers();
-        } catch (error) {
-            message.error("Không thể xóa voucher!");
-        }
-    };
+
 
     const formatDate = (date) => {
         return dayjs(date).format('DD/MM/YYYY HH:mm');
@@ -344,34 +336,16 @@ export default function Vouchers() {
         {
             title: "Hành động",
             key: "actions",
-            width: 150,
+            width: 100,
             render: (_, record) => (
-                <div>
-                    <Button
-                        type="primary"
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={() => openEditModal(record)}
-                        style={{ marginRight: 8 }}
-                    >
-                        Sửa
-                    </Button>
-                    <Popconfirm
-                        title="Bạn có chắc muốn xóa voucher này?"
-                        onConfirm={() => handleDelete(record._id)}
-                        okText="Xóa"
-                        cancelText="Hủy"
-                    >
-                        <Button
-                            type="primary"
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
-                        >
-                            Xóa
-                        </Button>
-                    </Popconfirm>
-                </div>
+                <Button
+                    type="primary"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => openEditModal(record)}
+                >
+                    Sửa
+                </Button>
             )
         }
     ];

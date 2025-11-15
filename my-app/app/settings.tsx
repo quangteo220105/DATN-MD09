@@ -33,7 +33,8 @@ export default function SettingsScreen() {
         try {
             await AsyncStorage.removeItem('user');
         } catch { }
-        router.replace('/(tabs)/login');
+        // Chuyển về Home với chế độ Guest (như Shopee)
+        router.replace('/(tabs)/home');
     };
 
     const handleOpenChangePassword = () => {
@@ -45,7 +46,13 @@ export default function SettingsScreen() {
             <View style={{ padding: 16 }}>
                 <TouchableOpacity
                     style={styles.profileCard}
-                    onPress={() => router.push('/profile')}
+                    onPress={() => {
+                        if (!user?._id) {
+                            router.push('/(tabs)/login');
+                            return;
+                        }
+                        router.push('/profile');
+                    }}
                     activeOpacity={0.7}
                 >
                     {user?.avatar ? (
@@ -63,23 +70,89 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.section}>
-                    <SettingsItem icon="key-outline" title="Đổi mật khẩu" onPress={handleOpenChangePassword} />
-                    <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-                        <View style={{ backgroundColor: '#e6f7ff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#bae7ff' }}>
-                            <Text style={{ color: '#0958d9', fontSize: 13 }}>
-                                Lưu ý: Mật khẩu mới cần tối thiểu 6 ký tự và khác mật khẩu cũ.
-                            </Text>
+                    <SettingsItem 
+                        icon="key-outline" 
+                        title="Đổi mật khẩu" 
+                        onPress={() => {
+                            if (!user?._id) {
+                                Alert.alert('Đăng nhập', 'Vui lòng đăng nhập để sử dụng tính năng này!', [
+                                    { text: 'Hủy', style: 'cancel' },
+                                    { text: 'Đăng nhập', onPress: () => router.push('/(tabs)/login') }
+                                ]);
+                                return;
+                            }
+                            handleOpenChangePassword();
+                        }} 
+                    />
+                    {user?._id && (
+                        <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                            <View style={{ backgroundColor: '#e6f7ff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#bae7ff' }}>
+                                <Text style={{ color: '#0958d9', fontSize: 13 }}>
+                                    Lưu ý: Mật khẩu mới cần tối thiểu 6 ký tự và khác mật khẩu cũ.
+                                </Text>
+                            </View>
                         </View>
-                    </View>
-                    <SettingsItem icon="notifications-outline" title="Thông báo" onPress={() => router.push('/notifications')} />
-                    <SettingsItem icon="chatbubbles-outline" title="Hỗ trợ tư vấn" onPress={() => router.push('/chat')} />
-                    <SettingsItem icon="sparkles-outline" title="Chat với AI tư vấn" onPress={() => router.push('/chatAI')} />
-                    <SettingsItem icon="cube-outline" title="Đơn hàng của tôi" onPress={() => router.push('/orders')} />
+                    )}
+                    <SettingsItem 
+                        icon="notifications-outline" 
+                        title="Thông báo" 
+                        onPress={() => {
+                            if (!user?._id) {
+                                router.push('/(tabs)/login');
+                                return;
+                            }
+                            router.push('/notifications');
+                        }} 
+                    />
+                    <SettingsItem 
+                        icon="chatbubbles-outline" 
+                        title="Hỗ trợ tư vấn" 
+                        onPress={() => {
+                            if (!user?._id) {
+                                router.push('/(tabs)/login');
+                                return;
+                            }
+                            router.push('/chat');
+                        }} 
+                    />
+                    <SettingsItem 
+                        icon="sparkles-outline" 
+                        title="Chat với AI tư vấn" 
+                        onPress={() => {
+                            if (!user?._id) {
+                                router.push('/(tabs)/login');
+                                return;
+                            }
+                            router.push('/chatAI');
+                        }} 
+                    />
+                    <SettingsItem 
+                        icon="cube-outline" 
+                        title="Đơn hàng của tôi" 
+                        onPress={() => {
+                            if (!user?._id) {
+                                router.push('/(tabs)/login');
+                                return;
+                            }
+                            router.push('/orders');
+                        }} 
+                    />
                 </View>
 
-                <View style={styles.section}>
-                    <SettingsItem icon="log-out-outline" title="Đăng xuất" danger onPress={logout} />
-                </View>
+                {user?._id && (
+                    <View style={styles.section}>
+                        <SettingsItem icon="log-out-outline" title="Đăng xuất" danger onPress={logout} />
+                    </View>
+                )}
+                {!user?._id && (
+                    <View style={styles.section}>
+                        <SettingsItem 
+                            icon="log-in-outline" 
+                            title="Đăng nhập" 
+                            onPress={() => router.push('/(tabs)/login')} 
+                        />
+                    </View>
+                )}
             </View>
 
             {/* Dialog đổi mật khẩu */}

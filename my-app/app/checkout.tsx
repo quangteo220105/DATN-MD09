@@ -125,7 +125,7 @@ export default function CheckoutScreen() {
             if (user && user._id) {
               await AsyncStorage.removeItem(`buy_now_${user._id}`);
             }
-          } catch {}
+          } catch { }
         })();
       };
     }, [])
@@ -161,6 +161,13 @@ export default function CheckoutScreen() {
 
   // 🟢 Chọn voucher từ danh sách
   const selectVoucher = async (voucher: any) => {
+    // Kiểm tra số lượng sản phẩm
+    const totalProducts = cart.reduce((sum, i) => sum + i.qty, 0);
+    if (totalProducts > 3) {
+      Alert.alert('Thông báo', 'Voucher chỉ được áp dụng cho tối đa 3 sản phẩm. Hiện tại bạn có ' + totalProducts + ' sản phẩm trong giỏ hàng.');
+      return;
+    }
+
     const cartTotal = cart.reduce((sum, i) => sum + i.qty * i.price, 0);
     const categoryIds = getCartCategoryIds();
     try {
@@ -212,6 +219,13 @@ export default function CheckoutScreen() {
       return;
     }
 
+    // Kiểm tra số lượng sản phẩm
+    const totalProducts = cart.reduce((sum, i) => sum + i.qty, 0);
+    if (totalProducts > 3) {
+      Alert.alert('Thông báo', 'Voucher chỉ được áp dụng cho tối đa 3 sản phẩm. Hiện tại bạn có ' + totalProducts + ' sản phẩm trong giỏ hàng.');
+      return;
+    }
+
     const cartTotal = cart.reduce((sum, i) => sum + i.qty * i.price, 0);
     const categoryIds = getCartCategoryIds();
 
@@ -258,12 +272,12 @@ export default function CheckoutScreen() {
       const ZALOPAY_APP_ID = '2554';
       // URL ZaloPay sandbox HTML (file trong public folder của backend)
       const ZALOPAY_SANDBOX_URL = `${BASE_URL.replace('/api', '')}/zalopay-sandbox.html`;
-      
+
       // Tạo transaction ID unique
       const apptransid = `${Date.now()}_${orderId}`;
       const apptime = Date.now();
       const amountRounded = Math.round(amount);
-      
+
       // Tạo URL với các tham số cần thiết cho ZaloPay sandbox
       const params = new URLSearchParams({
         appid: ZALOPAY_APP_ID,
@@ -283,9 +297,9 @@ export default function CheckoutScreen() {
       });
 
       const paymentUrl = `${ZALOPAY_SANDBOX_URL}?${params.toString()}`;
-      
+
       console.log('Opening ZaloPay Sandbox URL:', paymentUrl);
-      
+
       // Mở URL trong trình duyệt mặc định (Chrome trên Android, Safari trên iOS)
       const supported = await Linking.canOpenURL(paymentUrl);
       if (supported) {
@@ -318,12 +332,12 @@ export default function CheckoutScreen() {
           const productResponse = await fetch(`${BASE_URL}/products/${item.id}`);
           if (!productResponse.ok) return null;
           const productData = await productResponse.json();
-          
+
           // Tìm variant tương ứng
           const variant = productData.variants?.find(
             (v: any) => v.color === item.color && v.size === item.size
           );
-          
+
           if (variant && item.qty > variant.stock) {
             return {
               name: item.name,
@@ -339,14 +353,14 @@ export default function CheckoutScreen() {
           return null;
         }
       });
-      
+
       const stockIssues = (await Promise.all(stockCheckPromises)).filter(issue => issue !== null);
-      
+
       if (stockIssues.length > 0) {
-        const issueMessages = stockIssues.map(issue => 
+        const issueMessages = stockIssues.map(issue =>
           `${issue.name} (${issue.size}, ${issue.color}): Yêu cầu ${issue.requestedQty}, còn ${issue.availableStock}`
         ).join('\n');
-        
+
         Alert.alert(
           'Thông báo',
           `Số lượng tồn kho không đủ:\n\n${issueMessages}\n\nVui lòng điều chỉnh số lượng và thử lại.`
@@ -356,12 +370,12 @@ export default function CheckoutScreen() {
     } catch (error) {
       console.error('Error validating stock:', error);
       // Nếu không kiểm tra được stock từ API, kiểm tra stock đã lưu trong cart
-      const itemsExceedStock = cart.filter(item => 
+      const itemsExceedStock = cart.filter(item =>
         item.stock !== undefined && item.qty > item.stock
       );
-      
+
       if (itemsExceedStock.length > 0) {
-        const itemNames = itemsExceedStock.map(item => 
+        const itemNames = itemsExceedStock.map(item =>
           `${item.name} (${item.size}, ${item.color}): Yêu cầu ${item.qty}, còn ${item.stock}`
         ).join('\n');
         Alert.alert(
@@ -442,19 +456,19 @@ export default function CheckoutScreen() {
       const paymentOrderId = backendOrderId || orderId;
       const orderDescription = `Thanh toan don hang ${paymentOrderId}`;
       await openZaloPay(paymentOrderId, finalTotal, orderDescription);
-      
+
       Alert.alert(
         'Đang chuyển đến ZaloPay',
         'Vui lòng hoàn tất thanh toán trên trình duyệt. Sau khi thanh toán thành công, đơn hàng sẽ được cập nhật.',
         [
-          { 
-            text: 'Xem đơn hàng', 
-            onPress: () => router.replace('/orders') 
+          {
+            text: 'Xem đơn hàng',
+            onPress: () => router.replace('/orders')
           },
-          { 
-            text: 'Quay về Home', 
-            onPress: () => router.replace('/(tabs)/home'), 
-            style: 'cancel' 
+          {
+            text: 'Quay về Home',
+            onPress: () => router.replace('/(tabs)/home'),
+            style: 'cancel'
           },
         ]
       );
@@ -477,7 +491,7 @@ export default function CheckoutScreen() {
     // Nếu là buy now, dọn dẹp key tạm để không ảnh hưởng lần sau
     try {
       await AsyncStorage.removeItem(`buy_now_${user._id}`);
-    } catch {}
+    } catch { }
 
     // Reset voucher
     setAppliedVoucher(null);

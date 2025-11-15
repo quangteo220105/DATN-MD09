@@ -6,8 +6,8 @@ const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
     const handleNext = () => {
-        // Chuyển sang màn hình chính của ứng dụng
-        router.replace('/(tabs)/login' as any);
+        // Chuyển thẳng sang màn hình Home (Guest mode - như Shopee)
+        router.replace('/(tabs)/home' as any);
     };
 
     return (
