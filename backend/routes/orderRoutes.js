@@ -110,46 +110,27 @@ router.get('/:id', async (req, res) => {
     if (!ord) return res.status(404).json({ message: 'Not found' });
 
     let voucherInfo = null;
-    const Voucher = require('../model/Voucher');
 
-    if (ord.voucherCode) {
-      const voucher = await Voucher.findOne({ code: ord.voucherCode.toUpperCase() });
-      if (voucher) {
-        const totalAmount = ord.items.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
-        let discountTotal = 0;
+    // ✅ ƯU TIÊN dùng discount đã lưu trong order thay vì tính lại từ voucher
+    // Điều này đảm bảo discount không thay đổi khi voucher bị sửa
+    if (ord.voucherCode && ord.discount) {
+      // Dùng discount đã lưu
+      const discountTotal = ord.discount;
+      voucherInfo = { code: ord.voucherCode, discountApplied: discountTotal };
 
-        if (voucher.categoryIds && voucher.categoryIds.length > 0) {
-          const applicableItems = ord.items.filter(item =>
-            item.categoryId && voucher.categoryIds.map(id => String(id)).includes(String(item.categoryId))
-          );
-          const applicableAmount = applicableItems.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
+      // Phân bổ discount cho từng item theo tỉ lệ giá (nếu chưa có discountAmount)
+      const hasItemDiscount = ord.items.some(item => item.discountAmount && item.discountAmount > 0);
 
-          if (voucher.discountType === 'percent') {
-            discountTotal = Math.round((applicableAmount * voucher.discountValue) / 100);
-            if (voucher.maxDiscountAmount > 0 && discountTotal > voucher.maxDiscountAmount)
-              discountTotal = voucher.maxDiscountAmount;
-          } else {
-            discountTotal = voucher.discountValue;
-          }
-        } else {
-          if (voucher.discountType === 'percent') {
-            discountTotal = Math.round((totalAmount * voucher.discountValue) / 100);
-            if (voucher.maxDiscountAmount > 0 && discountTotal > voucher.maxDiscountAmount)
-              discountTotal = voucher.maxDiscountAmount;
-          } else {
-            discountTotal = voucher.discountValue;
-          }
-        }
-
-        voucherInfo = { code: voucher.code, discountApplied: discountTotal };
-
-        // Phân bổ discount cho từng item theo tỉ lệ giá
+      if (!hasItemDiscount) {
         const totalItemAmount = ord.items.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
         ord.items = ord.items.map(item => {
           const itemAmount = item.price * (item.qty || 1);
           const itemDiscount = totalItemAmount > 0 ? Math.round((itemAmount / totalItemAmount) * discountTotal) : 0;
           return { ...item.toObject(), discount: itemDiscount, discountAmount: itemDiscount };
         });
+      } else {
+        // Đã có discountAmount → giữ nguyên
+        ord.items = ord.items.map(item => ({ ...item.toObject() }));
       }
     } else {
       ord.items = ord.items.map(item => ({ ...item.toObject(), discount: 0, discountAmount: 0 }));
@@ -189,7 +170,7 @@ router.patch('/:id/status', async (req, res) => {
 
     // Cho phép hủy đơn ở bất kỳ trạng thái nào (trước khi giao hàng)
     if (status === 'Đã hủy') {
-      const updateData = { 
+      const updateData = {
         status,
         cancelledDate: new Date() // Lưu thời gian hủy đơn
       };
@@ -209,19 +190,19 @@ router.patch('/:id/status', async (req, res) => {
 
     // Chỉ cho phép chuyển sang trạng thái tiếp theo hoặc giữ nguyên
     if (newIndex !== oldIndex && newIndex !== oldIndex + 1) {
-      return res.status(400).json({ 
-        message: `Không thể chuyển từ "${oldOrder.status}" sang "${status}". Chỉ có thể chuyển sang trạng thái tiếp theo trong trình tự.` 
+      return res.status(400).json({
+        message: `Không thể chuyển từ "${oldOrder.status}" sang "${status}". Chỉ có thể chuyển sang trạng thái tiếp theo trong trình tự.`
       });
     }
 
     // Chuẩn bị dữ liệu cập nhật
     const updateData = { status };
-    
+
     // Cập nhật thời gian khi chuyển sang "Đang giao hàng"
     if (status === 'Đang giao hàng' && oldOrder.status !== 'Đang giao hàng') {
       updateData.shippingDate = new Date();
     }
-    
+
     // Cập nhật thời gian khi chuyển sang "Đã giao hàng"
     if (status === 'Đã giao hàng' && oldOrder.status !== 'Đã giao hàng') {
       updateData.deliveredDate = new Date();
@@ -364,44 +345,26 @@ router.get('/user/:userId/list', async (req, res) => {
     const data = await Promise.all(
       orders.map(async ord => {
         let voucherInfo = null;
-        let discountTotal = 0;
 
-        if (ord.voucherCode) {
-          const voucher = await Voucher.findOne({ code: ord.voucherCode.toUpperCase() });
-          if (voucher) {
-            const totalAmount = ord.items.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
+        // ✅ ƯU TIÊN dùng discount đã lưu trong order thay vì tính lại từ voucher
+        if (ord.voucherCode && ord.discount) {
+          // Dùng discount đã lưu
+          const discountTotal = ord.discount;
+          voucherInfo = { code: ord.voucherCode, discountApplied: discountTotal };
 
-            if (voucher.categoryIds && voucher.categoryIds.length > 0) {
-              const applicableItems = ord.items.filter(item =>
-                item.categoryId && voucher.categoryIds.map(id => String(id)).includes(String(item.categoryId))
-              );
-              const applicableAmount = applicableItems.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
+          // Phân bổ discount cho từng item theo tỉ lệ giá (nếu chưa có discountAmount)
+          const hasItemDiscount = ord.items.some(item => item.discountAmount && item.discountAmount > 0);
 
-              if (voucher.discountType === 'percent') {
-                discountTotal = Math.round((applicableAmount * voucher.discountValue) / 100);
-                if (voucher.maxDiscountAmount > 0 && discountTotal > voucher.maxDiscountAmount)
-                  discountTotal = voucher.maxDiscountAmount;
-              } else {
-                discountTotal = voucher.discountValue;
-              }
-            } else {
-              if (voucher.discountType === 'percent') {
-                discountTotal = Math.round((totalAmount * voucher.discountValue) / 100);
-                if (voucher.maxDiscountAmount > 0 && discountTotal > voucher.maxDiscountAmount)
-                  discountTotal = voucher.maxDiscountAmount;
-              } else {
-                discountTotal = voucher.discountValue;
-              }
-            }
-
-            voucherInfo = { code: voucher.code, discountApplied: discountTotal };
-
+          if (!hasItemDiscount) {
             const totalItemAmount = ord.items.reduce((sum, item) => sum + item.price * (item.qty || 1), 0);
             ord.items = ord.items.map(item => {
               const itemAmount = item.price * (item.qty || 1);
               const itemDiscount = totalItemAmount > 0 ? Math.round((itemAmount / totalItemAmount) * discountTotal) : 0;
               return { ...item, discount: itemDiscount, discountAmount: itemDiscount };
             });
+          } else {
+            // Đã có discountAmount → giữ nguyên
+            ord.items = ord.items.map(item => ({ ...item }));
           }
         } else {
           ord.items = ord.items.map(item => ({ ...item, discount: 0, discountAmount: 0 }));
@@ -512,16 +475,17 @@ router.post('/zalopay/callback', async (req, res) => {
 
     // Trả về response cho ZaloPay
     res.json({
-      returncode: status === 1 ? 1 : -1,
-      returnmessage: status === 1 ? 'Success' : 'Failed',
-      apptransid: apptransid
+      return_code: status === 1 ? 1 : -1,
+      return_message: status === 1 ? 'success' : 'failed',
+      orderId: order._id,
+      paymentSuccess: status === 1
     });
   } catch (e) {
     console.error('[ZaloPay Callback] Error:', e);
     res.status(500).json({
-      returncode: -1,
-      returnmessage: 'Server error',
-      apptransid: req.body?.apptransid || ''
+      return_code: 0,
+      return_message: 'error',
+      error: e.message
     });
   }
 });

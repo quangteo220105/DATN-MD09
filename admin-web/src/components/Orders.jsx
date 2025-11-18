@@ -22,13 +22,13 @@ const getAvailableStatuses = (currentStatus) => {
         // Nếu đã hủy hoặc đã giao hàng, không thể chuyển trạng thái
         return [currentStatus];
     }
-    
+
     const currentIndex = STATUS_SEQUENCE.indexOf(currentStatus);
     if (currentIndex === -1) {
         // Nếu trạng thái không nằm trong trình tự, chỉ giữ nguyên
         return [currentStatus];
     }
-    
+
     // Trả về trạng thái hiện tại và trạng thái tiếp theo
     const available = [currentStatus];
     if (currentIndex < STATUS_SEQUENCE.length - 1) {
@@ -161,7 +161,7 @@ export default function Orders() {
             alert(`Không thể chuyển từ "${currentStatus}" sang "${nextStatus}". Chỉ có thể chuyển sang trạng thái tiếp theo trong trình tự.`);
             return;
         }
-        
+
         try {
             const res = await fetch(`http://localhost:3000/api/orders/${orderId}/status`, {
                 method: 'PATCH',
@@ -296,9 +296,9 @@ export default function Orders() {
                                             <td style={td}>{name || '—'}<div style={{ color: '#888', fontSize: 12 }}>{phone || ''}</div></td>
                                             <td style={td}>{(o.total || 0).toLocaleString('vi-VN')} VND</td>
                                             <td style={td}>
-                                                <select 
-                                                    value={o.status || 'Chờ xác nhận'} 
-                                                    onChange={e => updateStatus(o._id || o.id, e.target.value, o.status || 'Chờ xác nhận')} 
+                                                <select
+                                                    value={o.status || 'Chờ xác nhận'}
+                                                    onChange={e => updateStatus(o._id || o.id, e.target.value, o.status || 'Chờ xác nhận')}
                                                     style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd' }}
                                                     disabled={o.status === 'Đã hủy' || o.status === 'Đã giao hàng'}
                                                 >
@@ -394,7 +394,6 @@ export default function Orders() {
                                         <th style={th}>Thuộc tính</th>
                                         <th style={th}>SL</th>
                                         <th style={th}>Giá</th>
-                                        <th style={th}>Tổng</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -418,13 +417,42 @@ export default function Orders() {
                                             <td style={td}>{[it.size, it.color].filter(Boolean).join(', ')}</td>
                                             <td style={td}>{it.qty}</td>
                                             <td style={td}>{(it.price || 0).toLocaleString('vi-VN')} VND</td>
-                                            <td style={td}>{((it.price || 0) * (it.qty || 0)).toLocaleString('vi-VN')} VND</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                             <div style={{ textAlign: 'right', marginTop: 10 }}>
-                                <strong>Tổng cộng: {(selected.total || 0).toLocaleString('vi-VN')} VND</strong>
+                                {(() => {
+                                    // Tính tổng
+                                    const items = selected.items || [];
+
+                                    // Tổng tiền sản phẩm
+                                    const lineSubtotal = items.reduce((sum, p) => {
+                                        const price = Number(p.price || 0);
+                                        const qty = Number(p.qty || 1);
+                                        return sum + price * qty;
+                                    }, 0);
+
+                                    // Tổng giảm giá (đã bao gồm cả voucher discount được phân bổ vào items)
+                                    const totalDiscount = items.reduce((sum, p) => {
+                                        const disc = Number(p.discountAmount || p.discount || 0);
+                                        return sum + disc;
+                                    }, 0);
+
+                                    // Tổng thanh toán = Tổng sản phẩm - Tổng giảm giá
+                                    const totalPayment = Math.max(0, lineSubtotal - totalDiscount);
+
+                                    return (
+                                        <div>
+                                            {totalDiscount > 0 && (
+                                                <div style={{ color: '#22c55e', marginBottom: 4 }}>
+                                                    Giảm giá: -{totalDiscount.toLocaleString('vi-VN')} VND
+                                                </div>
+                                            )}
+                                            <strong>Tổng cộng: {totalPayment.toLocaleString('vi-VN')} VND</strong>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

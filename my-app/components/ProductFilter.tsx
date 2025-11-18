@@ -179,7 +179,8 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
 
                         {/* Đánh giá */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Đánh giá tối thiểu</Text>
+                            <Text style={styles.sectionTitle}>Đánh giá</Text>
+                            <Text style={styles.sectionSubtitle}>Chọn số sao chính xác</Text>
                             <View style={styles.ratingContainer}>
                                 {[0, 1, 2, 3, 4, 5].map((rating) => (
                                     <TouchableOpacity
@@ -259,6 +260,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#333',
+        marginBottom: 4,
+    },
+    sectionSubtitle: {
+        fontSize: 12,
+        color: '#999',
         marginBottom: 12,
     },
     chipContainer: {

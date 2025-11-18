@@ -428,6 +428,42 @@
             }
         }
 
+        /* Full screen loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner-large {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #22c55e;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 20px;
+            text-align: center;
+        }
+
         /* Responsive */
         @media (max-width: 480px) {
             .container {
@@ -526,6 +562,14 @@
         </div>
     </div>
 
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div style="text-align: center;">
+            <div class="loading-spinner-large"></div>
+            <div class="loading-text">Đang xử lý...</div>
+        </div>
+    </div>
+
     <script>
         // Lấy thông tin từ URL query params
         const urlParams = new URLSearchParams(window.location.search);
@@ -564,8 +608,14 @@
             let statusClass = '';
 
             if (status === 'success') {
+                // Hiển thị loading overlay
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                loadingOverlay.classList.add('active');
+                
                 message = '✅ Thanh toán thành công! Đang gửi callback...';
                 statusClass = 'status-success';
+                statusMessage.textContent = message;
+                statusMessage.className = 'status-message ' + statusClass;
 
                 // Gửi callback về server
                 try {
@@ -589,86 +639,81 @@
                     });
 
                     if (response.ok) {
-                        message = '✅ Thanh toán thành công! Callback đã được gửi về server. Đang quay về app...';
-                        statusMessage.textContent = message;
-                        statusMessage.className = 'status-message ' + statusClass;
+                        // Cập nhật loading text
+                        const loadingText = loadingOverlay.querySelector('.loading-text');
+                        if (loadingText) {
+                            loadingText.textContent = 'Thanh toán thành công!';
+                        }
 
-                        // Đợi 1.5 giây để người dùng thấy thông báo
+                        // Đợi 1.5 giây để người dùng thấy loading
                         setTimeout(() => {
-                            // Nếu đang trong WebView của app
+                            // Ẩn loading overlay
+                            loadingOverlay.classList.remove('active');
+                            
+                            // Hiển thị thông báo thành công
+                            message = '✅ Thanh toán thành công!';
+                            statusMessage.textContent = message;
+                            statusMessage.className = 'status-message ' + statusClass;
+                            statusMessage.style.display = 'block';
+                            
+                            // Nếu đang trong WebView của app, thử gửi message
                             if (window.ReactNativeWebView) {
-                                window.ReactNativeWebView.postMessage(JSON.stringify({
-                                    type: 'payment_success',
-                                    apptransid: apptransid,
-                                    amount: amountNum
-                                }));
-                            } else {
-                                // Nếu mở từ trình duyệt Chrome, mở deep link về app Expo
-                                const deepLink = 'myapp://orders?payment=success';
-
-                                // Hàm mở deep link - thử nhiều cách để đảm bảo hoạt động trên Android emulator
-                                function openApp() {
-                                    console.log('Attempting to open deep link:', deepLink);
-
-                                    // Cách 1: Tạo thẻ <a> và click (hoạt động tốt trên Android)
-                                    try {
-                                        const link = document.createElement('a');
-                                        link.href = deepLink;
-                                        link.style.display = 'none';
-                                        link.setAttribute('target', '_self');
-                                        document.body.appendChild(link);
-                                        link.click();
-
-                                        // Xóa link sau 200ms
-                                        setTimeout(() => {
-                                            if (document.body.contains(link)) {
-                                                document.body.removeChild(link);
-                                            }
-                                        }, 200);
-
-                                        console.log('Deep link opened via <a> tag');
-                                    } catch (e) {
-                                        console.error('Failed to open via <a> tag:', e);
-                                    }
-
-                                    // Cách 2: Thử window.location.href (fallback)
-                                    setTimeout(() => {
-                                        try {
-                                            window.location.href = deepLink;
-                                            console.log('Deep link opened via window.location.href');
-                                        } catch (e) {
-                                            console.error('Failed to open via window.location.href:', e);
-                                        }
-                                    }, 100);
-
-                                    // Cách 3: Thử window.location.replace (fallback cuối cùng)
-                                    setTimeout(() => {
-                                        try {
-                                            window.location.replace(deepLink);
-                                            console.log('Deep link opened via window.location.replace');
-                                        } catch (e) {
-                                            console.error('Failed to open via window.location.replace:', e);
-                                        }
-                                    }, 200);
+                                try {
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                                        type: 'payment_success',
+                                        apptransid: apptransid,
+                                        amount: amountNum
+                                    }));
+                                } catch (e) {
+                                    console.error('Failed to post message to WebView:', e);
                                 }
-
-                                // Mở app ngay lập tức
-                                openApp();
-
-                                // Fallback: Nếu không mở được app sau 3 giây, hiển thị thông báo
-                                setTimeout(() => {
-                                    message = '✅ Thanh toán thành công! Vui lòng mở app để xem đơn hàng.';
-                                    statusMessage.textContent = message;
-                                }, 3000);
+                            }
+                            
+                            // Hiển thị hướng dẫn quay lại app (KHÔNG tự động redirect để tránh lỗi)
+                            const instructionDiv = document.createElement('div');
+                            instructionDiv.style.marginTop = '20px';
+                            instructionDiv.style.padding = '16px';
+                            instructionDiv.style.backgroundColor = '#f0fdf4';
+                            instructionDiv.style.borderRadius = '12px';
+                            instructionDiv.style.border = '2px solid #22c55e';
+                            instructionDiv.style.fontSize = '14px';
+                            instructionDiv.style.color = '#166534';
+                            instructionDiv.style.lineHeight = '1.6';
+                            instructionDiv.innerHTML = `
+                                <div style="font-weight: bold; margin-bottom: 12px; font-size: 16px;">🎉 Đơn hàng đã được đặt thành công!</div>
+                                <div style="margin-bottom: 8px;">📱 <strong>Vui lòng quay lại app:</strong></div>
+                                <div style="margin-left: 20px; margin-bottom: 4px;">1. Nhấn nút <strong>Back</strong> hoặc <strong>Home</strong> trên điện thoại</div>
+                                <div style="margin-left: 20px; margin-bottom: 4px;">2. Mở lại app của bạn</div>
+                                <div style="margin-left: 20px; margin-bottom: 12px;">3. App sẽ <strong>tự động</strong> chuyển đến màn hình thanh toán và hiển thị thông báo thành công</div>
+                                <div style="padding-top: 12px; border-top: 1px solid #86efac; font-size: 13px; color: #15803d;">
+                                    💡 <em>Lưu ý: Bạn không cần làm gì thêm, app sẽ tự động phát hiện và xử lý!</em>
+                                </div>
+                            `;
+                            
+                            // Xóa instruction cũ nếu có
+                            const oldInstruction = document.querySelector('.payment-instruction');
+                            if (oldInstruction) {
+                                oldInstruction.remove();
+                            }
+                            
+                            instructionDiv.className = 'payment-instruction';
+                            statusMessage.parentNode.insertBefore(instructionDiv, statusMessage.nextSibling);
+                            
+                            // Ẩn các nút thanh toán
+                            const actionButtons = document.querySelector('.actions');
+                            if (actionButtons) {
+                                actionButtons.style.display = 'none';
                             }
                         }, 1500);
                     } else {
+                        loadingOverlay.classList.remove('active');
                         message = '⚠️ Thanh toán thành công nhưng callback thất bại. Vui lòng kiểm tra server.';
                         statusMessage.textContent = message;
                         statusMessage.className = 'status-message ' + statusClass;
                     }
                 } catch (error) {
                     console.error('Callback error:', error);
+                    loadingOverlay.classList.remove('active');
                     message = '⚠️ Thanh toán thành công nhưng không thể gửi callback. Vui lòng thử lại.';
                     statusMessage.textContent = message;
                     statusMessage.className = 'status-message ' + statusClass;

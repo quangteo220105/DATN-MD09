@@ -133,7 +133,7 @@ export default function HomeScreen() {
             const userStr = await AsyncStorage.getItem('user');
             const currentUser = userStr ? JSON.parse(userStr) : null;
             const userId = currentUser?._id || currentUser?.id;
-            
+
             // Nếu không có user, dùng key 'favorites_guest'
             const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
             const savedFavorites = await AsyncStorage.getItem(favoritesKey);
@@ -417,10 +417,14 @@ export default function HomeScreen() {
                 return false;
             }
 
-            // Lọc theo đánh giá
+            // Lọc theo đánh giá (chính xác số sao đã chọn)
             if (activeFilters.minRating > 0) {
                 const rating = productRatings[p._id];
-                if (!rating || rating.averageRating < activeFilters.minRating) {
+                if (!rating) return false;
+
+                // Làm tròn rating về số nguyên gần nhất để so sánh
+                const roundedRating = Math.round(rating.averageRating);
+                if (roundedRating !== activeFilters.minRating) {
                     return false;
                 }
             }
@@ -473,10 +477,10 @@ export default function HomeScreen() {
             const userStr = await AsyncStorage.getItem('user');
             const currentUser = userStr ? JSON.parse(userStr) : null;
             const userId = currentUser?._id || currentUser?.id;
-            
+
             // Nếu không có user, dùng key 'favorites_guest'
             const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
-            
+
             setFavorites((prev) => {
                 const next = new Set(prev);
                 if (next.has(id)) {
