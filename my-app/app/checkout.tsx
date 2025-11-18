@@ -44,7 +44,30 @@ export default function CheckoutScreen() {
   const [showVoucherList, setShowVoucherList] = useState(false);
   const [loadingVouchers, setLoadingVouchers] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showFailureDialog, setShowFailureDialog] = useState(false);
   const hasCheckedPaymentRef = useRef(false); // Tránh check nhiều lần trong cùng một session
+
+  // � Hàmm xử lý thanh toán thất bại
+  const handlePaymentFailure = React.useCallback(async () => {
+    console.log('❌❌❌ handlePaymentFailure CALLED! ❌❌❌');
+    try {
+      const userString = await AsyncStorage.getItem('user');
+      const user = userString ? JSON.parse(userString) : null;
+      if (!user || !user._id) {
+        console.log('❌ No user found, returning...');
+        return;
+      }
+
+      console.log('✅ User found:', user._id);
+
+      // Hiển thị dialog thất bại
+      console.log('❌❌❌ SETTING showFailureDialog to TRUE ❌❌❌');
+      setShowFailureDialog(true);
+      console.log('❌ Failure dialog state updated!');
+    } catch (error) {
+      console.error('[Checkout] Error handling payment failure:', error);
+    }
+  }, []);
 
   // 🟢 Hàm xử lý thanh toán thành công
   const handlePaymentSuccess = React.useCallback(async () => {
@@ -167,19 +190,44 @@ export default function CheckoutScreen() {
             const orderTime = new Date(newestUnseenOrder.createdAt).getTime();
             const hoursAgo = Math.round((Date.now() - orderTime) / (1000 * 60 * 60));
 
+            const orderStatus = (newestUnseenOrder.status || '').toLowerCase().trim();
+
             console.log('✅✅✅ NEW ZALOPAY ORDER FOUND! ✅✅✅', {
               orderId: orderId,
               status: newestUnseenOrder.status,
+              statusLower: orderStatus,
               createdAt: newestUnseenOrder.createdAt,
               hoursAgo: hoursAgo,
               orderTime: new Date(orderTime).toISOString(),
               lastDismissed: lastDismissedTime ? new Date(lastDismissedTime).toISOString() : 'Never'
             });
 
-            console.log('� About to calal handlePaymentSuccess...');
-            await handlePaymentSuccess();
-            console.log('✅ handlePaymentSuccess completed!');
-            return true;
+            // Kiểm tra trạng thái đơn hàng
+            console.log('[Checkout] Checking order status:', {
+              original: newestUnseenOrder.status,
+              lowercase: orderStatus,
+              isWaitingPayment: orderStatus === 'chờ thanh toán',
+              isConfirmed: orderStatus === 'đã xác nhận' || orderStatus.includes('xác nhận')
+            });
+
+            if (orderStatus === 'chờ thanh toán') {
+              // Thanh toán thất bại - đơn vẫn ở trạng thái chờ thanh toán
+              console.log('❌❌❌ Payment FAILED - Order status: Chờ thanh toán');
+              await handlePaymentFailure();
+              return true;
+            } else if (orderStatus === 'đã xác nhận' || orderStatus.includes('xác nhận') || orderStatus === 'confirmed') {
+              // Thanh toán thành công - đơn đã được xác nhận
+              console.log('🚀 Payment SUCCESS - Order confirmed');
+              await handlePaymentSuccess();
+              console.log('✅ handlePaymentSuccess completed!');
+              return true;
+            } else {
+              // Trạng thái khác (Đang giao hàng, Đã giao hàng, v.v.) - coi như thành công
+              console.log('🚀 Payment SUCCESS - Order status:', newestUnseenOrder.status);
+              await handlePaymentSuccess();
+              console.log('✅ handlePaymentSuccess completed!');
+              return true;
+            }
           } else {
             console.log('[Checkout] No new ZaloPay orders since last dismissal');
           }
@@ -230,22 +278,32 @@ export default function CheckoutScreen() {
                 });
               }
 
-              // ✅ Nếu tìm thấy đơn theo ID → Hiển thị dialog NGAY (không cần kiểm tra status hay thời gian)
+              // ✅ Nếu tìm thấy đơn theo ID → Kiểm tra status
               if (zalopayOrder) {
+                const orderStatus = (zalopayOrder.status || '').toLowerCase().trim();
+
                 console.log('✅✅✅ ZALOPAY ORDER FOUND! ✅✅✅', {
                   orderId: zalopayOrder._id || zalopayOrder.id,
                   status: zalopayOrder.status,
+                  statusLower: orderStatus,
                   payment: zalopayOrder.payment
                 });
 
-                // Đánh dấu đơn đã processed
-                const orderId = zalopayOrder._id || zalopayOrder.id;
-                await AsyncStorage.setItem(`zalopay_order_processed_${orderId}`, 'true');
                 await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
-                console.log('🚀 About to call handlePaymentSuccess...');
-                await handlePaymentSuccess();
-                console.log('✅ handlePaymentSuccess completed!');
-                return true;
+
+                // Kiểm tra trạng thái
+                if (orderStatus === 'chờ thanh toán') {
+                  // Thanh toán thất bại
+                  console.log('❌❌❌ [Legacy] Payment FAILED - Order status: Chờ thanh toán');
+                  await handlePaymentFailure();
+                  return true;
+                } else {
+                  // Thanh toán thành công
+                  console.log('🚀 [Legacy] About to call handlePaymentSuccess...');
+                  await handlePaymentSuccess();
+                  console.log('✅ [Legacy] handlePaymentSuccess completed!');
+                  return true;
+                }
               }
 
               // Nếu không tìm thấy theo orderId, tìm đơn ZaloPay mới nhất trong 5 phút
@@ -261,20 +319,30 @@ export default function CheckoutScreen() {
 
               if (recentZaloPayOrders.length > 0) {
                 zalopayOrder = recentZaloPayOrders[0];
+                const orderStatus = (zalopayOrder.status || '').toLowerCase().trim();
+
                 console.log('✅✅✅ RECENT ZALOPAY ORDER FOUND! ✅✅✅', {
                   orderId: zalopayOrder._id || zalopayOrder.id,
                   status: zalopayOrder.status,
+                  statusLower: orderStatus,
                   createdAt: zalopayOrder.createdAt
                 });
 
-                // Đánh dấu đơn đã processed
-                const orderId = zalopayOrder._id || zalopayOrder.id;
-                await AsyncStorage.setItem(`zalopay_order_processed_${orderId}`, 'true');
                 await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
-                console.log('🚀 About to call handlePaymentSuccess...');
-                await handlePaymentSuccess();
-                console.log('✅ handlePaymentSuccess completed!');
-                return true;
+
+                // Kiểm tra trạng thái
+                if (orderStatus === 'chờ thanh toán') {
+                  // Thanh toán thất bại
+                  console.log('❌❌❌ [Legacy] Payment FAILED - Recent order status: Chờ thanh toán');
+                  await handlePaymentFailure();
+                  return true;
+                } else {
+                  // Thanh toán thành công
+                  console.log('🚀 [Legacy] About to call handlePaymentSuccess (recent order)...');
+                  await handlePaymentSuccess();
+                  console.log('✅ [Legacy] handlePaymentSuccess completed!');
+                  return true;
+                }
               } else {
                 console.log('[Checkout] No recent ZaloPay order found, will retry...');
               }
@@ -1097,6 +1165,40 @@ export default function CheckoutScreen() {
                 }}
               >
                 <Text style={styles.successButtonText}>QUAY VỀ HOME</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Failure Dialog */}
+      <Modal visible={showFailureDialog} animationType="fade" transparent>
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalContainer}>
+            <Text style={[styles.successTitle, { color: '#ef4444' }]}>Thanh toán thất bại</Text>
+            <Text style={styles.successMessage}>Giao dịch ZaloPay không thành công. Vui lòng thử lại!</Text>
+            <View style={styles.successButtonRow}>
+              <TouchableOpacity
+                style={[styles.successButton, { flex: 1, backgroundColor: '#ff4757' }]}
+                onPress={async () => {
+                  setShowFailureDialog(false);
+
+                  // ✅ Lưu timestamp khi user đóng dialog
+                  try {
+                    const userString = await AsyncStorage.getItem('user');
+                    const user = userString ? JSON.parse(userString) : null;
+                    if (user && user._id) {
+                      await AsyncStorage.setItem(`zalopay_last_dismissed_${user._id}`, Date.now().toString());
+                      console.log('✅ Saved failure dismissal timestamp:', new Date().toISOString());
+                    }
+                  } catch (e) {
+                    console.error('Error saving timestamp:', e);
+                  }
+
+                  // Ở lại màn checkout để user thử lại
+                }}
+              >
+                <Text style={[styles.successButtonText, { color: '#fff' }]}>XÁC NHẬN</Text>
               </TouchableOpacity>
             </View>
           </View>

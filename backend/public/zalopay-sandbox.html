@@ -45,6 +45,7 @@
             0% {
                 transform: translate(0, 0);
             }
+
             100% {
                 transform: translate(50px, 50px);
             }
@@ -67,6 +68,7 @@
                 opacity: 0;
                 transform: translateY(40px) scale(0.95);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
@@ -387,6 +389,7 @@
                 opacity: 0;
                 transform: translateY(-10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -486,9 +489,12 @@
 
         /* Pulse animation for amount */
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: scale(1);
             }
+
             50% {
                 transform: scale(1.02);
             }
@@ -553,9 +559,6 @@
                 <button class="btn btn-failure" onclick="handlePayment('failure')">
                     <span>❌ Thanh toán thất bại</span>
                 </button>
-                <button class="btn btn-processing" onclick="handlePayment('processing')">
-                    <span>⏸️ Đang xử lý</span>
-                </button>
             </div>
 
             <div class="status-message" id="statusMessage"></div>
@@ -611,7 +614,7 @@
                 // Hiển thị loading overlay
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 loadingOverlay.classList.add('active');
-                
+
                 message = '✅ Thanh toán thành công! Đang gửi callback...';
                 statusClass = 'status-success';
                 statusMessage.textContent = message;
@@ -649,13 +652,13 @@
                         setTimeout(() => {
                             // Ẩn loading overlay
                             loadingOverlay.classList.remove('active');
-                            
+
                             // Hiển thị thông báo thành công
                             message = '✅ Thanh toán thành công!';
                             statusMessage.textContent = message;
                             statusMessage.className = 'status-message ' + statusClass;
                             statusMessage.style.display = 'block';
-                            
+
                             // Nếu đang trong WebView của app, thử gửi message
                             if (window.ReactNativeWebView) {
                                 try {
@@ -668,7 +671,7 @@
                                     console.error('Failed to post message to WebView:', e);
                                 }
                             }
-                            
+
                             // Hiển thị hướng dẫn quay lại app (KHÔNG tự động redirect để tránh lỗi)
                             const instructionDiv = document.createElement('div');
                             instructionDiv.style.marginTop = '20px';
@@ -689,16 +692,16 @@
                                     💡 <em>Lưu ý: Bạn không cần làm gì thêm, app sẽ tự động phát hiện và xử lý!</em>
                                 </div>
                             `;
-                            
+
                             // Xóa instruction cũ nếu có
                             const oldInstruction = document.querySelector('.payment-instruction');
                             if (oldInstruction) {
                                 oldInstruction.remove();
                             }
-                            
+
                             instructionDiv.className = 'payment-instruction';
                             statusMessage.parentNode.insertBefore(instructionDiv, statusMessage.nextSibling);
-                            
+
                             // Ẩn các nút thanh toán
                             const actionButtons = document.querySelector('.actions');
                             if (actionButtons) {

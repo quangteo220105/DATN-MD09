@@ -625,8 +625,35 @@ export default function OrdersScreen() {
     const tabs = useMemo(() => ['Tất cả', ...STATUS_ORDER, 'Đã hủy'], []);
 
     const filteredOrders = useMemo(() => {
-        if (activeTab === 'Tất cả') return orders;
-        return orders.filter((o) => normalizeStatus(o.status) === activeTab);
+        let filtered = activeTab === 'Tất cả'
+            ? [...orders]
+            : orders.filter((o) => normalizeStatus(o.status) === activeTab);
+
+        // Sắp xếp đơn hàng theo thời gian tương ứng với trạng thái
+        filtered.sort((a, b) => {
+            const statusA = normalizeStatus(a.status);
+            const statusB = normalizeStatus(b.status);
+
+            // Lấy thời gian tương ứng với trạng thái của từng đơn
+            const getRelevantTime = (order: any, status: string) => {
+                if (status === 'Đã giao hàng' && order.deliveredDate) {
+                    return new Date(order.deliveredDate).getTime();
+                }
+                if (status === 'Đang giao hàng' && order.shippingDate) {
+                    return new Date(order.shippingDate).getTime();
+                }
+                // Các trạng thái khác (Chờ xác nhận, Đã xác nhận, Đã hủy) dùng createdAt
+                return order.createdAt ? new Date(order.createdAt).getTime() : 0;
+            };
+
+            const timeA = getRelevantTime(a, statusA);
+            const timeB = getRelevantTime(b, statusB);
+
+            // Sắp xếp theo thời gian: mới nhất lên đầu
+            return timeB - timeA;
+        });
+
+        return filtered;
     }, [orders, activeTab]);
 
     const emptyComponent = useMemo(() => (
