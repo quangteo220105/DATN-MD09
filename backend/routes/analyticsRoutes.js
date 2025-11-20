@@ -269,6 +269,41 @@ router.get('/top-customers', async (req, res) => {
   }
 });
 
+// GET /api/analytics/export?from=&to=
+router.get('/export', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const fromDate = parseDate(from, null);
+    const toDate = parseDate(to, null);
+    const match = buildDateMatch(fromDate, toDate);
+
+    const orders = await Order.find(match).sort({ createdAt: -1 }).lean();
+
+    const rows = [];
+    orders.forEach(order => {
+      const { name, phone } = parseAddress(order.address, order.customerName, order.customerPhone);
+      const items = Array.isArray(order.items) ? order.items : [];
+      items.forEach(item => {
+        rows.push({
+          date: order.createdAt,
+          productName: item?.name || 'Sản phẩm',
+          color: item?.color || '',
+          size: item?.size || '',
+          quantity: item?.qty || 1,
+          revenue: (item?.price || 0) * (item?.qty || 1),
+          customer: name,
+          phone,
+        });
+      });
+    });
+
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/analytics/growth?currentFrom=&currentTo=&prevFrom=&prevTo=
 router.get('/growth', async (req, res) => {
   try {

@@ -28,6 +28,23 @@ export default function UserManager() {
         return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
     };
 
+    const resolveAvatarUrl = (user) => {
+        const raw = user?.avatar || user?.photo || user?.profileImage || user?.avatarUrl;
+        if (!raw) return null;
+        if (/^https?:\/\//i.test(raw)) return raw;
+        const normalizedBase = BASE_URL.replace(/\/api\/?$/, "");
+        const sanitizedPath = raw.startsWith("/") ? raw : `/${raw}`;
+        return `${normalizedBase}${sanitizedPath}`;
+    };
+
+    const getInitials = (user) => {
+        const name = (user?.name || user?.fullName || "").trim();
+        if (!name) return "👤";
+        const parts = name.split(/\s+/);
+        if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    };
+
     useEffect(() => {
         fetchList();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,6 +147,7 @@ export default function UserManager() {
                     <thead>
                         <tr style={{ background: "#f7f9fc" }}>
                             <th style={{ textAlign: 'center', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>STT</th>
+                            <th style={{ textAlign: 'center', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Avatar</th>
                             <th style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Họ tên</th>
                             <th style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Email</th>
                             <th style={{ textAlign: 'center', padding: '12px 14px', fontWeight: 700, color: '#334155', borderBottom: '1px solid #eaeef3' }}>Số điện thoại</th>
@@ -140,15 +158,50 @@ export default function UserManager() {
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan={7} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Đang tải...</td></tr>
+                            <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Đang tải...</td></tr>
                         ) : users.length === 0 ? (
-                            <tr><td colSpan={7} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Chưa có tài khoản nào</td></tr>
+                            <tr><td colSpan={8} style={{ padding: 16, textAlign: 'center', color: '#64748b' }}>Chưa có tài khoản nào</td></tr>
                         ) : (
                             users.map((u, idx) => {
                                 const isLocked = u.isLocked === true;
+                                const avatarUrl = resolveAvatarUrl(u);
                                 return (
                                     <tr key={u._id || u.id || idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fbfdff' }}>
                                         <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 60 }}>{idx + 1}</td>
+                                        <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 90 }}>
+                                            {avatarUrl ? (
+                                                <img
+                                                    src={avatarUrl}
+                                                    alt={u.name || u.email || "avatar"}
+                                                    style={{
+                                                        width: 48,
+                                                        height: 48,
+                                                        objectFit: 'cover',
+                                                        borderRadius: '50%',
+                                                        border: '2px solid #e2e8f0',
+                                                        boxShadow: '0 4px 8px rgba(15,23,42,0.15)'
+                                                    }}
+                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                />
+                                            ) : (
+                                                <div style={{
+                                                    width: 48,
+                                                    height: 48,
+                                                    borderRadius: '50%',
+                                                    background: 'linear-gradient(135deg,#a5b4fc,#818cf8)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    fontWeight: 700,
+                                                    fontSize: 16,
+                                                    margin: '0 auto',
+                                                    boxShadow: '0 4px 8px rgba(99,102,241,0.35)'
+                                                }}>
+                                                    {getInitials(u)}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td style={{ textAlign: 'left', padding: '12px 14px', color: '#0f172a', borderBottom: '1px solid #eef2f7', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name || u.fullName || "—"}</td>
                                         <td style={{ textAlign: 'left', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', maxWidth: 260, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email || "—"}</td>
                                         <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 160 }}>{u.phone || u.phoneNumber || "—"}</td>

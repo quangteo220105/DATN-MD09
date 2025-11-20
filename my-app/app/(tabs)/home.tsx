@@ -63,7 +63,7 @@ export default function HomeScreen() {
     });
     const searchInputRef = useRef<any>(null);
     const isSelectingSuggestionRef = useRef(false);
-    const lockCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lockCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const normalizeText = (text: string) =>
         (text || "")
             .toLowerCase()
@@ -981,7 +981,12 @@ export default function HomeScreen() {
                                                 }));
                                             }}
                                         >
-                                            <Text style={[styles.brandText, activeFilters.selectedCategory === category.name && styles.brandTextActive]}>{category.name}</Text>
+                                            <Text
+                                                style={[styles.brandText, activeFilters.selectedCategory === category.name && styles.brandTextActive]}
+                                                numberOfLines={2}
+                                            >
+                                                {category.name}
+                                            </Text>
                                         </TouchableOpacity>
                                     ))}
                                 </ScrollView>
@@ -1336,33 +1341,37 @@ const styles = StyleSheet.create({
         alignItems: "center"
     },
     brandChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
+        minWidth: 80,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
         backgroundColor: "#f8f9fa",
-        borderRadius: 20,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#e9ecef",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
-        flexShrink: 0, // ✅ Không cho phép co lại
-        minWidth: 80, // ✅ Chiều rộng tối thiểu
+        borderColor: "#e2e8f0",
+        shadowColor: "#0f172a",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 5,
+        elevation: 3,
+        flexShrink: 0,
+        justifyContent: "center",
+        alignItems: "center",
     },
     brandChipActive: {
         backgroundColor: "#222",
         borderColor: "#222",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 4
     },
     brandText: {
-        color: "#666",
-        fontSize: 14,
-        fontWeight: "500"
+        color: "#475569",
+        fontSize: 13,
+        fontWeight: "600",
+        textAlign: "center",
+        lineHeight: 18,
     },
     brandTextActive: {
         color: "#fff",

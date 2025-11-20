@@ -22,7 +22,7 @@ const STATUS_INFO: Record<string, { emoji: string; color: string }> = {
     'Chờ xác nhận': { emoji: '🛒', color: '#0ea5e9' },
     'Đã xác nhận': { emoji: '📦', color: '#22c55e' },
     'Đang giao hàng': { emoji: '🚚', color: '#f59e0b' },
-    'Đã giao hàng': { emoji: '', color: '#16a34a' },
+    'Đã giao hàng': { emoji: '✅', color: '#16a34a' },
     'Đã hủy': { emoji: '', color: '#ef4444' },
 };
 
@@ -72,6 +72,7 @@ function mergeOrderData(localOrder: any, backendOrder: any) {
 
 export default function OrdersScreen() {
     const [orders, setOrders] = useState<any[]>([]);
+    const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState<string>('Tất cả');
     const router = useRouter();
 
@@ -199,6 +200,15 @@ export default function OrdersScreen() {
 
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
     useFocusEffect(React.useCallback(() => { fetchOrders(); }, [fetchOrders]));
+
+    const handleRefresh = React.useCallback(async () => {
+        try {
+            setRefreshing(true);
+            await fetchOrders();
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchOrders]);
 
     // Xử lý deep linking khi nhận được từ ZaloPay
     useEffect(() => {
@@ -686,6 +696,8 @@ export default function OrdersScreen() {
                     contentContainerStyle={{ paddingBottom: 80 }}
                     ListFooterComponent={<View style={{ height: 12 }} />}
                     showsVerticalScrollIndicator={false}
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
                 />
             </View>
         </SafeAreaView>
