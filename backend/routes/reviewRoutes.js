@@ -107,6 +107,8 @@ router.get('/', async (req, res) => {
           _id: 1,
           orderId: { _id: '$orderId._id', code: '$orderId.code' },
           userId: { _id: '$userId._id', name: '$userId.name', phone: '$userId.phone' },
+          productId: 1,
+          itemIdentifier: 1,
           rating: 1,
           comment: 1,
           items: 1,
@@ -261,7 +263,7 @@ router.get('/product/:productId', async (req, res) => {
 // POST /api/reviews
 router.post('/', async (req, res) => {
   try {
-    const { orderId, userId, rating, comment, items } = req.body;
+    const { orderId, userId, productId, rating, comment, items } = req.body;
 
     if (!orderId || !userId || !rating) {
       return res.status(400).json({ message: 'Thiếu thông tin bắt buộc: orderId, userId, rating' });
@@ -277,15 +279,47 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
     }
 
-    // Kiểm tra đã đánh giá chưa
-    const existingReview = await Review.findOne({ orderId, userId });
-    if (existingReview) {
-      return res.status(400).json({ message: 'Bạn đã đánh giá đơn hàng này rồi' });
+    // Tạo identifier duy nhất cho item review dựa trên productId, color, size
+    let itemIdentifier = null;
+    if (items && items.length > 0 && productId) {
+      const firstItem = items[0];
+      const itemColor = String(firstItem.color || '').trim();
+      const itemSize = String(firstItem.size || '').trim();
+      // Tạo identifier: productId_color_size (đảm bảo productId là string)
+      const productIdStr = String(productId);
+      itemIdentifier = `${productIdStr}_${itemColor}_${itemSize}`;
+    } else if (productId) {
+      // Nếu có productId nhưng không có items, chỉ dùng productId (đảm bảo là string)
+      itemIdentifier = String(productId);
+    }
+
+    // Kiểm tra đã đánh giá chưa bằng itemIdentifier
+    if (itemIdentifier) {
+      const existingReview = await Review.findOne({ 
+        orderId, 
+        userId, 
+        itemIdentifier 
+      });
+      if (existingReview) {
+        return res.status(400).json({ message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi' });
+      }
+    } else {
+      // Nếu không có itemIdentifier (không có productId), kiểm tra review chung
+      const existingReview = await Review.findOne({ 
+        orderId, 
+        userId, 
+        itemIdentifier: null 
+      });
+      if (existingReview) {
+        return res.status(400).json({ message: 'Bạn đã đánh giá đơn hàng này rồi' });
+      }
     }
 
     const review = new Review({
       orderId,
       userId,
+      productId: productId || null,
+      itemIdentifier: itemIdentifier || null,
       rating: Number(rating),
       comment: comment || '',
       items: items || []
@@ -301,7 +335,37 @@ router.post('/', async (req, res) => {
   } catch (e) {
     console.error('POST /api/reviews error:', e);
     if (e.code === 11000) {
-      return res.status(400).json({ message: 'Bạn đã đánh giá đơn hàng này rồi' });
+      // Nếu vẫn bị duplicate key error, thử tìm lại review đã tồn tại
+      try {
+        const { orderId, userId, items } = req.body;
+        const productId = req.body.productId || null;
+        
+        let itemIdentifier = null;
+        if (items && items.length > 0 && productId) {
+          const firstItem = items[0];
+          const itemColor = String(firstItem.color || '').trim();
+          const itemSize = String(firstItem.size || '').trim();
+          const productIdStr = String(productId);
+          itemIdentifier = `${productIdStr}_${itemColor}_${itemSize}`;
+        } else if (productId) {
+          itemIdentifier = String(productId);
+        }
+        
+        const query = { orderId, userId };
+        if (itemIdentifier) {
+          query.itemIdentifier = itemIdentifier;
+        } else {
+          query.itemIdentifier = null;
+        }
+        
+        const existing = await Review.findOne(query);
+        if (existing) {
+          return res.status(400).json({ message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi' });
+        }
+      } catch (findErr) {
+        console.error('Error finding existing review:', findErr);
+      }
+      return res.status(400).json({ message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi' });
     }
     res.status(500).json({ message: 'Lỗi tạo đánh giá' });
   }

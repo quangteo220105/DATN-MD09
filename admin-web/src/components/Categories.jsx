@@ -48,6 +48,20 @@ export default function Categories() {
     const handleModalOk = async () => {
         try {
             const values = await form.validateFields();
+            
+            // Kiểm tra tên trùng trước khi submit
+            const normalizedValue = values.name.trim().toLowerCase();
+            const existingCategory = categories.find(
+                (cat) => 
+                    cat.name.trim().toLowerCase() === normalizedValue &&
+                    (!editingCategory || cat._id !== editingCategory._id)
+            );
+            
+            if (existingCategory) {
+                message.error("Tên danh mục đã tồn tại! Vui lòng chọn tên khác.");
+                return;
+            }
+            
             if (editingCategory) {
                 // Sửa
                 const res = await fetch(`http://localhost:3000/api/categories/${editingCategory._id}`, {
@@ -71,7 +85,13 @@ export default function Categories() {
             fetchCategories();
         } catch (error) {
             console.error(error);
-            message.error(error.message || "Thao tác thất bại!");
+            if (error.errorFields) {
+                // Validation error từ form
+                const errorMsg = error.errorFields[0]?.errors?.[0] || "Vui lòng kiểm tra lại thông tin!";
+                message.error(errorMsg);
+            } else {
+                message.error(error.message || "Thao tác thất bại!");
+            }
         }
     };
 
@@ -157,13 +177,31 @@ export default function Categories() {
                 onCancel={() => setIsModalOpen(false)}
                 okText="Lưu"
             >
-                <Form form={form} layout="vertical">
+                <Form form={form} layout="vertical" validateTrigger="onBlur">
                     <Form.Item
                         label="Tên danh mục"
                         name="name"
-                        rules={[{ required: true, message: "Vui lòng nhập tên danh mục" }]}
+                        hasFeedback
+                        rules={[
+                            { required: true, message: "Vui lòng nhập tên danh mục" },
+                            {
+                                validator: (_, value) => {
+                                    if (!value || !value.trim()) return Promise.resolve();
+                                    const normalizedValue = value.trim().toLowerCase();
+                                    const existingCategory = categories.find(
+                                        (cat) => 
+                                            cat.name && cat.name.trim().toLowerCase() === normalizedValue &&
+                                            (!editingCategory || cat._id !== editingCategory._id)
+                                    );
+                                    if (existingCategory) {
+                                        return Promise.reject(new Error("Tên danh mục đã tồn tại! Vui lòng chọn tên khác."));
+                                    }
+                                    return Promise.resolve();
+                                },
+                            },
+                        ]}
                     >
-                        <Input />
+                        <Input placeholder="Nhập tên danh mục" />
                     </Form.Item>
 
                     <Form.Item label="Mô tả" name="description">

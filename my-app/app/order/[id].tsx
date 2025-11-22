@@ -30,6 +30,8 @@ export default function OrderDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const [order, setOrder] = useState<any | null>(null);
+    const [reviews, setReviews] = useState<any[]>([]);
+    const [loadingReviews, setLoadingReviews] = useState(false);
 
     const loadOrder = async () => {
         const userString = await AsyncStorage.getItem('user');
@@ -58,8 +60,42 @@ export default function OrderDetailScreen() {
         setOrder(found || null);
     };
 
-    useEffect(() => { loadOrder(); }, [id]);
-    useFocusEffect(React.useCallback(() => { loadOrder(); }, [id]));
+    // Load reviews cho đơn hàng
+    const loadReviews = async () => {
+        if (!order) return;
+        setLoadingReviews(true);
+        try {
+            const backendId = order._id || (String(id).length === 24 ? id : null);
+            const checkId = backendId || id;
+            const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
+            if (res.ok) {
+                const data = await res.json();
+                const reviewsList = Array.isArray(data) ? data : [];
+                setReviews(reviewsList);
+            }
+        } catch (e) {
+            console.log('Error loading reviews:', e);
+        } finally {
+            setLoadingReviews(false);
+        }
+    };
+
+    useEffect(() => { 
+        loadOrder(); 
+    }, [id]);
+    
+    useEffect(() => {
+        if (order) {
+            loadReviews();
+        }
+    }, [order]);
+
+    useFocusEffect(React.useCallback(() => { 
+        loadOrder(); 
+        if (order) {
+            loadReviews();
+        }
+    }, [id]));
 
     const status = normalizeStatus(order?.status);
     const created = order?.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : '';
@@ -69,65 +105,59 @@ export default function OrderDetailScreen() {
 
     const currentIndex = useMemo(() => Math.max(0, STATUS_ORDER.indexOf(status as any)), [status]);
 
+    // Helper function để so sánh ID
+    const compareIds = (id1: any, id2: any): boolean => {
+        if (!id1 || !id2) return false;
+        const str1 = String(id1._id || id1);
+        const str2 = String(id2._id || id2);
+        return str1 === str2;
+    };
+
+    // Kiểm tra xem tất cả sản phẩm đã được đánh giá chưa
     const checkReviewExists = async () => {
         try {
             const userString = await AsyncStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
-            if (!user || !user._id) return false;
+            if (!user || !user._id || !order || !Array.isArray(order.items)) return false;
             
             const backendId = order?._id || (String(id).length === 24 ? id : null);
             const checkId = backendId || id;
             
-            // ƯU TIÊN: Kiểm tra từ API trước (nếu admin xóa thì trong database sẽ không còn)
+            // Kiểm tra từ API
             try {
                 const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
                 if (res.ok) {
                     const data = await res.json();
-                    const reviews = Array.isArray(data) ? data : [];
-                    // Chỉ kiểm tra đánh giá của user hiện tại (hỗ trợ cả populate và không populate)
-                    const userReview = reviews.find((r: any) => {
+                    const reviewsList = Array.isArray(data) ? data : [];
+                    // Lọc reviews của user hiện tại
+                    const userReviews = reviewsList.filter((r: any) => {
                         const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
                         return String(reviewUserId) === String(user._id);
                     });
-                    if (userReview) return true;
+                    
+                    // Kiểm tra xem mỗi sản phẩm đã có review chưa
+                    const itemsWithReviews = order.items.filter((item: any) => {
+                        const productId = item.productId || item._id;
+                        if (!productId) return false;
+                        
+                        return userReviews.some((rev: any) => {
+                            if (!rev.productId) return false;
+                            if (!compareIds(rev.productId, productId)) return false;
+                            
+                            // Kiểm tra color và size nếu có
+                            if (rev.items && rev.items.length > 0 && item.color && item.size) {
+                                const revItem = rev.items[0];
+                                return revItem.color === item.color && revItem.size === item.size;
+                            }
+                            return true;
+                        });
+                    });
+                    
+                    // Nếu tất cả sản phẩm đã có review, return true
+                    return itemsWithReviews.length === order.items.length;
                 }
             } catch (e) {
-                console.log('API check failed, checking local:', e);
-            }
-            
-            // Fallback: Kiểm tra trong AsyncStorage (khi không có kết nối)
-            const reviewKey1 = `review_${user._id}_${id}`;
-            const reviewString1 = await AsyncStorage.getItem(reviewKey1);
-            if (reviewString1) {
-                // Nếu có trong local, vẫn kiểm tra lại API một lần nữa để đảm bảo
-                try {
-                    const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const reviews = Array.isArray(data) ? data : [];
-                        const userReview = reviews.find((r: any) => {
-                            const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
-                            return String(reviewUserId) === String(user._id);
-                        });
-                        // Nếu không tìm thấy trong API nhưng có trong local, xóa local để sync
-                        if (!userReview) {
-                            await AsyncStorage.removeItem(reviewKey1);
-                            if (backendId && backendId !== id) {
-                                await AsyncStorage.removeItem(`review_${user._id}_${backendId}`);
-                            }
-                            return false;
-                        }
-                        return true;
-                    }
-                } catch {}
-                // Nếu không kết nối được API, dùng dữ liệu local
-                return true;
-            }
-            
-            if (backendId && backendId !== id) {
-                const reviewKey2 = `review_${user._id}_${backendId}`;
-                const reviewString2 = await AsyncStorage.getItem(reviewKey2);
-                if (reviewString2) return true;
+                console.log('API check failed:', e);
             }
             
             return false;
@@ -276,28 +306,80 @@ export default function OrderDetailScreen() {
                 <View style={styles.card}>
                     <Text style={styles.cardTitle}>Sản phẩm</Text>
                     {Array.isArray(order.items) && order.items.length > 0 ? (
-                        order.items.map((it: any, idx: number) => (
-                            <View key={idx} style={styles.itemRow}>
-                                {it.image ? (
-                                    <Image source={{ uri: `${DOMAIN}${it.image}` }} style={styles.itemImage} />
-                                ) : (
-                                    <View style={[styles.itemImage, { backgroundColor: '#f0f0f0' }]} />
-                                )}
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.itemName}>{it.name}</Text>
-                                    <Text style={styles.itemMeta}>{[it.size, it.color].filter(Boolean).join(', ') || '—'}</Text>
-                                    <Text style={styles.itemMeta}>x{it.qty}</Text>
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={styles.itemPrice}>{((it.price || 0) * (it.qty || 0)).toLocaleString('vi-VN')} VND</Text>
-                                    {Number(it.discountAmount || 0) > 0 && (
-                                        <Text style={{ color: '#22c55e', fontSize: 12, marginTop: 2 }}>
-                                            -{Number(it.discountAmount).toLocaleString('vi-VN')} VND
-                                        </Text>
+                        order.items.map((it: any, idx: number) => {
+                            const productId = it.productId || it._id;
+                            const itemColor = it.color || '';
+                            const itemSize = it.size || '';
+                            
+                            // Tìm reviews cho sản phẩm này
+                            const itemReviews = reviews.filter((rev: any) => {
+                                if (!rev.productId || !productId) return false;
+                                if (!compareIds(rev.productId, productId)) return false;
+                                
+                                // Kiểm tra color và size nếu có
+                                if (rev.items && rev.items.length > 0 && itemColor && itemSize) {
+                                    const revItem = rev.items[0];
+                                    return revItem.color === itemColor && revItem.size === itemSize;
+                                }
+                                return true;
+                            });
+                            
+                            return (
+                                <View key={idx}>
+                                    <View style={styles.itemRow}>
+                                        {it.image ? (
+                                            <Image source={{ uri: `${DOMAIN}${it.image}` }} style={styles.itemImage} />
+                                        ) : (
+                                            <View style={[styles.itemImage, { backgroundColor: '#f0f0f0' }]} />
+                                        )}
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.itemName}>{it.name}</Text>
+                                            <Text style={styles.itemMeta}>{[it.size, it.color].filter(Boolean).join(', ') || '—'}</Text>
+                                            <Text style={styles.itemMeta}>x{it.qty}</Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={styles.itemPrice}>{((it.price || 0) * (it.qty || 0)).toLocaleString('vi-VN')} VND</Text>
+                                            {Number(it.discountAmount || 0) > 0 && (
+                                                <Text style={{ color: '#22c55e', fontSize: 12, marginTop: 2 }}>
+                                                    -{Number(it.discountAmount).toLocaleString('vi-VN')} VND
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                    
+                                    {/* Hiển thị reviews cho sản phẩm này */}
+                                    {itemReviews.length > 0 && (
+                                        <View style={styles.reviewSection}>
+                                            <Text style={styles.reviewSectionTitle}>Đánh giá của bạn:</Text>
+                                            {itemReviews.map((rev: any, revIdx: number) => (
+                                                <View key={revIdx} style={styles.reviewItem}>
+                                                    <View style={styles.reviewRating}>
+                                                        {[1, 2, 3, 4, 5].map((star) => (
+                                                            <Text key={star} style={styles.star}>
+                                                                {star <= (rev.rating || 0) ? '⭐' : '☆'}
+                                                            </Text>
+                                                        ))}
+                                                        <Text style={styles.reviewRatingText}>({rev.rating || 0}/5)</Text>
+                                                    </View>
+                                                    {rev.comment && (
+                                                        <Text style={styles.reviewComment}>{rev.comment}</Text>
+                                                    )}
+                                                    {rev.createdAt && (
+                                                        <Text style={styles.reviewDate}>
+                                                            {new Date(rev.createdAt).toLocaleDateString('vi-VN')}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            ))}
+                                        </View>
+                                    )}
+                                    
+                                    {idx < order.items.length - 1 && (
+                                        <View style={{ borderBottomWidth: 1, borderBottomColor: '#eee', marginVertical: 10 }} />
                                     )}
                                 </View>
-                            </View>
-                        ))
+                            );
+                        })
                     ) : (
                         <Text style={styles.text}>Không có sản phẩm.</Text>
                     )}
@@ -359,6 +441,52 @@ const styles = StyleSheet.create({
     // Actions
     actionBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8 },
     actionText: { color: '#fff', fontWeight: '600' },
+    // Reviews
+    reviewSection: { 
+        marginTop: 12, 
+        paddingTop: 12, 
+        borderTopWidth: 1, 
+        borderTopColor: '#f0f0f0',
+        backgroundColor: '#f8f9fa',
+        borderRadius: 8,
+        padding: 10,
+        marginLeft: 64,
+    },
+    reviewSectionTitle: { 
+        fontSize: 13, 
+        fontWeight: '600', 
+        color: '#666', 
+        marginBottom: 8 
+    },
+    reviewItem: { 
+        marginBottom: 8,
+    },
+    reviewRating: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        marginBottom: 4 
+    },
+    star: { 
+        fontSize: 14, 
+        marginRight: 2 
+    },
+    reviewRatingText: { 
+        marginLeft: 6, 
+        fontSize: 13, 
+        fontWeight: '600', 
+        color: '#f59e0b' 
+    },
+    reviewComment: { 
+        fontSize: 13, 
+        color: '#333', 
+        marginTop: 4,
+        lineHeight: 18,
+    },
+    reviewDate: { 
+        fontSize: 11, 
+        color: '#999', 
+        marginTop: 4 
+    },
 });
 
 
