@@ -5,69 +5,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from '../../config/apiConfig';
 
-// Hàm parse địa chỉ để lấy tên và số điện thoại
-function parseAddressInfo(address: any, fallbackName = 'Khách hàng', fallbackPhone = '-') {
-    if (!address) return { name: fallbackName, phone: fallbackPhone };
-
-    // Nếu address là object
-    if (typeof address === 'object') {
-        return {
-            name: address.name || fallbackName,
-            phone: address.phone || fallbackPhone,
-        };
-    }
-
-    const text = String(address);
-
-    // Thử parse JSON nếu address là JSON string
-    if (text.trim().startsWith('{')) {
-        try {
-            const parsed = JSON.parse(text);
-            if (parsed && typeof parsed === 'object') {
-                return {
-                    name: parsed.name || fallbackName,
-                    phone: parsed.phone || fallbackPhone,
-                };
-            }
-        } catch (err) {
-            // ignore parse error
-        }
-    }
-
-    let name = fallbackName;
-    let phone = fallbackPhone;
-    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-    const firstLine = lines[0] || '';
-
-    // Pattern: "Tên - Số điện thoại"
-    const dashSplit = firstLine.split(/\s*-\s*/);
-    if (dashSplit.length >= 2) {
-        name = dashSplit[0].trim() || name;
-        phone = dashSplit.slice(1).join(' - ').trim() || phone;
-    }
-
-    // Extract phone number using regex (Vietnamese formats)
-    const phoneMatch = text.match(/(\+?84|0)(\d[\s\.\-]?){8,10}/);
-    if (phoneMatch) {
-        phone = phoneMatch[0].replace(/[\s\.\-]/g, '');
-        if (phone.startsWith('84') && phone.length >= 11) {
-            phone = '0' + phone.slice(2);
-        }
-    }
-
-    if ((!name || name === fallbackName) && dashSplit.length === 1 && lines.length > 1) {
-        name = firstLine || name;
-    }
-
-    return { name: name || fallbackName, phone: phone || fallbackPhone };
-}
-
 export default function ReviewScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const [order, setOrder] = useState<any | null>(null);
-    const [rating, setRating] = useState(0);
-    const [comment, setComment] = useState('');
+    const [productRatings, setProductRatings] = useState<{ [key: string]: { rating: number; comment: string } }>({});
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -79,7 +21,6 @@ export default function ReviewScreen() {
                 return;
             }
 
-            // Ưu tiên lấy từ backend để có _id chính xác
             try {
                 const res = await fetch(`${BASE_URL}/orders/${id}`);
                 if (res.ok) {
@@ -90,10 +31,9 @@ export default function ReviewScreen() {
                     }
                 }
             } catch (e) {
-                console.log('Fetch from backend failed, trying local:', e);
+                console.log('Fetch from backend failed:', e);
             }
 
-            // Fallback: lấy từ local storage
             const historyKey = `order_history_${user._id}`;
             const historyString = await AsyncStorage.getItem(historyKey);
             let history = historyString ? JSON.parse(historyString) : [];
@@ -106,13 +46,39 @@ export default function ReviewScreen() {
         if (id) loadOrder();
     }, [id, router]);
 
+    const handleProductRatingChange = (itemKey: string, rating: number) => {
+        setProductRatings(prev => ({
+            ...prev,
+            [itemKey]: { ...prev[itemKey], rating }
+        }));
+    };
+
+    const handleProductCommentChange = (itemKey: string, comment: string) => {
+        setProductRatings(prev => ({
+            ...prev,
+            [itemKey]: { ...prev[itemKey], comment }
+        }));
+    };
+
     const handleSubmit = async () => {
-        if (rating === 0) {
-            Alert.alert('Thông báo', 'Vui lòng chọn điểm đánh giá');
+        if (!order || !Array.isArray(order.items) || order.items.length === 0) {
+            Alert.alert('Thông báo', 'Không có sản phẩm để đánh giá');
             return;
         }
-        if (!comment.trim()) {
-            Alert.alert('Thông báo', 'Vui lòng nhập đánh giá của bạn');
+
+        const items = order.items;
+        const missingRatings: string[] = [];
+
+        items.forEach((item: any, index: number) => {
+            const itemKey = `${item.productId || item._id || index}_${item.color}_${item.size}`;
+            const productReview = productRatings[itemKey];
+            if (!productReview || !productReview.rating || productReview.rating === 0) {
+                missingRatings.push(item.name || `Sản phẩm ${index + 1}`);
+            }
+        });
+
+        if (missingRatings.length > 0) {
+            Alert.alert('Thông báo', `Vui lòng chọn điểm đánh giá cho:\n${missingRatings.join('\n')}`);
             return;
         }
 
@@ -122,10 +88,10 @@ export default function ReviewScreen() {
             const user = userString ? JSON.parse(userString) : null;
             if (!user || !user._id) {
                 Alert.alert('Lỗi', 'Vui lòng đăng nhập lại');
+                setLoading(false);
                 return;
             }
 
-            // Lấy orderId từ backend (_id) nếu có, không thì dùng id
             const backendOrderId = order?._id || (String(id).length === 24 ? id : null);
             if (!backendOrderId) {
                 Alert.alert('Lỗi', 'Không tìm thấy thông tin đơn hàng');
@@ -133,148 +99,152 @@ export default function ReviewScreen() {
                 return;
             }
 
-            // Gửi đánh giá lên server
-            const reviewData = {
-                orderId: backendOrderId,
-                userId: user._id,
-                rating: rating,
-                comment: comment.trim(),
-                items: order?.items || []
-            };
+            let successCount = 0;
+            const errors: string[] = [];
+            const totalItems = items.length;
 
-            try {
-                const res = await fetch(`${BASE_URL}/reviews`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reviewData)
-                });
+            for (let index = 0; index < items.length; index++) {
+                const item = items[index];
+                const itemKey = `${item.productId || item._id || index}_${item.color}_${item.size}`;
+                const productReview = productRatings[itemKey];
 
-                const responseData = await res.json();
+                if (!productReview || !productReview.rating) continue;
 
-                if (res.ok) {
-                    // Lưu local để đảm bảo (với cả id và _id)
-                    const reviewDataWithTime = {
-                        ...reviewData,
-                        createdAt: new Date().toISOString()
-                    };
-                    const reviewKey1 = `review_${user._id}_${id}`;
-                    await AsyncStorage.setItem(reviewKey1, JSON.stringify(reviewDataWithTime));
-
-                    if (backendOrderId !== id) {
-                        const reviewKey2 = `review_${user._id}_${backendOrderId}`;
-                        await AsyncStorage.setItem(reviewKey2, JSON.stringify(reviewDataWithTime));
-                    }
-
-                    Alert.alert('Thành công', 'Cảm ơn bạn đã đánh giá!', [
-                        { text: 'OK', onPress: () => router.back() }
-                    ]);
-                } else {
-                    // Nếu lỗi từ API, hiển thị thông báo lỗi
-                    const errorMsg = responseData?.message || 'Không thể gửi đánh giá. Vui lòng thử lại.';
-                    Alert.alert('Lỗi', errorMsg);
+                const productId = item.productId || item._id;
+                if (!productId) {
+                    errors.push(item.name);
+                    continue;
                 }
-            } catch (error) {
-                console.error('Error submitting review:', error);
-                Alert.alert('Lỗi', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối và thử lại.');
+
+                try {
+                    const res = await fetch(`${BASE_URL}/reviews`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            orderId: backendOrderId,
+                            userId: user._id,
+                            productId: productId,
+                            rating: productReview.rating,
+                            comment: productReview.comment || '',
+                            items: [item]
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        successCount++;
+                        console.log(`✅ Review ${successCount}/${totalItems} created for ${item.name}`);
+                    } else if (data.message?.includes('đã đánh giá')) {
+                        // Nếu gặp lỗi "đã đánh giá", có 2 khả năng:
+                        // 1. Review vừa được tạo ở request trước (race condition)
+                        // 2. Review đã tồn tại từ trước
+                        // Trong cả 2 trường hợp, đều đếm vào successCount vì mục tiêu là tạo review
+                        successCount++;
+                        console.log(`✅ Review ${successCount}/${totalItems} already exists for ${item.name} (counting as success)`);
+                    } else {
+                        errors.push(item.name);
+                        console.log(`❌ Error for ${item.name}: ${data.message}`);
+                    }
+                } catch (e: any) {
+                    errors.push(item.name);
+                    console.log(`❌ Exception for ${item.name}:`, e);
+                }
+
+                // Delay giữa các request
+                if (index < items.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            setLoading(false);
+
+            // Hiển thị kết quả
+            if (successCount === totalItems) {
+                Alert.alert('Thành công', `Đã đánh giá thành công ${successCount} sản phẩm!`, [
+                    { text: 'OK', onPress: () => router.back() }
+                ]);
+            } else if (successCount > 0) {
+                const msg = errors.length > 0
+                    ? `Đã đánh giá thành công ${successCount}/${totalItems} sản phẩm. ${errors.length} sản phẩm gặp lỗi.`
+                    : `Đã đánh giá thành công ${successCount} sản phẩm!`;
+                Alert.alert('Thành công', msg, [
+                    { text: 'OK', onPress: () => router.back() }
+                ]);
+            } else {
+                Alert.alert('Lỗi', `Không thể đánh giá: ${errors.join(', ')}`);
             }
         } catch (error) {
-            console.error('Error submitting review:', error);
-            Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
-        } finally {
             setLoading(false);
+            console.error('Error submitting reviews:', error);
+            Alert.alert('Lỗi', 'Không thể gửi đánh giá. Vui lòng thử lại.');
         }
     };
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f8f9' }}>
             <ScrollView contentContainerStyle={styles.container}>
-                {order && (() => {
-                    // Lấy tên và số điện thoại từ địa chỉ nhận hàng
-                    const { name, phone } = parseAddressInfo(
-                        order.address,
-                        'Khách hàng',
-                        '-'
-                    );
-                    const customerName = name;
-                    const customerPhone = phone;
+                {order && (
+                    <>
+                        <View style={styles.orderInfo}>
+                            <Text style={styles.orderLabel}>Mã đơn hàng:</Text>
+                            <Text style={styles.orderValue}>{String(order.id || order._id)}</Text>
+                        </View>
 
-                    return (
-                        <>
-                            <View style={styles.orderInfo}>
-                                <Text style={styles.orderLabel}>Mã đơn hàng:</Text>
-                                <Text style={styles.orderValue}>{String(order.id || order._id)}</Text>
-                            </View>
-
-                            <View style={styles.customerInfo}>
-                                <Text style={styles.sectionTitle}>Thông tin khách hàng</Text>
-                                <View style={styles.customerRow}>
-                                    <Text style={styles.customerLabel}>Tên khách hàng:</Text>
-                                    <Text style={styles.customerValue}>{customerName}</Text>
-                                </View>
-                                <View style={styles.customerRow}>
-                                    <Text style={styles.customerLabel}>Số điện thoại:</Text>
-                                    <Text style={styles.customerValue}>{customerPhone}</Text>
-                                </View>
-                            </View>
-
+                        {Array.isArray(order.items) && order.items.length > 0 && (
                             <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>Đánh giá của bạn</Text>
+                                <Text style={styles.sectionTitle}>Đánh giá sản phẩm</Text>
+                                {order.items.map((item: any, index: number) => {
+                                    const itemKey = `${item.productId || item._id || index}_${item.color}_${item.size}`;
+                                    const productReview = productRatings[itemKey] || { rating: 0, comment: '' };
 
-                                {/* Rating Stars */}
-                                <View style={styles.ratingContainer}>
-                                    <Text style={styles.ratingLabel}>Điểm đánh giá: {rating > 0 ? `${rating}/5` : '(Chưa chọn)'}</Text>
-                                    <View style={styles.starsContainer}>
-                                        {[1, 2, 3, 4, 5].map((star) => (
-                                            <TouchableOpacity
-                                                key={star}
-                                                onPress={() => setRating(star)}
-                                                style={styles.starBtn}
-                                            >
-                                                <Ionicons
-                                                    name={star <= rating ? "star" : "star-outline"}
-                                                    size={36}
-                                                    color={star <= rating ? "#f59e0b" : "#ddd"}
-                                                />
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                    {rating > 0 && (
-                                        <Text style={styles.ratingText}>{rating}/5</Text>
-                                    )}
-                                </View>
-
-                                {/* Comment Input */}
-                                <View style={styles.commentContainer}>
-                                    <Text style={styles.commentLabel}>Nhận xét của bạn:</Text>
-                                    <TextInput
-                                        style={styles.commentInput}
-                                        placeholder="Chia sẻ cảm nhận của bạn về đơn hàng..."
-                                        placeholderTextColor="#999"
-                                        multiline
-                                        numberOfLines={6}
-                                        value={comment}
-                                        onChangeText={setComment}
-                                        textAlignVertical="top"
-                                    />
-                                </View>
-                            </View>
-
-                            {/* Products in order */}
-                            {Array.isArray(order.items) && order.items.length > 0 && (
-                                <View style={styles.section}>
-                                    <Text style={styles.sectionTitle}>Sản phẩm đã mua</Text>
-                                    {order.items.map((item: any, index: number) => (
-                                        <View key={index} style={styles.productItem}>
+                                    return (
+                                        <View key={index} style={styles.productReviewCard}>
                                             <Text style={styles.productName}>
                                                 {item.name} ({item.size}, {item.color}) x{item.qty}
                                             </Text>
+
+                                            <View style={styles.ratingContainer}>
+                                                <Text style={styles.ratingLabel}>
+                                                    Điểm đánh giá: {productReview.rating > 0 ? `${productReview.rating}/5` : '(Chưa chọn)'}
+                                                </Text>
+                                                <View style={styles.starsContainer}>
+                                                    {[1, 2, 3, 4, 5].map((star) => (
+                                                        <TouchableOpacity
+                                                            key={star}
+                                                            onPress={() => handleProductRatingChange(itemKey, star)}
+                                                            style={styles.starBtn}
+                                                        >
+                                                            <Ionicons
+                                                                name={star <= productReview.rating ? "star" : "star-outline"}
+                                                                size={32}
+                                                                color={star <= productReview.rating ? "#f59e0b" : "#ddd"}
+                                                            />
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.commentContainer}>
+                                                <Text style={styles.commentLabel}>Nhận xét của bạn:</Text>
+                                                <TextInput
+                                                    style={styles.commentInput}
+                                                    placeholder="Chia sẻ cảm nhận của bạn về sản phẩm này..."
+                                                    placeholderTextColor="#999"
+                                                    multiline
+                                                    numberOfLines={4}
+                                                    value={productReview.comment}
+                                                    onChangeText={(text) => handleProductCommentChange(itemKey, text)}
+                                                    textAlignVertical="top"
+                                                />
+                                            </View>
                                         </View>
-                                    ))}
-                                </View>
-                            )}
-                        </>
-                    );
-                })()}
+                                    );
+                                })}
+                            </View>
+                        )}
+                    </>
+                )}
 
                 <TouchableOpacity
                     style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
@@ -291,26 +261,7 @@ export default function ReviewScreen() {
 }
 
 const styles = StyleSheet.create({
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 15,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    backBtn: {
-        padding: 5,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#222',
-    },
-    container: {
-        padding: 16,
-    },
+    container: { padding: 16 },
     orderInfo: {
         backgroundColor: '#fff',
         borderRadius: 10,
@@ -320,101 +271,39 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    orderLabel: {
-        fontSize: 14,
-        color: '#666',
-    },
-    orderValue: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#222',
-    },
-    customerInfo: {
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 16,
-        marginBottom: 12,
-    },
-    customerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    customerLabel: {
-        fontSize: 14,
-        color: '#666',
-        flex: 1,
-    },
-    customerValue: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#222',
-        flex: 2,
-        textAlign: 'right',
-    },
+    orderLabel: { fontSize: 14, color: '#666' },
+    orderValue: { fontSize: 16, fontWeight: 'bold', color: '#222' },
     section: {
         backgroundColor: '#fff',
         borderRadius: 10,
         padding: 16,
         marginBottom: 12,
     },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#222',
+    sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 16 },
+    productReviewCard: {
+        backgroundColor: '#f8f9fa',
+        borderRadius: 10,
+        padding: 16,
         marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
     },
-    ratingContainer: {
-        marginBottom: 20,
-    },
-    ratingLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 10,
-    },
-    starsContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    starBtn: {
-        marginRight: 8,
-    },
-    ratingText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#f59e0b',
-        marginTop: 8,
-    },
-    commentContainer: {
-        marginTop: 10,
-    },
-    commentLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 8,
-    },
+    productName: { fontSize: 15, fontWeight: '600', color: '#222', marginBottom: 12 },
+    ratingContainer: { marginBottom: 20 },
+    ratingLabel: { fontSize: 14, color: '#666', marginBottom: 10 },
+    starsContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    starBtn: { marginRight: 8 },
+    commentContainer: { marginTop: 10 },
+    commentLabel: { fontSize: 14, color: '#666', marginBottom: 8 },
     commentInput: {
-        backgroundColor: '#f8f8f9',
+        backgroundColor: '#fff',
         borderRadius: 8,
         padding: 12,
         fontSize: 14,
         color: '#222',
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        minHeight: 120,
-    },
-    productItem: {
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    productName: {
-        fontSize: 14,
-        color: '#333',
+        minHeight: 80,
     },
     submitBtn: {
         backgroundColor: '#f59e0b',
@@ -424,13 +313,6 @@ const styles = StyleSheet.create({
         marginTop: 20,
         marginBottom: 20,
     },
-    submitBtnDisabled: {
-        opacity: 0.6,
-    },
-    submitBtnText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
+    submitBtnDisabled: { opacity: 0.6 },
+    submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
-
