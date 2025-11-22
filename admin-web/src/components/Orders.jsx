@@ -6,6 +6,7 @@ const STATUS_OPTIONS = [
     { value: "Đã xác nhận", label: "📦 Đã xác nhận" },
     { value: "Đang giao hàng", label: "🚚 Đang giao hàng" },
     { value: "Đã giao hàng", label: "✅ Đã giao hàng" },
+    { value: "Đã hủy", label: "❌ Đã hủy" },
 ];
 
 // Trình tự trạng thái đơn hàng (theo thứ tự)
@@ -48,6 +49,7 @@ export default function Orders() {
         "Đã xác nhận": 0,
         "Đang giao hàng": 0,
         "Đã giao hàng": 0,
+        "Đã hủy": 0,
     });
 
     const [query, setQuery] = useState("");
@@ -134,6 +136,7 @@ export default function Orders() {
                     "Đã xác nhận": counts["Đã xác nhận"] || 0,
                     "Đang giao hàng": counts["Đang giao hàng"] || 0,
                     "Đã giao hàng": counts["Đã giao hàng"] || 0,
+                    "Đã hủy": counts["Đã hủy"] || 0,
                 });
             }
         } catch (e) {
@@ -237,7 +240,7 @@ export default function Orders() {
             </form>
 
             {/* Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
                 {Object.entries(statusTotals).map(([k, v]) => (
                     <div key={k} style={{ background: '#fff', borderRadius: 10, border: '1px solid #eee', padding: 12 }}>
                         <div style={{ fontWeight: 700, marginBottom: 4 }}>{k}</div>
