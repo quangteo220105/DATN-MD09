@@ -48,6 +48,28 @@ export default function Categories() {
     const handleModalOk = async () => {
         try {
             const values = await form.validateFields();
+
+            console.log('Checking duplicate for:', values.name);
+            console.log('Current categories:', categories.map(c => c.name));
+            console.log('Editing category:', editingCategory);
+
+            // ✅ Kiểm tra tên danh mục trùng lặp
+            const duplicateCategory = categories.find(cat => {
+                const isSameName = cat.name.trim().toLowerCase() === values.name.trim().toLowerCase();
+                // Nếu đang sửa, bỏ qua chính danh mục đang sửa
+                const isDifferentCategory = editingCategory ? cat._id !== editingCategory._id : true;
+                console.log(`Comparing "${cat.name}" with "${values.name}":`, { isSameName, isDifferentCategory });
+                return isSameName && isDifferentCategory;
+            });
+
+            console.log('Duplicate found:', duplicateCategory);
+
+            if (duplicateCategory) {
+                message.error(`Tên danh mục "${values.name}" đã tồn tại. Vui lòng chọn tên khác!`);
+                alert(`Tên danh mục "${values.name}" đã tồn tại. Vui lòng chọn tên khác!`);
+                return;
+            }
+
             if (editingCategory) {
                 // Sửa
                 const res = await fetch(`http://localhost:3000/api/categories/${editingCategory._id}`, {
@@ -121,11 +143,11 @@ export default function Categories() {
                     <Button type="primary" size="small" style={{ height: 32 }} onClick={() => openEditModal(record)}>
                         Sửa
                     </Button>
-                    <Button 
-                        type="primary" 
-                        danger={record.isActive} 
-                        size="small" 
-                        style={{ height: 32 }} 
+                    <Button
+                        type="primary"
+                        danger={record.isActive}
+                        size="small"
+                        style={{ height: 32 }}
                         onClick={() => handleToggleVisibility(record)}
                     >
                         {record.isActive ? "Ẩn danh mục" : "Hiển thị"}

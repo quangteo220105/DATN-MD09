@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
 export default function ManagerDashboard() {
     const [products, setProducts] = useState([]);
@@ -6,6 +6,7 @@ export default function ManagerDashboard() {
     const [showModal, setShowModal] = useState(false);
     const [categories, setCategories] = useState([]);
     const [editingProduct, setEditingProduct] = useState(null);
+    const lastVariantRef = useRef(null);
 
     // 🟢 Form state với multiple variants
     const [formProduct, setFormProduct] = useState({
@@ -68,6 +69,16 @@ export default function ManagerDashboard() {
                 }
             ]
         });
+
+        // Scroll xuống form biến thể mới sau khi render
+        setTimeout(() => {
+            if (lastVariantRef.current) {
+                lastVariantRef.current.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            }
+        }, 100);
     };
 
     // 🟢 Xóa variant
@@ -120,6 +131,23 @@ export default function ManagerDashboard() {
             if (!v.size || !v.color || !v.originalPrice || !v.currentPrice || !v.stock || !v.imageFile) {
                 alert(`Vui lòng điền đủ thông tin biến thể ${i + 1} và chọn ảnh!`);
                 return;
+            }
+        }
+
+        // ✅ Kiểm tra biến thể trùng lặp hoàn toàn (không tính ảnh)
+        for (let i = 0; i < formProduct.variants.length; i++) {
+            for (let j = i + 1; j < formProduct.variants.length; j++) {
+                const v1 = formProduct.variants[i];
+                const v2 = formProduct.variants[j];
+
+                if (v1.size.trim().toLowerCase() === v2.size.trim().toLowerCase() &&
+                    v1.color.trim().toLowerCase() === v2.color.trim().toLowerCase() &&
+                    Number(v1.originalPrice) === Number(v2.originalPrice) &&
+                    Number(v1.currentPrice) === Number(v2.currentPrice) &&
+                    Number(v1.stock) === Number(v2.stock)) {
+                    alert(`Biến thể ${i + 1} và ${j + 1} trùng lặp hoàn toàn (Size: ${v1.size}, Màu: ${v1.color}). Vui lòng kiểm tra lại!`);
+                    return;
+                }
             }
         }
 
@@ -230,6 +258,23 @@ export default function ManagerDashboard() {
         if (!formProduct.name || !formProduct.categoryId) {
             alert("Tên sản phẩm và danh mục là bắt buộc!");
             return;
+        }
+
+        // ✅ Kiểm tra biến thể trùng lặp hoàn toàn (không tính ảnh)
+        for (let i = 0; i < formProduct.variants.length; i++) {
+            for (let j = i + 1; j < formProduct.variants.length; j++) {
+                const v1 = formProduct.variants[i];
+                const v2 = formProduct.variants[j];
+
+                if (v1.size.trim().toLowerCase() === v2.size.trim().toLowerCase() &&
+                    v1.color.trim().toLowerCase() === v2.color.trim().toLowerCase() &&
+                    Number(v1.originalPrice) === Number(v2.originalPrice) &&
+                    Number(v1.currentPrice) === Number(v2.currentPrice) &&
+                    Number(v1.stock) === Number(v2.stock)) {
+                    alert(`Biến thể ${i + 1} và ${j + 1} trùng lặp hoàn toàn (Size: ${v1.size}, Màu: ${v1.color}). Vui lòng kiểm tra lại!`);
+                    return;
+                }
+            }
         }
 
         const formData = new FormData();
@@ -467,7 +512,11 @@ export default function ManagerDashboard() {
                             </div>
 
                             {formProduct.variants.map((variant, index) => (
-                                <div key={index} style={styles.variantCard}>
+                                <div
+                                    key={index}
+                                    style={styles.variantCard}
+                                    ref={index === formProduct.variants.length - 1 ? lastVariantRef : null}
+                                >
                                     <div style={styles.variantHeader}>
                                         <h5>Biến thể {index + 1}</h5>
                                         <div style={styles.variantHeaderActions}>
@@ -704,56 +753,66 @@ const styles = {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+        backdropFilter: "blur(4px)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         zIndex: 999,
+        padding: "20px",
     },
     modal: {
-        backgroundColor: "#fff",
-        padding: 24,
-        borderRadius: 10,
+        backgroundColor: "#ffffff",
+        padding: "32px",
+        borderRadius: "16px",
         width: "90%",
-        maxWidth: 1000,
+        maxWidth: "1000px",
         maxHeight: "90vh",
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
-        gap: 16,
+        gap: "20px",
+        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)",
+        animation: "modalFadeIn 0.2s ease-out",
     },
     formGroup: {
         display: "flex",
         flexDirection: "column",
-        marginBottom: 12,
+        marginBottom: "16px",
     },
     variantsSection: {
-        border: "1px solid #e5e7eb",
-        borderRadius: 8,
-        padding: 16,
+        border: "2px solid #e5e7eb",
+        borderRadius: "12px",
+        padding: "20px",
         backgroundColor: "#f9fafb",
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
     },
     variantsHeader: {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 16,
+        marginBottom: "20px",
     },
     addVariantBtn: {
-        backgroundColor: "#10b981",
+        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
         color: "#fff",
         border: "none",
-        padding: "6px 12px",
-        borderRadius: 6,
+        padding: "10px 18px",
+        borderRadius: "8px",
         cursor: "pointer",
-        fontSize: 14,
+        fontSize: "14px",
+        fontWeight: "600",
+        boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+        transition: "all 0.2s ease",
     },
     variantCard: {
-        border: "1px solid #d1d5db",
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 16,
-        backgroundColor: "#fff",
+        border: "2px solid #e5e7eb",
+        borderRadius: "12px",
+        padding: "20px",
+        marginBottom: "16px",
+        backgroundColor: "#ffffff",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+        transition: "all 0.2s ease",
     },
     variantHeader: {
         display: "flex",
@@ -817,16 +876,22 @@ const styles = {
     modalActions: {
         display: "flex",
         justifyContent: "flex-end",
-        gap: 12,
-        marginTop: 20,
+        gap: "14px",
+        marginTop: "24px",
+        paddingTop: "20px",
+        borderTop: "2px solid #f3f4f6",
     },
     cancelBtn: {
-        backgroundColor: "#6b7280",
+        background: "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
         color: "#fff",
         border: "none",
-        padding: "8px 20px",
-        borderRadius: 6,
+        padding: "12px 24px",
+        borderRadius: "10px",
         cursor: "pointer",
-        minWidth: 100,
+        minWidth: "120px",
+        fontSize: "15px",
+        fontWeight: "600",
+        boxShadow: "0 4px 12px rgba(107, 114, 128, 0.3)",
+        transition: "all 0.2s ease",
     },
 };

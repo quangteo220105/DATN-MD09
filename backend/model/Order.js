@@ -26,6 +26,7 @@ const orderSchema = new mongoose.Schema({
   shippingDate: { type: Date, default: null }, // Thời gian bắt đầu giao hàng
   deliveredDate: { type: Date, default: null }, // Thời gian hoàn thành giao hàng
   cancelledDate: { type: Date, default: null }, // Thời gian hủy đơn hàng
+  cancelReason: { type: String, default: null }, // Lý do hủy đơn hàng
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

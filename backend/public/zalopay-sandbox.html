@@ -554,10 +554,10 @@
 
             <div class="actions">
                 <button class="btn btn-success" onclick="handlePayment('success')">
-                    <span>✅ Thanh toán thành công</span>
+                    <span>Thanh toán thành công</span>
                 </button>
                 <button class="btn btn-failure" onclick="handlePayment('failure')">
-                    <span>❌ Thanh toán thất bại</span>
+                    <span>Hủy</span>
                 </button>
             </div>
 
@@ -615,7 +615,7 @@
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 loadingOverlay.classList.add('active');
 
-                message = '✅ Thanh toán thành công! Đang gửi callback...';
+                message = 'Thanh toán thành công! Đang gửi callback...';
                 statusClass = 'status-success';
                 statusMessage.textContent = message;
                 statusMessage.className = 'status-message ' + statusClass;
@@ -654,7 +654,7 @@
                             loadingOverlay.classList.remove('active');
 
                             // Hiển thị thông báo thành công
-                            message = '✅ Thanh toán thành công!';
+                            message = 'Thanh toán thành công!';
                             statusMessage.textContent = message;
                             statusMessage.className = 'status-message ' + statusClass;
                             statusMessage.style.display = 'block';

@@ -11,6 +11,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
+    Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -394,8 +395,7 @@ export default function HomeScreen() {
         const q = normalizeText(debouncedQuery.trim());
 
         return products.filter((p) => {
-            // Chỉ hiển thị sản phẩm đang bán
-            if (!p.isActive) return false;
+            // ✅ Hiển thị cả sản phẩm dừng bán (không filter isActive nữa)
 
             // Lọc theo danh mục
             if (activeFilters.selectedCategory !== "Tất cả") {
@@ -456,7 +456,6 @@ export default function HomeScreen() {
         if (!q) return [] as any[];
         // Ưu tiên tên sản phẩm khớp đầu, sau đó chứa
         const scored = products
-            .filter(p => p.isActive)
             .map(p => {
                 const name = normalizeText(p.name);
                 let score = 0;
@@ -505,14 +504,22 @@ export default function HomeScreen() {
         const totalStock = item.variants.reduce((sum: number, v: any) => sum + v.stock, 0);
         const isFavorite = favorites.has(item._id);
         const isOutOfStock = totalStock === 0;
+        const isInactive = !item.isActive; // ✅ Kiểm tra sản phẩm dừng bán
         const rating = productRatings[item._id];
         const hasRating = rating && rating.totalReviews > 0;
 
         return (
             <TouchableOpacity
-                style={[styles.card, isOutOfStock && styles.outOfStockCard]}
+                style={[styles.card, (isOutOfStock || isInactive) && styles.outOfStockCard]}
                 onPress={() => {
-                    if (isOutOfStock) {
+                    if (isInactive) {
+                        // ✅ Hiển thị dialog sản phẩm dừng bán
+                        Alert.alert(
+                            'Sản phẩm đã dừng bán',
+                            'Sản phẩm này hiện không còn được bán nữa.',
+                            [{ text: 'Đóng', style: 'cancel' }]
+                        );
+                    } else if (isOutOfStock) {
                         setShowOutOfStockDialog(true);
                     } else {
                         console.log('Navigating to product:', item._id);
@@ -550,7 +557,9 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.productInfo}>
                     <Text numberOfLines={2} style={styles.productName}>{item.name}</Text>
-                    {isOutOfStock ? (
+                    {isInactive ? (
+                        <Text style={styles.inactiveText}>Đã dừng bán</Text>
+                    ) : isOutOfStock ? (
                         <Text style={styles.outOfStockText}>Hết hàng</Text>
                     ) : (
                         <Text style={styles.soldText}>Số lượng còn {totalStock}</Text>
@@ -1339,7 +1348,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 10,
         backgroundColor: "#f8f9fa",
-        borderRadius: 20,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: "#e9ecef",
         shadowColor: "#000",
@@ -1453,6 +1462,12 @@ const styles = StyleSheet.create({
     outOfStockText: {
         fontSize: 12,
         color: "#ff4757",
+        fontWeight: "600",
+        marginBottom: 4
+    },
+    inactiveText: {
+        fontSize: 12,
+        color: "#f59e0b",
         fontWeight: "600",
         marginBottom: 4
     },

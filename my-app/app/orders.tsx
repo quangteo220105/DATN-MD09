@@ -8,7 +8,10 @@ import {
     TouchableOpacity,
     Alert,
     ScrollView,
-    Image
+    Image,
+    RefreshControl,
+    Modal,
+    TextInput
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -22,8 +25,8 @@ const STATUS_INFO: Record<string, { emoji: string; color: string }> = {
     'Chờ xác nhận': { emoji: '🛒', color: '#0ea5e9' },
     'Đã xác nhận': { emoji: '📦', color: '#22c55e' },
     'Đang giao hàng': { emoji: '🚚', color: '#f59e0b' },
-    'Đã giao hàng': { emoji: '', color: '#16a34a' },
-    'Đã hủy': { emoji: '', color: '#ef4444' },
+    'Đã giao hàng': { emoji: '✅', color: '#16a34a' },
+    'Đã hủy': { emoji: '❌', color: '#ef4444' },
 };
 
 function normalizeStatus(raw?: string) {
@@ -73,6 +76,10 @@ function mergeOrderData(localOrder: any, backendOrder: any) {
 export default function OrdersScreen() {
     const [orders, setOrders] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<string>('Tất cả');
+    const [refreshing, setRefreshing] = useState(false);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelingOrder, setCancelingOrder] = useState<{ orderId: any; backendId?: any } | null>(null);
     const router = useRouter();
 
     // Fetch orders từ API hoặc AsyncStorage fallback
@@ -196,6 +203,13 @@ export default function OrdersScreen() {
         // Fallback: chỉ lấy từ AsyncStorage
         setOrders(localHistory);
     }, [router]);
+
+    // Hàm xử lý pull-to-refresh
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        await fetchOrders();
+        setRefreshing(false);
+    }, [fetchOrders]);
 
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
     useFocusEffect(React.useCallback(() => { fetchOrders(); }, [fetchOrders]));
@@ -389,8 +403,23 @@ export default function OrdersScreen() {
         } catch { return false; }
     };
 
-    // Hủy đơn
-    const handleCancel = async (orderId: any, backendId?: any) => {
+    // Mở dialog hủy đơn
+    const openCancelDialog = (orderId: any, backendId?: any) => {
+        setCancelingOrder({ orderId, backendId });
+        setCancelReason('');
+        setShowCancelDialog(true);
+    };
+
+    // Xác nhận hủy đơn với lý do
+    const confirmCancel = async () => {
+        if (!cancelReason.trim()) {
+            Alert.alert('Thông báo', 'Vui lòng nhập lý do hủy đơn');
+            return;
+        }
+
+        if (!cancelingOrder) return;
+
+        const { orderId, backendId } = cancelingOrder;
         const userString = await AsyncStorage.getItem('user');
         const user = userString ? JSON.parse(userString) : null;
         if (!user || !user._id) return;
@@ -400,7 +429,10 @@ export default function OrdersScreen() {
                 await fetch(`${BASE_URL}/orders/${backendId}/status`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'Đã hủy' })
+                    body: JSON.stringify({
+                        status: 'Đã hủy',
+                        cancelReason: cancelReason.trim()
+                    })
                 });
             } catch (e) {
                 console.log('PATCH /orders/:id/status failed', e);
@@ -412,13 +444,20 @@ export default function OrdersScreen() {
                 (o.id === orderId || o._id === orderId) ? {
                     ...o,
                     status: 'Đã hủy',
-                    cancelledDate: new Date().toISOString() // Lưu thời gian hủy
+                    cancelledDate: new Date().toISOString(),
+                    cancelReason: cancelReason.trim()
                 } : o
             );
             const historyKey = `order_history_${user._id}`;
             AsyncStorage.setItem(historyKey, JSON.stringify(newOrders));
             return newOrders;
         });
+
+        // Đóng dialog và reset
+        setShowCancelDialog(false);
+        setCancelReason('');
+        setCancelingOrder(null);
+        Alert.alert('Thành công', 'Đơn hàng đã được hủy');
     };
 
     // Bấm review
@@ -578,10 +617,7 @@ export default function OrdersScreen() {
 
                     {status !== 'Đã hủy' && status !== 'Đã giao hàng' && (
                         <TouchableOpacity
-                            onPress={() => Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
-                                { text: 'Không', style: 'cancel' },
-                                { text: 'Có, hủy', style: 'destructive', onPress: () => handleCancel(item.id || item._id, item._id) }
-                            ])}
+                            onPress={() => openCancelDialog(item.id || item._id, item._id)}
                             style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
                         >
                             <Text style={{ color: '#fff', fontWeight: '600' }}>Hủy đơn</Text>
@@ -686,8 +722,61 @@ export default function OrdersScreen() {
                     contentContainerStyle={{ paddingBottom: 80 }}
                     ListFooterComponent={<View style={{ height: 12 }} />}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#111827']}
+                            tintColor="#111827"
+                        />
+                    }
                 />
             </View>
+
+            {/* Dialog hủy đơn */}
+            <Modal
+                visible={showCancelDialog}
+                animationType="fade"
+                transparent
+                onRequestClose={() => setShowCancelDialog(false)}
+            >
+                <View style={styles.cancelDialogOverlay}>
+                    <View style={styles.cancelDialogContainer}>
+                        <Text style={styles.cancelDialogTitle}>Lý do hủy đơn</Text>
+                        <Text style={styles.cancelDialogSubtitle}>Vui lòng cho chúng tôi biết lý do bạn muốn hủy đơn hàng này</Text>
+
+                        <TextInput
+                            style={styles.cancelReasonInput}
+                            placeholder="Nhập lý do hủy đơn..."
+                            placeholderTextColor="#999"
+                            multiline
+                            numberOfLines={4}
+                            value={cancelReason}
+                            onChangeText={setCancelReason}
+                            textAlignVertical="top"
+                        />
+
+                        <View style={styles.cancelDialogActions}>
+                            <TouchableOpacity
+                                style={[styles.cancelDialogBtn, styles.cancelDialogBtnSecondary]}
+                                onPress={() => {
+                                    setShowCancelDialog(false);
+                                    setCancelReason('');
+                                    setCancelingOrder(null);
+                                }}
+                            >
+                                <Text style={styles.cancelDialogBtnTextSecondary}>Đóng</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.cancelDialogBtn, styles.cancelDialogBtnPrimary]}
+                                onPress={confirmCancel}
+                            >
+                                <Text style={styles.cancelDialogBtnTextPrimary}>Xác nhận hủy</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -715,4 +804,77 @@ const styles = StyleSheet.create({
     productMeta: { fontSize: 12, color: '#666', marginTop: 2 },
     productPrice: { fontSize: 14, fontWeight: '600', color: '#222' },
     discountLabel: { fontSize: 14, fontWeight: '600', color: '#111', marginTop: 6 },
+    // Dialog hủy đơn styles
+    cancelDialogOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    cancelDialogContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 24,
+        width: '100%',
+        maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    cancelDialogTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1a1a1a',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    cancelDialogSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 20,
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    cancelReasonInput: {
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 15,
+        color: '#1a1a1a',
+        backgroundColor: '#f9fafb',
+        marginBottom: 20,
+        minHeight: 100,
+    },
+    cancelDialogActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    cancelDialogBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    cancelDialogBtnSecondary: {
+        backgroundColor: '#f3f4f6',
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+    },
+    cancelDialogBtnPrimary: {
+        backgroundColor: '#ef4444',
+    },
+    cancelDialogBtnTextSecondary: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    cancelDialogBtnTextPrimary: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#fff',
+    },
 });
