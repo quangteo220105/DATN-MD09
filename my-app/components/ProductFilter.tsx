@@ -174,6 +174,12 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                                 >
                                     <Text style={styles.quickPriceText}>200.000 - 300.000</Text>
                                 </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.quickPriceBtn}
+                                    onPress={() => { setPriceMin(300000); setPriceMax(1000000); }}
+                                >
+                                    <Text style={styles.quickPriceText}>Trên 300.000</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
 

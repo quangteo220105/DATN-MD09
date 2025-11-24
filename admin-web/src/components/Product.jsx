@@ -538,113 +538,115 @@ export default function ManagerDashboard() {
                                 </button>
                             </div>
 
-                            {formProduct.variants.map((variant, index) => (
-                                <div
-                                    key={index}
-                                    style={styles.variantCard}
-                                    ref={index === formProduct.variants.length - 1 ? lastVariantRef : null}
-                                >
-                                    <div style={styles.variantHeader}>
-                                        <h5>Biến thể {index + 1}</h5>
-                                        <div style={styles.variantHeaderActions}>
-                                            <button
-                                                type="button"
-                                                style={styles.addInlineBtn}
-                                                onClick={addVariant}
-                                                title="Thêm biến thể"
-                                            >
-                                                +
-                                            </button>
-                                            {formProduct.variants.length > 1 && (
+                            <div style={styles.variantGrid}>
+                                {formProduct.variants.map((variant, index) => (
+                                    <div
+                                        key={index}
+                                        style={styles.variantCard}
+                                        ref={index === formProduct.variants.length - 1 ? lastVariantRef : null}
+                                    >
+                                        <div style={styles.variantHeader}>
+                                            <h5>Biến thể {index + 1}</h5>
+                                            <div style={styles.variantHeaderActions}>
                                                 <button
                                                     type="button"
-                                                    style={styles.removeVariantBtn}
-                                                    onClick={() => removeVariant(index)}
-                                                    title="Xóa biến thể này"
+                                                    style={styles.addInlineBtn}
+                                                    onClick={addVariant}
+                                                    title="Thêm biến thể"
                                                 >
-                                                    ×
+                                                    +
                                                 </button>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div style={styles.variantRow}>
-                                        <div style={styles.inputGroup}>
-                                            <label>Size:</label>
-                                            <input
-                                                placeholder="VD: 40, 41, 42..."
-                                                value={variant.size}
-                                                onChange={(e) => updateVariant(index, 'size', e.target.value)}
-                                            />
-                                        </div>
-
-                                        <div style={styles.inputGroup}>
-                                            <label>Màu:</label>
-                                            <input
-                                                placeholder="VD: Đen, Trắng, Xanh..."
-                                                value={variant.color}
-                                                onChange={(e) => updateVariant(index, 'color', e.target.value)}
-                                            />
-                                        </div>
-
-                                        <div style={styles.inputGroup}>
-                                            <label>Giá nhập:</label>
-                                            <input
-                                                placeholder="Giá nhập"
-                                                type="number"
-                                                value={variant.originalPrice}
-                                                onChange={(e) => updateVariant(index, 'originalPrice', e.target.value)}
-                                            />
-                                        </div>
-
-                                        <div style={styles.inputGroup}>
-                                            <label>Giá bán:</label>
-                                            <input
-                                                placeholder="Giá bán"
-                                                type="number"
-                                                value={variant.currentPrice}
-                                                onChange={(e) => updateVariant(index, 'currentPrice', e.target.value)}
-                                            />
-                                        </div>
-
-                                        <div style={styles.inputGroup}>
-                                            <label>Số lượng:</label>
-                                            <input
-                                                placeholder="Số lượng"
-                                                type="number"
-                                                value={variant.stock}
-                                                onChange={(e) => updateVariant(index, 'stock', e.target.value)}
-                                            />
-                                        </div>
-
-                                        <div style={styles.inputGroup}>
-                                            <label>Ảnh:</label>
-                                            <div style={styles.imageUpload}>
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={(e) => {
-                                                        if (e.target.files && e.target.files[0]) {
-                                                            updateVariantImage(index, e.target.files[0]);
-                                                        }
-                                                    }}
-                                                />
-                                                {/* Preview ảnh */}
-                                                {(variant.imageFile || variant.existingImage) && (
-                                                    <img
-                                                        src={variant.imageFile ?
-                                                            URL.createObjectURL(variant.imageFile) :
-                                                            `http://localhost:3000${variant.existingImage}`
-                                                        }
-                                                        alt="Preview"
-                                                        style={styles.previewImage}
-                                                    />
+                                                {formProduct.variants.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        style={styles.removeVariantBtn}
+                                                        onClick={() => removeVariant(index)}
+                                                        title="Xóa biến thể này"
+                                                    >
+                                                        ×
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
+
+                                        <div style={styles.variantRow}>
+                                            <div style={styles.inputGroup}>
+                                                <label>Size:</label>
+                                                <input
+                                                    placeholder="VD: 40, 41, 42..."
+                                                    value={variant.size}
+                                                    onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div style={styles.inputGroup}>
+                                                <label>Màu:</label>
+                                                <input
+                                                    placeholder="VD: Đen, Trắng, Xanh..."
+                                                    value={variant.color}
+                                                    onChange={(e) => updateVariant(index, 'color', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div style={styles.inputGroup}>
+                                                <label>Giá nhập:</label>
+                                                <input
+                                                    placeholder="Giá nhập"
+                                                    type="number"
+                                                    value={variant.originalPrice}
+                                                    onChange={(e) => updateVariant(index, 'originalPrice', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div style={styles.inputGroup}>
+                                                <label>Giá bán:</label>
+                                                <input
+                                                    placeholder="Giá bán"
+                                                    type="number"
+                                                    value={variant.currentPrice}
+                                                    onChange={(e) => updateVariant(index, 'currentPrice', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div style={styles.inputGroup}>
+                                                <label>Số lượng:</label>
+                                                <input
+                                                    placeholder="Số lượng"
+                                                    type="number"
+                                                    value={variant.stock}
+                                                    onChange={(e) => updateVariant(index, 'stock', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div style={styles.inputGroup}>
+                                                <label>Ảnh:</label>
+                                                <div style={styles.imageUpload}>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                updateVariantImage(index, e.target.files[0]);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {/* Preview ảnh */}
+                                                    {(variant.imageFile || variant.existingImage) && (
+                                                        <img
+                                                            src={variant.imageFile ?
+                                                                URL.createObjectURL(variant.imageFile) :
+                                                                `http://localhost:3000${variant.existingImage}`
+                                                            }
+                                                            alt="Preview"
+                                                            style={styles.previewImage}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
 
                         <div style={styles.modalActions}>
@@ -814,6 +816,11 @@ const styles = {
         backgroundColor: "#f9fafb",
         boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
     },
+    variantGrid: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        gap: "16px",
+    },
     variantsHeader: {
         display: "flex",
         justifyContent: "space-between",
@@ -836,10 +843,13 @@ const styles = {
         border: "2px solid #e5e7eb",
         borderRadius: "12px",
         padding: "20px",
-        marginBottom: "16px",
         backgroundColor: "#ffffff",
         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
         transition: "all 0.2s ease",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        height: "100%",
     },
     variantHeader: {
         display: "flex",
