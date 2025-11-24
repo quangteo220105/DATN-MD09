@@ -31,6 +31,23 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
     const [priceMin, setPriceMin] = useState<number>(0);
     const [priceMax, setPriceMax] = useState<number>(10000000);
     const [minRating, setMinRating] = useState<number>(0);
+    const categoryOptions = [{ id: 'all', name: 'Tất cả' }, ...categories];
+    const quickRanges = [
+        { label: 'Dưới 100.000', min: 0, max: 100000 },
+        { label: '100.000 - 200.000', min: 100000, max: 200000 },
+        { label: '200.000 - 300.000', min: 200000, max: 300000 },
+        { label: 'Trên 300.000', min: 300000, max: 1000000 },
+    ];
+    const filterSummary = [
+        { label: 'Danh mục', value: selectedCategory },
+        { label: 'Thương hiệu', value: selectedBrand },
+        {
+            label: 'Khoảng giá',
+            value: `${priceMin.toLocaleString('vi-VN')} - ${priceMax.toLocaleString('vi-VN')} đ`,
+        },
+        { label: 'Đánh giá', value: minRating === 0 ? 'Tất cả' : `${minRating}★ trở lên` },
+    ];
+    const isQuickRangeActive = (min: number, max: number) => priceMin === min && priceMax === max;
 
     const handleReset = () => {
         setSelectedCategory('Tất cả');
@@ -70,6 +87,16 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                             <Ionicons name="close" size={24} color="#111827" />
                         </TouchableOpacity>
                     </View>
+                    <View style={styles.summaryRow}>
+                        {filterSummary.map((item) => (
+                            <View key={item.label} style={styles.summaryCard}>
+                                <Text style={styles.summaryLabel}>{item.label}</Text>
+                                <Text style={styles.summaryValue} numberOfLines={1}>
+                                    {item.value}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
 
                     <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
                         {/* Danh mục */}
@@ -79,7 +106,7 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                                 <Text style={styles.sectionTitle}>Danh mục</Text>
                             </View>
                             <View style={styles.chipContainer}>
-                                {categories.map((cat) => (
+                                {categoryOptions.map((cat) => (
                                     <TouchableOpacity
                                         key={cat.id}
                                         style={[
@@ -170,30 +197,28 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                             </View>
                             {/* Quick price range buttons */}
                             <View style={styles.quickPriceContainer}>
-                                <TouchableOpacity
-                                    style={styles.quickPriceBtn}
-                                    onPress={() => { setPriceMin(0); setPriceMax(100000); }}
-                                >
-                                    <Text style={styles.quickPriceText}>Dưới 100.000</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.quickPriceBtn}
-                                    onPress={() => { setPriceMin(100000); setPriceMax(200000); }}
-                                >
-                                    <Text style={styles.quickPriceText}>100.000 - 200.000</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.quickPriceBtn}
-                                    onPress={() => { setPriceMin(200000); setPriceMax(300000); }}
-                                >
-                                    <Text style={styles.quickPriceText}>200.000 - 300.000</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.quickPriceBtn}
-                                    onPress={() => { setPriceMin(300000); setPriceMax(1000000); }}
-                                >
-                                    <Text style={styles.quickPriceText}>Trên 300.000</Text>
-                                </TouchableOpacity>
+                                {quickRanges.map((range) => (
+                                    <TouchableOpacity
+                                        key={range.label}
+                                        style={[
+                                            styles.quickPriceBtn,
+                                            isQuickRangeActive(range.min, range.max) && styles.quickPriceBtnActive,
+                                        ]}
+                                        onPress={() => {
+                                            setPriceMin(range.min);
+                                            setPriceMax(range.max);
+                                        }}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.quickPriceText,
+                                                isQuickRangeActive(range.min, range.max) && styles.quickPriceTextActive,
+                                            ]}
+                                        >
+                                            {range.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
                             </View>
                         </View>
 
@@ -247,19 +272,21 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
 const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
         justifyContent: 'flex-end',
     },
     modalContainer: {
-backgroundColor: '#fff',
+        marginHorizontal: 12,
+        backgroundColor: '#f8fafc',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         maxHeight: '85%',
-        paddingBottom: 24,
+        paddingBottom: 20,
         shadowColor: '#000',
         shadowOpacity: 0.12,
         shadowRadius: 12,
         elevation: 12,
+        overflow: 'hidden',
     },
     handle: {
         width: 60,
@@ -275,10 +302,11 @@ backgroundColor: '#fff',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 24,
-        paddingTop: 20,
-        paddingBottom: 16,
+        paddingTop: 24,
+        paddingBottom: 18,
+        backgroundColor: '#fff',
         borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+        borderBottomColor: '#eceffb',
     },
     headerTitle: {
         fontSize: 22,
@@ -292,12 +320,50 @@ backgroundColor: '#fff',
     },
     closeBtn: {
         padding: 6,
-        backgroundColor: '#F5F5F5',
+        backgroundColor: '#eef2ff',
         borderRadius: 20,
         width: 36,
         height: 36,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#e0e7ff',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        backgroundColor: '#f1f5f9',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+    },
+    summaryCard: {
+        width: '47%',
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#e3e8ff',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    summaryLabel: {
+        fontSize: 12,
+        color: '#94a3b8',
+        marginBottom: 4,
+    },
+    summaryValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0f172a',
     },
     content: {
         paddingHorizontal: 20,
@@ -306,10 +372,14 @@ backgroundColor: '#fff',
     section: {
         marginBottom: 24,
         padding: 16,
-        borderRadius: 16,
-        backgroundColor: '#f8fafc',
+        borderRadius: 18,
+        backgroundColor: '#fff',
         borderWidth: 1,
-        borderColor: '#eef2ff',
+        borderColor: '#e3e8ff',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+        elevation: 4,
     },
     sectionHeading: {
         flexDirection: 'row',
@@ -336,8 +406,8 @@ backgroundColor: '#fff',
     chip: {
         paddingHorizontal: 16,
         paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#fff',
+        borderRadius: 18,
+        backgroundColor: '#f8fafc',
         borderWidth: 1,
         borderColor: '#e2e8f0',
         shadowColor: '#0f172a',
@@ -349,6 +419,7 @@ backgroundColor: '#fff',
         backgroundColor: '#1d4ed8',
         borderColor: '#1d4ed8',
         shadowOpacity: 0.15,
+        elevation: 4,
     },
     chipText: {
         fontSize: 14,
@@ -368,8 +439,8 @@ backgroundColor: '#fff',
     priceInputWrapper: {
         flex: 1,
         backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 12,
+        borderRadius: 14,
+        padding: 14,
         borderWidth: 1,
         borderColor: '#e2e8f0',
         shadowColor: '#0f172a',
@@ -404,14 +475,14 @@ backgroundColor: '#fff',
     quickPriceContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
-        marginTop: 14,
+        gap: 12,
+        marginTop: 16,
     },
     quickPriceBtn: {
         paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 16,
-        backgroundColor: '#fff',
+        paddingVertical: 10,
+        borderRadius: 14,
+        backgroundColor: '#f8fafc',
         borderWidth: 1,
         borderColor: '#e2e8f0',
         shadowColor: '#0f172a',
@@ -419,10 +490,20 @@ backgroundColor: '#fff',
         shadowRadius: 6,
         elevation: 2,
     },
+    quickPriceBtnActive: {
+        backgroundColor: '#e0f2fe',
+        borderColor: '#0ea5e9',
+        shadowOpacity: 0.18,
+        elevation: 4,
+    },
     quickPriceText: {
         fontSize: 12,
         color: '#475569',
         fontWeight: '500',
+    },
+    quickPriceTextActive: {
+        color: '#0f172a',
+        fontWeight: '700',
     },
     ratingContainer: {
         flexDirection: 'row',
@@ -461,12 +542,12 @@ backgroundColor: '#fff',
     footer: {
         flexDirection: 'row',
         paddingHorizontal: 24,
-        paddingTop: 20,
-        paddingBottom: 8,
+        paddingTop: 16,
+        paddingBottom: 16,
         gap: 14,
         borderTopWidth: 1,
-        borderTopColor: '#f1f5f9',
-        backgroundColor: '#fff',
+        borderTopColor: '#e2e8f0',
+        backgroundColor: '#f8fafc',
         shadowColor: '#0f172a',
         shadowOpacity: 0.08,
         shadowRadius: 10,
