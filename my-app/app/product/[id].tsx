@@ -37,6 +37,7 @@ interface Product {
     description: string;
     variants: Variant[];
     categoryId?: string;
+    isActive?: boolean;
 }
 
 export default function ProductDetailScreen() {
@@ -96,6 +97,22 @@ export default function ProductDetailScreen() {
         };
 
         if (id) fetchProduct();
+    }, [id]);
+
+    // ✅ Auto-refresh product mỗi 2 giây để kiểm tra trạng thái dừng bán real-time
+    useEffect(() => {
+        if (!id) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const response = await axios.get(`${BASE_URL}/products/${id}`);
+                setProduct(response.data);
+            } catch (error) {
+                console.log('Lỗi refresh sản phẩm:', error);
+            }
+        }, 2000); // Refresh mỗi 2 giây
+
+        return () => clearInterval(interval);
     }, [id]);
 
     // Load product rating
@@ -201,6 +218,11 @@ export default function ProductDetailScreen() {
             Alert.alert('Thông báo', 'Vui lòng chọn màu sắc và kích cỡ');
             return;
         }
+        // Kiểm tra sản phẩm dừng bán
+        if (product.isActive === false) {
+            Alert.alert('Thông báo', 'Sản phẩm này đã dừng bán');
+            return;
+        }
         // Kiểm tra stock
         if (selectedVariant.stock === 0) {
             Alert.alert('Thông báo', 'Sản phẩm đã hết hàng');
@@ -266,6 +288,11 @@ export default function ProductDetailScreen() {
     const buyNow = async () => {
         if (!selectedVariant || !product) {
             Alert.alert('Thông báo', 'Vui lòng chọn màu sắc và kích cỡ');
+            return;
+        }
+        // Kiểm tra sản phẩm dừng bán
+        if (product.isActive === false) {
+            Alert.alert('Thông báo', 'Sản phẩm này đã dừng bán');
             return;
         }
         // Kiểm tra stock

@@ -380,6 +380,63 @@ export default function CheckoutScreen() {
     }
   }, [handlePaymentSuccess]);
 
+  // 🟢 Kiểm tra sản phẩm dừng bán
+  const checkStoppedProducts = React.useCallback(async (items: any[]) => {
+    if (items.length === 0) return false;
+
+    try {
+      // Kiểm tra từng sản phẩm trong giỏ
+      const checkPromises = items.map(async (item) => {
+        try {
+          const productId = item.id || item._id || item.productId;
+          console.log('[Checkout] Checking product:', productId, item.name);
+
+          const response = await fetch(`${BASE_URL}/products/${productId}`);
+          if (!response.ok) return null;
+          const productData = await response.json();
+
+          console.log('[Checkout] Product isActive:', productData.name, productData.isActive);
+
+          if (productData.isActive === false) {
+            console.log('[Checkout] 🚨 STOPPED PRODUCT FOUND:', productData.name);
+            return {
+              id: productId,
+              name: item.name || productData.name,
+              isStopped: true
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error('Error checking product:', error);
+          return null;
+        }
+      });
+
+      const stoppedProducts = (await Promise.all(checkPromises)).filter(p => p !== null);
+
+      if (stoppedProducts.length > 0) {
+        const productNames = stoppedProducts.map(p => p.name).join(', ');
+        console.log('[Checkout] 🚨 SHOWING ALERT for:', productNames);
+        Alert.alert(
+          'Sản phẩm dừng bán',
+          `Các sản phẩm sau đã dừng bán: ${productNames}`,
+          [
+            {
+              text: 'Xác nhận',
+              onPress: () => router.replace('/(tabs)/home')
+            }
+          ],
+          { cancelable: false }
+        );
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking stopped products:', error);
+      return false;
+    }
+  }, [router]);
+
   // 🟢 Load cart, address, user info
   useEffect(() => {
     const fetchData = async () => {
@@ -431,6 +488,12 @@ export default function CheckoutScreen() {
       // ✅ Thêm discountAmount mặc định = 0
       items = items.map(i => ({ ...i, discountAmount: 0 }));
 
+      // ✅ Kiểm tra sản phẩm dừng bán
+      const hasStopped = await checkStoppedProducts(items);
+      if (hasStopped) {
+        return; // Dừng lại nếu có sản phẩm dừng bán
+      }
+
       setCart(items);
 
       const cartTotal = items.reduce((sum, i) => sum + i.qty * i.price, 0);
@@ -440,7 +503,7 @@ export default function CheckoutScreen() {
       if (cartTotal > 0) fetchAvailableVouchers(cartTotal);
     };
     fetchData();
-  }, []);
+  }, [checkStoppedProducts]);
 
   // 🔄 Reload khi quay lại màn hình (đảm bảo tên từ profile cập nhật, hoặc địa chỉ vừa chọn)
   useFocusEffect(
@@ -455,14 +518,34 @@ export default function CheckoutScreen() {
         const addr = addressString ? JSON.parse(addressString) : { name: user.name || '', phone: '', address: '' };
         setAddressObj(addr);
 
+        // ✅ Kiểm tra sản phẩm dừng bán khi focus
+        if (cart.length > 0) {
+          console.log('[Checkout] 🔍 Initial check for stopped products');
+          await checkStoppedProducts(cart);
+        }
+
         // ✅ CHỈ reload address, KHÔNG reload cart để giữ nguyên buy_now
         // Cart đã được load trong useEffect ban đầu
       };
       reload();
 
+      // ✅ Auto-check sản phẩm dừng bán mỗi 5 giây
+      const interval = setInterval(async () => {
+        if (cart.length > 0) {
+          const now = new Date().toLocaleTimeString();
+          console.log(`[Checkout] 🔄 [${now}] Auto-checking stopped products...`);
+          await checkStoppedProducts(cart);
+        }
+      }, 5000); // 5 giây
+
+      return () => {
+        console.log('[Checkout] 🛑 Clearing interval');
+        clearInterval(interval);
+      };
+
       // ❌ KHÔNG xóa buy_now ở đây vì sẽ bị xóa khi chuyển sang address-book
       // buy_now sẽ được xóa trong confirmOrder sau khi thanh toán thành công
-    }, [])
+    }, [cart, checkStoppedProducts])
   );
 
   // 🟢 Xử lý deep link khi thanh toán ZaloPay thành công

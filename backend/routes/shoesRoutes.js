@@ -261,30 +261,35 @@ router.put("/:id", upload.any(), async (req, res) => {
     }
 });
 
-
 // ==========================
-// 🟡 Toggle trạng thái sản phẩm (Ngừng bán/Tiếp tục bán)
+// 🟠 Toggle dừng bán sản phẩm
 // ==========================
-router.put("/:id/toggle-status", async (req, res) => {
+router.put("/:id/toggle-stop", async (req, res) => {
     try {
-        const { id } = req.params;
-        const { isActive } = req.body;
+        console.log('🔄 [Toggle Stop] Request received for product:', req.params.id);
 
-        const product = await Product.findById(id);
+        const product = await Product.findById(req.params.id);
         if (!product) {
-            return res.status(404).json({ message: "Không tìm thấy sản phẩm!" });
+            console.log('❌ [Toggle Stop] Product not found:', req.params.id);
+            return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
         }
 
-        product.isActive = isActive;
+        console.log('📦 [Toggle Stop] Current isActive:', product.isActive);
+
+        // Toggle trạng thái isActive
+        product.isActive = !product.isActive;
         await product.save();
 
+        console.log('✅ [Toggle Stop] Updated isActive:', product.isActive);
+
         res.status(200).json({
-            message: isActive ? "✅ Đã tiếp tục bán sản phẩm!" : "✅ Đã ngừng bán sản phẩm!",
+            success: true,
+            message: product.isActive ? "Đã mở lại sản phẩm" : "Đã dừng bán sản phẩm",
             product
         });
-    } catch (err) {
-        console.error("❌ Lỗi toggle status:", err);
-        res.status(500).json({ message: "Không thể thay đổi trạng thái sản phẩm!" });
+    } catch (error) {
+        console.error("❌ Lỗi toggle dừng bán:", error);
+        res.status(500).json({ message: "Không thể cập nhật trạng thái sản phẩm" });
     }
 });
 

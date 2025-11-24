@@ -363,6 +363,14 @@ export default function HomeScreen() {
         fetchProducts();
     }, []);
 
+    // ✅ Auto-refresh products mỗi 3 giây để cập nhật trạng thái dừng bán real-time
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchProducts();
+        }, 3000); // Refresh mỗi 3 giây
+        return () => clearInterval(interval);
+    }, []);
+
     // Pull to refresh
     const onRefresh = async () => {
         setRefreshing(true);

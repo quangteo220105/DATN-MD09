@@ -1,0 +1,104 @@
+=== HƯỚNG DẪN CUỐI CÙNG - THÊM KIỂM TRA DỪNG BÁN ===
+
+✅ ĐÃ HOÀN THÀNH:
+- Backend model có field isStopped ✅
+- Backend API /api/products/:id/toggle-stop ✅  
+- Admin có nút "Dừng bán" ✅
+- Product interface có isStopped ✅
+
+📝 CẦN LÀM (2 FILE):
+
+=== FILE 1: my-app/app/product/[id].tsx ===
+
+TÌM: Bất kỳ function nào có:
+- AsyncStorage.setItem và 'cart'
+- Hoặc router.push('/checkout')
+- Hoặc router.push('/(tabs)/cart')
+
+THÊM VÀO ĐẦU FUNCTION:
+```typescript
+if (product?.isStopped) {
+    Alert.alert('Thông báo', 'Sản phẩm này đã dừng bán');
+    return;
+}
+```
+
+VÍ DỤ:
+```typescript
+const handleAddToCart = async () => {
+    // THÊM DÒNG NÀY ↓
+    if (product?.isStopped) {
+        Alert.alert('Thông báo', 'Sản phẩm này đã dừng bán');
+        return;
+    }
+    // Code cũ tiếp tục...
+    const cart = await AsyncStorage.getItem('cart');
+    // ...
+};
+```
+
+=== FILE 2: my-app/app/checkout.tsx ===
+
+BƯỚC 1: Thêm import useFocusEffect nếu chưa có:
+```typescript
+import { useFocusEffect } from '@react-navigation/native';
+```
+
+BƯỚC 2: Thêm function này SAU các useState, TRƯỚC các useEffect:
+```typescript
+const checkStoppedProducts = async () => {
+    try {
+        const stoppedProducts = [];
+        for (const item of cartItems) {
+            const productId = item.productId || item._id;
+            if (!productId) continue;
+            const res = await fetch(`${BASE_URL}/shoes/${productId}`);
+            if (res.ok) {
+                const product = await res.json();
+                if (product.isStopped) {
+                    stoppedProducts.push(product.name || item.name);
+                }
+            }
+        }
+        if (stoppedProducts.length > 0) {
+            Alert.alert(
+                'Sản phẩm dừng bán',
+                `Sản phẩm sau đã dừng bán:\n${stoppedProducts.join('\n')}`,
+                [{ text: 'Về trang chủ', onPress: () => router.replace('/(tabs)/home') }]
+            );
+            return true;
+        }
+        return false;
+    } catch (error) {
+        return false;
+    }
+};
+```
+
+BƯỚC 3: Thêm useFocusEffect để kiểm tra khi vào màn hình:
+```typescript
+useFocusEffect(
+    React.useCallback(() => {
+        checkStoppedProducts();
+    }, [cartItems])
+);
+```
+
+BƯỚC 4: TÌM function thanh toán (có tên như handleCheckout, handlePayment, processOrder)
+THÊM VÀO ĐẦU FUNCTION:
+```typescript
+const hasStoppedProducts = await checkStoppedProducts();
+if (hasStoppedProducts) return;
+```
+
+=== TEST ===
+1. Restart backend
+2. Admin: Bấm "Dừng bán" một sản phẩm
+3. Mobile: Vào chi tiết sản phẩm → Thử thêm giỏ → Thấy thông báo ✅
+4. Mobile: Vào checkout → Tự động thông báo và về home ✅
+
+=== LƯU Ý ===
+- Tất cả backend đã xong
+- Chỉ cần thêm code kiểm tra vào 2 file mobile
+- Copy đúng vị trí như hướng dẫn
+- Restart backend trước khi test

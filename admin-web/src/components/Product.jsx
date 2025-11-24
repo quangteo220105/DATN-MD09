@@ -353,6 +353,33 @@ export default function ManagerDashboard() {
         }
     };
 
+    // 🟠 Toggle dừng bán sản phẩm
+    const toggleStopProduct = async (product) => {
+        const willStop = product.isActive; // Nếu đang active thì sẽ dừng bán
+        const confirmed = window.confirm(willStop
+            ? "Bạn có chắc muốn dừng bán sản phẩm này?"
+            : "Bạn có chắc muốn mở bán sản phẩm này?");
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`http://localhost:3000/api/products/${product._id}/toggle-stop`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" }
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                alert(data.message || (willStop ? "✅ Đã dừng bán sản phẩm." : "✅ Đã mở lại sản phẩm."));
+                fetchProducts();
+            } else {
+                alert(data.message || "❌ Không thể cập nhật trạng thái sản phẩm!");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("❌ Lỗi kết nối server!");
+        }
+    };
+
     return (
         <div style={styles.page}>
             <div style={styles.mainContent}>
@@ -432,10 +459,10 @@ export default function ManagerDashboard() {
                                         <td style={styles.td}>
                                             <button style={styles.editBtn} onClick={() => handleEditClick(p)}>Sửa</button>
                                             <button
-                                                style={p.isActive ? styles.stopBtn : styles.resumeBtn}
-                                                onClick={() => toggleSellingProduct(p)}
+                                                style={!p.isActive ? { ...styles.resumeBtn, backgroundColor: '#22c55e' } : { ...styles.stopBtn, backgroundColor: '#ef4444' }}
+                                                onClick={() => toggleStopProduct(p)}
                                             >
-                                                {p.isActive ? "Dừng bán" : "Mở bán"}
+                                                {!p.isActive ? "Mở bán" : "Dừng bán"}
                                             </button>
                                         </td>
                                     </tr>
