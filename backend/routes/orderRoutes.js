@@ -174,6 +174,10 @@ router.patch('/:id/status', async (req, res) => {
         status,
         cancelledDate: new Date() // Lưu thời gian hủy đơn
       };
+      // Lưu lý do hủy nếu có
+      if (req.body.cancelReason) {
+        updateData.cancelReason = req.body.cancelReason;
+      }
       const ord = await Order.findByIdAndUpdate(orderId, updateData, { new: true });
       return res.json({ message: 'Đã hủy đơn hàng thành công', order: ord });
     }

@@ -211,7 +211,7 @@ export default function Analytics() {
                     </div>
                 </div>
                 <div style={{ background: "#fff", borderRadius: 8, padding: 16 }}>
-                    <div style={{ color: "#666", fontSize: 12 }}>Số đơn hàng</div>
+                    <div style={{ color: "#666", fontSize: 12 }}>Số đơn hàng đã giao</div>
                     <div style={{ fontWeight: 700, fontSize: 22 }}>{summary.ordersCount}</div>
                     <div style={{ color: growth.ordersChangePct >= 0 ? '#16a34a' : '#ef4444', fontSize: 12, marginTop: 4 }}>
                         {Number(growth.ordersChangePct || 0) >= 0 ? '▲' : '▼'} {Math.abs(Number(growth.ordersChangePct || 0)).toLocaleString('vi-VN')}%

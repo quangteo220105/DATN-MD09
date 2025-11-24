@@ -53,6 +53,7 @@ export default function ProductDetailScreen() {
     const [favorites, setFavorites] = useState(new Set<string>());
     const [productRating, setProductRating] = useState<{ averageRating: number; totalReviews: number } | null>(null);
     const [loadingRating, setLoadingRating] = useState(false);
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
     const scrollViewRef = useRef<ScrollView>(null);
 
@@ -128,7 +129,7 @@ export default function ProductDetailScreen() {
                 const userStr = await AsyncStorage.getItem('user');
                 const currentUser = userStr ? JSON.parse(userStr) : null;
                 const userId = currentUser?._id || currentUser?.id;
-                
+
                 // Nếu không có user, dùng key 'favorites_guest'
                 const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
                 const savedFavorites = await AsyncStorage.getItem(favoritesKey);
@@ -152,10 +153,10 @@ export default function ProductDetailScreen() {
             const userStr = await AsyncStorage.getItem('user');
             const currentUser = userStr ? JSON.parse(userStr) : null;
             const userId = currentUser?._id || currentUser?.id;
-            
+
             // Nếu không có user, dùng key 'favorites_guest'
             const favoritesKey = userId ? `favorites_${userId}` : 'favorites_guest';
-            
+
             const newFavorites = new Set(favorites);
             if (isFavorite) newFavorites.delete(id as string);
             else newFavorites.add(id as string);
@@ -370,11 +371,34 @@ export default function ProductDetailScreen() {
                 <View style={styles.infoSection}>
                     <Text style={styles.brand}>{product.brand || 'Thương hiệu không xác định'}</Text>
                     <Text style={styles.productName}>{product.name || 'Tên sản phẩm không xác định'}</Text>
-                    <Text style={styles.description}>{product.description || 'Mô tả không có sẵn'}</Text>
+
+                    {/* Description with Read More */}
+                    <View style={styles.descriptionContainer}>
+                        <Text
+                            style={styles.description}
+                            numberOfLines={isDescriptionExpanded ? undefined : 3}
+                        >
+                            {product.description || 'Mô tả không có sẵn'}
+                        </Text>
+                        {product.description && product.description.length > 100 && (
+                            <TouchableOpacity
+                                onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                style={styles.readMoreBtn}
+                            >
+                                <Text style={styles.readMoreText}>
+                                    {isDescriptionExpanded ? 'Thu gọn' : 'Đọc thêm'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
 
                     {/* Rating */}
                     {productRating && productRating.totalReviews > 0 && (
-                        <View style={styles.ratingSection}>
+                        <TouchableOpacity
+                            style={styles.ratingSection}
+                            onPress={() => router.push(`/product-reviews/${id}` as any)}
+                            activeOpacity={0.7}
+                        >
                             <View style={styles.ratingRow}>
                                 <View style={styles.starsContainer}>
                                     {[1, 2, 3, 4, 5].map(star => (
@@ -389,8 +413,9 @@ export default function ProductDetailScreen() {
                                 <Text style={styles.ratingText}>
                                     {productRating.averageRating.toFixed(1)} ({productRating.totalReviews} đánh giá)
                                 </Text>
+                                <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     )}
 
                     {/* Price */}
@@ -497,7 +522,10 @@ const styles = StyleSheet.create({
     infoSection: { padding: 15 },
     brand: { fontSize: 14, color: '#888' },
     productName: { fontSize: 20, fontWeight: 'bold', marginVertical: 5 },
-    description: { fontSize: 14, color: '#555', marginBottom: 10 },
+    descriptionContainer: { marginBottom: 10 },
+    description: { fontSize: 14, color: '#555', lineHeight: 20 },
+    readMoreBtn: { marginTop: 5 },
+    readMoreText: { fontSize: 14, color: '#ff4757', fontWeight: '600' },
     priceSection: { marginVertical: 10 },
     priceRow: { flexDirection: 'row', alignItems: 'center' },
     currentPrice: { fontSize: 18, fontWeight: 'bold', color: '#222' },

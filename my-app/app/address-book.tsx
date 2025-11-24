@@ -63,11 +63,11 @@ export default function AddressBookScreen() {
         <Text style={styles.phone}>{item.phone}</Text>
         <Text style={styles.address}>{item.address}</Text>
       </View>
-      <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-        <TouchableOpacity onPress={() => select(item)} style={[styles.btn, styles.primary]}>
+      <View style={{ alignItems: 'flex-end', justifyContent: 'center', minWidth: 80 }}>
+        <TouchableOpacity onPress={() => select(item)} style={[styles.btn, styles.primary, { width: '100%' }]}>
           <Text style={styles.btnTxt}>Chọn</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => remove(item.id)} style={[styles.btn, styles.danger, { marginTop: 6 }]}>
+        <TouchableOpacity onPress={() => remove(item.id)} style={[styles.btn, styles.danger, { marginTop: 6, width: '100%' }]}>
           <Text style={styles.btnTxt}>Xoá</Text>
         </TouchableOpacity>
       </View>

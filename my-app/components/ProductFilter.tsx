@@ -247,11 +247,11 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
 const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         justifyContent: 'flex-end',
     },
     modalContainer: {
-        backgroundColor: '#fff',
+backgroundColor: '#fff',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         maxHeight: '85%',
@@ -274,12 +274,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
+        paddingHorizontal: 24,
+        paddingTop: 20,
+        paddingBottom: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9',
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '700',
         color: '#0f172a',
     },
@@ -289,7 +291,13 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     closeBtn: {
-        padding: 4,
+        padding: 6,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 20,
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     content: {
         paddingHorizontal: 20,
@@ -322,7 +330,8 @@ const styles = StyleSheet.create({
     chipContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 10,
+        marginTop: 8,
     },
     chip: {
         paddingHorizontal: 16,
@@ -347,13 +356,14 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     chipTextActive: {
-        color: '#fff',
-        fontWeight: '600',
+        color: '#FFFFFF',
+        fontWeight: '700',
     },
     priceInputRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         marginBottom: 16,
+        marginTop: 8,
     },
     priceInputWrapper: {
         flex: 1,
@@ -394,8 +404,8 @@ const styles = StyleSheet.create({
     quickPriceContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
-        marginTop: 12,
+        gap: 10,
+        marginTop: 14,
     },
     quickPriceBtn: {
         paddingHorizontal: 12,
@@ -417,7 +427,8 @@ const styles = StyleSheet.create({
     ratingContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 10,
+        marginTop: 8,
     },
     ratingChip: {
         paddingHorizontal: 16,
@@ -444,14 +455,15 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     ratingTextActive: {
-        color: '#fff',
-        fontWeight: '600',
+        color: '#FFFFFF',
+        fontWeight: '700',
     },
     footer: {
         flexDirection: 'row',
-        padding: 20,
-        paddingTop: 16,
-        gap: 12,
+        paddingHorizontal: 24,
+        paddingTop: 20,
+        paddingBottom: 8,
+        gap: 14,
         borderTopWidth: 1,
         borderTopColor: '#f1f5f9',
         backgroundColor: '#fff',
@@ -490,8 +502,9 @@ const styles = StyleSheet.create({
         elevation: 6,
     },
     applyBtnText: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '700',
-        color: '#fff',
+        color: '#FFFFFF',
+        letterSpacing: 0.5,
     },
 });

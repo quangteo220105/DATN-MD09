@@ -164,51 +164,54 @@ export default function UserManager() {
                         ) : (
                             users.map((u, idx) => {
                                 const isLocked = u.isLocked === true;
-                                const avatarUrl = resolveAvatarUrl(u);
+
+                                const avatarUrl = u.avatar || u.avatarUrl || u.profilePicture || u.image;
                                 return (
                                     <tr key={u._id || u.id || idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fbfdff' }}>
                                         <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 60 }}>{idx + 1}</td>
-                                        <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 90 }}>
+                                        <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 80 }}>
                                             {avatarUrl ? (
                                                 <img
-                                                    src={avatarUrl}
-                                                    alt={u.name || u.email || "avatar"}
+                                                    src={avatarUrl.startsWith('http') ? avatarUrl : `${BASE_URL}${avatarUrl}`}
+                                                    alt="Avatar"
                                                     style={{
-                                                        width: 48,
-                                                        height: 48,
-                                                        objectFit: 'cover',
+                                                        width: 45,
+                                                        height: 45,
                                                         borderRadius: '50%',
-                                                        border: '2px solid #e2e8f0',
-                                                        boxShadow: '0 4px 8px rgba(15,23,42,0.15)'
+                                                        objectFit: 'cover',
+                                                        border: '2px solid #e5e7eb',
+                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                                                     }}
-                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
                                                 />
-                                            ) : (
-                                                <div style={{
-                                                    width: 48,
-                                                    height: 48,
-                                                    borderRadius: '50%',
-                                                    background: 'linear-gradient(135deg,#a5b4fc,#818cf8)',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: '#fff',
-                                                    fontWeight: 700,
-                                                    fontSize: 16,
-                                                    margin: '0 auto',
-                                                    boxShadow: '0 4px 8px rgba(99,102,241,0.35)'
-                                                }}>
-                                                    {getInitials(u)}
-                                                </div>
-                                            )}
+                                            ) : null}
+                                            <div style={{
+                                                width: 45,
+                                                height: 45,
+                                                borderRadius: '50%',
+                                                backgroundColor: '#e5e7eb',
+                                                display: avatarUrl ? 'none' : 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#6b7280',
+                                                margin: '0 auto',
+                                                border: '2px solid #d1d5db'
+                                            }}>
+                                                {(u.name || u.fullName || '?').charAt(0).toUpperCase()}
+                                            </div>
                                         </td>
                                         <td style={{ textAlign: 'left', padding: '12px 14px', color: '#0f172a', borderBottom: '1px solid #eef2f7', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name || u.fullName || "—"}</td>
                                         <td style={{ textAlign: 'left', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', maxWidth: 260, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email || "—"}</td>
                                         <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 160 }}>{u.phone || u.phoneNumber || "—"}</td>
                                         <td style={{ textAlign: 'center', padding: '12px 14px', color: '#334155', borderBottom: '1px solid #eef2f7', width: 160 }}>{formatViDate(getRegistrationDate(u))}</td>
                                         <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 120 }}>
-                                            <span style={{ 
-                                                color: isLocked ? '#ef4444' : '#22c55e', 
+                                            <span style={{
+                                                color: isLocked ? '#ef4444' : '#22c55e',
                                                 fontWeight: 700,
                                                 fontSize: 13
                                             }}>
@@ -218,8 +221,8 @@ export default function UserManager() {
                                         <td style={{ textAlign: 'center', padding: '12px 14px', borderBottom: '1px solid #eef2f7', width: 120 }}>
                                             <button
                                                 style={{
-                                                    background: isLocked 
-                                                        ? "linear-gradient(180deg,#22c55e,#16a34a)" 
+                                                    background: isLocked
+                                                        ? "linear-gradient(180deg,#22c55e,#16a34a)"
                                                         : "linear-gradient(180deg,#ff6066,#ff4b52)",
                                                     border: "none",
                                                     borderRadius: 10,
@@ -227,8 +230,8 @@ export default function UserManager() {
                                                     padding: "8px 14px",
                                                     fontWeight: 700,
                                                     cursor: "pointer",
-                                                    boxShadow: isLocked 
-                                                        ? '0 6px 12px rgba(34,197,94,0.25)' 
+                                                    boxShadow: isLocked
+                                                        ? '0 6px 12px rgba(34,197,94,0.25)'
                                                         : '0 6px 12px rgba(255,91,97,0.25)',
                                                     transition: 'transform 0.08s ease-in-out',
                                                 }}

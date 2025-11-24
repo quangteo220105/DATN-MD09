@@ -372,6 +372,12 @@ export default function Orders() {
                                         <strong>❌ Đã hủy:</strong> {new Date(selected.cancelledDate).toLocaleString('vi-VN')}
                                     </div>
                                 )}
+                                {selected.cancelReason && (
+                                    <div style={{ marginTop: 8, padding: 10, background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
+                                        <strong style={{ color: '#ef4444' }}>Lý do hủy:</strong>
+                                        <div style={{ marginTop: 4, color: '#991b1b' }}>{selected.cancelReason}</div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 {(() => {
