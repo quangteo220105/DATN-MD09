@@ -178,15 +178,15 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.quickPriceBtn}
-                                    onPress={() => { setPriceMin(100000); setPriceMax(150000); }}
+                                    onPress={() => { setPriceMin(100000); setPriceMax(200000); }}
                                 >
-                                    <Text style={styles.quickPriceText}>100.000 - 150.000</Text>
+                                    <Text style={styles.quickPriceText}>100.000 - 200.000</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.quickPriceBtn}
-                                    onPress={() => { setPriceMin(150000); setPriceMax(300000); }}
+                                    onPress={() => { setPriceMin(200000); setPriceMax(300000); }}
                                 >
-                                    <Text style={styles.quickPriceText}>150.000 - 300.000</Text>
+                                    <Text style={styles.quickPriceText}>200.000 - 300.000</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.quickPriceBtn}

@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
-// URL kết nối MongoDB Atlas (điền username, password, và tên database của bạn)
-//const mongoURI = 'mongodb+srv://<username>:<password>@cluster0.mongodb.net/mydatabase?retryWrites=true&w=majority';
+const fixReviewIndexes = require("../migrations/fixReviewIndexes");
+
 // URL kết nối MongoDB
 const mongoURI = "mongodb://127.0.0.1:27017/DB";
+
 //kết nối
 const connect = async () => {
     try {
@@ -11,8 +12,11 @@ const connect = async () => {
                 useNewUrlParser: true,
                 useUnifiedTopology: true,
             })
-            .then(() => {
+            .then(async () => {
                 console.log("kết nối mongodb thành công");
+
+                // Chạy migration để fix review indexes
+                await fixReviewIndexes();
             })
             .catch((err) => {
                 console.log("kết nối thất bại");

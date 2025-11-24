@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Image, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Image, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,6 +32,8 @@ export default function OrderDetailScreen() {
     const [order, setOrder] = useState<any | null>(null);
     const [reviews, setReviews] = useState<any[]>([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
 
     const loadOrder = async () => {
         const userString = await AsyncStorage.getItem('user');
@@ -55,7 +57,7 @@ export default function OrderDetailScreen() {
                         found = data;
                     }
                 }
-            } catch {}
+            } catch { }
         }
         setOrder(found || null);
     };
@@ -80,18 +82,18 @@ export default function OrderDetailScreen() {
         }
     };
 
-    useEffect(() => { 
-        loadOrder(); 
+    useEffect(() => {
+        loadOrder();
     }, [id]);
-    
+
     useEffect(() => {
         if (order) {
             loadReviews();
         }
     }, [order]);
 
-    useFocusEffect(React.useCallback(() => { 
-        loadOrder(); 
+    useFocusEffect(React.useCallback(() => {
+        loadOrder();
         if (order) {
             loadReviews();
         }
@@ -119,10 +121,10 @@ export default function OrderDetailScreen() {
             const userString = await AsyncStorage.getItem('user');
             const user = userString ? JSON.parse(userString) : null;
             if (!user || !user._id || !order || !Array.isArray(order.items)) return false;
-            
+
             const backendId = order?._id || (String(id).length === 24 ? id : null);
             const checkId = backendId || id;
-            
+
             // Kiểm tra từ API
             try {
                 const res = await fetch(`${BASE_URL}/reviews/order/${checkId}`);
@@ -134,32 +136,42 @@ export default function OrderDetailScreen() {
                         const reviewUserId = (typeof r.userId === 'object' && r.userId?._id) ? r.userId._id : (r.userId || null);
                         return String(reviewUserId) === String(user._id);
                     });
-                    
+
                     // Kiểm tra xem mỗi sản phẩm đã có review chưa
                     const itemsWithReviews = order.items.filter((item: any) => {
                         const productId = item.productId || item._id;
                         if (!productId) return false;
-                        
+
+                        const itemColor = String(item.color || '').trim();
+                        const itemSize = String(item.size || '').trim();
+
                         return userReviews.some((rev: any) => {
                             if (!rev.productId) return false;
                             if (!compareIds(rev.productId, productId)) return false;
-                            
+
                             // Kiểm tra color và size nếu có
-                            if (rev.items && rev.items.length > 0 && item.color && item.size) {
+                            if (rev.items && rev.items.length > 0) {
                                 const revItem = rev.items[0];
-                                return revItem.color === item.color && revItem.size === item.size;
+                                const revColor = String(revItem.color || '').trim();
+                                const revSize = String(revItem.size || '').trim();
+                                // So sánh chính xác color và size
+                                return revColor === itemColor && revSize === itemSize;
                             }
-                            return true;
+
+                            // Nếu review không có items, chỉ so sánh productId
+                            return !itemColor && !itemSize;
                         });
                     });
-                    
+
+                    console.log(`🔍 Check review exists: ${itemsWithReviews.length}/${order.items.length} items reviewed`);
+
                     // Nếu tất cả sản phẩm đã có review, return true
                     return itemsWithReviews.length === order.items.length;
                 }
             } catch (e) {
                 console.log('API check failed:', e);
             }
-            
+
             return false;
         } catch {
             return false;
@@ -169,41 +181,53 @@ export default function OrderDetailScreen() {
     const handleCancel = () => {
         if (!order) return;
         if (status === 'Đã giao hàng' || status === 'Đã hủy') return;
-        Alert.alert('Xác nhận', 'Bạn có chắc muốn hủy đơn hàng này?', [
-            { text: 'Không', style: 'cancel' },
-            {
-                text: 'Có, hủy', style: 'destructive', onPress: async () => {
-                    const userString = await AsyncStorage.getItem('user');
-                    const user = userString ? JSON.parse(userString) : null;
-                    if (!user || !user._id) return;
-                    const historyKey = `order_history_${user._id}`;
-                    const historyString = await AsyncStorage.getItem(historyKey);
-                    let history = historyString ? JSON.parse(historyString) : [];
-                    history = Array.isArray(history) ? history : [];
-                    // Try backend if id looks like ObjectId or order has _id
-                    const backendId = order._id || (String(id).length === 24 ? id : null);
-                    if (backendId) {
-                        try {
-                            await fetch(`${BASE_URL}/orders/${backendId}/status`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ status: 'Đã hủy' })
-                            });
-                        } catch (e) {
-                            console.log('PATCH /orders/:id/status failed', e);
-                        }
-                    }
-                    history = history.map((o: any) => (String(o.id || o._id) === String(id) ? { 
-                        ...o, 
+        setShowCancelDialog(true);
+    };
+
+    const confirmCancel = async () => {
+        if (!cancelReason.trim()) {
+            Alert.alert('Thông báo', 'Vui lòng nhập lý do hủy đơn');
+            return;
+        }
+
+        const userString = await AsyncStorage.getItem('user');
+        const user = userString ? JSON.parse(userString) : null;
+        if (!user || !user._id) return;
+
+        const historyKey = `order_history_${user._id}`;
+        const historyString = await AsyncStorage.getItem(historyKey);
+        let history = historyString ? JSON.parse(historyString) : [];
+        history = Array.isArray(history) ? history : [];
+
+        const backendId = order._id || (String(id).length === 24 ? id : null);
+        if (backendId) {
+            try {
+                await fetch(`${BASE_URL}/orders/${backendId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
                         status: 'Đã hủy',
-                        cancelledDate: new Date().toISOString() // Lưu thời gian hủy
-                    } : o));
-                    await AsyncStorage.setItem(historyKey, JSON.stringify(history));
-                    const updated = history.find((o: any) => String(o.id || o._id) === String(id));
-                    setOrder(updated || null);
-                }
+                        cancelReason: cancelReason.trim()
+                    })
+                });
+            } catch (e) {
+                console.log('PATCH /orders/:id/status failed', e);
             }
-        ]);
+        }
+
+        history = history.map((o: any) => (String(o.id || o._id) === String(id) ? {
+            ...o,
+            status: 'Đã hủy',
+            cancelledDate: new Date().toISOString(),
+            cancelReason: cancelReason.trim()
+        } : o));
+        await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+        const updated = history.find((o: any) => String(o.id || o._id) === String(id));
+        setOrder(updated || null);
+
+        setShowCancelDialog(false);
+        setCancelReason('');
+        Alert.alert('Thành công', 'Đơn hàng đã được hủy');
     };
 
     const handleReviewPress = async () => {
@@ -310,12 +334,12 @@ export default function OrderDetailScreen() {
                             const productId = it.productId || it._id;
                             const itemColor = it.color || '';
                             const itemSize = it.size || '';
-                            
+
                             // Tìm reviews cho sản phẩm này
                             const itemReviews = reviews.filter((rev: any) => {
                                 if (!rev.productId || !productId) return false;
                                 if (!compareIds(rev.productId, productId)) return false;
-                                
+
                                 // Kiểm tra color và size nếu có
                                 if (rev.items && rev.items.length > 0 && itemColor && itemSize) {
                                     const revItem = rev.items[0];
@@ -323,7 +347,7 @@ export default function OrderDetailScreen() {
                                 }
                                 return true;
                             });
-                            
+
                             return (
                                 <View key={idx}>
                                     <View style={styles.itemRow}>
@@ -346,7 +370,7 @@ export default function OrderDetailScreen() {
                                             )}
                                         </View>
                                     </View>
-                                    
+
                                     {/* Hiển thị reviews cho sản phẩm này */}
                                     {itemReviews.length > 0 && (
                                         <View style={styles.reviewSection}>
@@ -373,7 +397,7 @@ export default function OrderDetailScreen() {
                                             ))}
                                         </View>
                                     )}
-                                    
+
                                     {idx < order.items.length - 1 && (
                                         <View style={{ borderBottomWidth: 1, borderBottomColor: '#eee', marginVertical: 10 }} />
                                     )}
@@ -408,6 +432,50 @@ export default function OrderDetailScreen() {
                     )}
                 </View>
             </ScrollView>
+
+            {/* Dialog hủy đơn */}
+            <Modal
+                visible={showCancelDialog}
+                animationType="fade"
+                transparent
+                onRequestClose={() => setShowCancelDialog(false)}
+            >
+                <View style={styles.cancelDialogOverlay}>
+                    <View style={styles.cancelDialogContainer}>
+                        <Text style={styles.cancelDialogTitle}>Lý do hủy đơn</Text>
+                        <Text style={styles.cancelDialogSubtitle}>Vui lòng cho chúng tôi biết lý do bạn muốn hủy đơn hàng này</Text>
+
+                        <TextInput
+                            style={styles.cancelReasonInput}
+                            placeholder="Nhập lý do hủy đơn..."
+                            placeholderTextColor="#999"
+                            multiline
+                            numberOfLines={4}
+                            value={cancelReason}
+                            onChangeText={setCancelReason}
+                            textAlignVertical="top"
+                        />
+
+                        <View style={styles.cancelDialogActions}>
+                            <TouchableOpacity
+                                style={[styles.cancelDialogBtn, styles.cancelDialogBtnSecondary]}
+                                onPress={() => {
+                                    setShowCancelDialog(false);
+                                    setCancelReason('');
+                                }}
+                            >
+                                <Text style={styles.cancelDialogBtnTextSecondary}>Đóng</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.cancelDialogBtn, styles.cancelDialogBtnPrimary]}
+                                onPress={confirmCancel}
+                            >
+                                <Text style={styles.cancelDialogBtnTextPrimary}>Xác nhận hủy</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -442,50 +510,123 @@ const styles = StyleSheet.create({
     actionBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8 },
     actionText: { color: '#fff', fontWeight: '600' },
     // Reviews
-    reviewSection: { 
-        marginTop: 12, 
-        paddingTop: 12, 
-        borderTopWidth: 1, 
+    reviewSection: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
         borderTopColor: '#f0f0f0',
         backgroundColor: '#f8f9fa',
         borderRadius: 8,
         padding: 10,
         marginLeft: 64,
     },
-    reviewSectionTitle: { 
-        fontSize: 13, 
-        fontWeight: '600', 
-        color: '#666', 
-        marginBottom: 8 
+    reviewSectionTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 8
     },
-    reviewItem: { 
+    reviewItem: {
         marginBottom: 8,
     },
-    reviewRating: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        marginBottom: 4 
+    reviewRating: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4
     },
-    star: { 
-        fontSize: 14, 
-        marginRight: 2 
+    star: {
+        fontSize: 14,
+        marginRight: 2
     },
-    reviewRatingText: { 
-        marginLeft: 6, 
-        fontSize: 13, 
-        fontWeight: '600', 
-        color: '#f59e0b' 
+    reviewRatingText: {
+        marginLeft: 6,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#f59e0b'
     },
-    reviewComment: { 
-        fontSize: 13, 
-        color: '#333', 
+    reviewComment: {
+        fontSize: 13,
+        color: '#333',
         marginTop: 4,
         lineHeight: 18,
     },
-    reviewDate: { 
-        fontSize: 11, 
-        color: '#999', 
-        marginTop: 4 
+    reviewDate: {
+        fontSize: 11,
+        color: '#999',
+        marginTop: 4
+    },
+    // Dialog hủy đơn styles
+    cancelDialogOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    cancelDialogContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 24,
+        width: '100%',
+        maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    cancelDialogTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1a1a1a',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    cancelDialogSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 20,
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    cancelReasonInput: {
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 15,
+        color: '#1a1a1a',
+        backgroundColor: '#f9fafb',
+        marginBottom: 20,
+        minHeight: 100,
+    },
+    cancelDialogActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    cancelDialogBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    cancelDialogBtnSecondary: {
+        backgroundColor: '#f3f4f6',
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+    },
+    cancelDialogBtnPrimary: {
+        backgroundColor: '#ef4444',
+    },
+    cancelDialogBtnTextSecondary: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    cancelDialogBtnTextPrimary: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#fff',
     },
 });
 

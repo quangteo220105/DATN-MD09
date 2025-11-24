@@ -176,47 +176,47 @@ export default function Reviews() {
         return stats;
     };
 
-const fetchOrderDetails = async (orderId, cache) => {
-    if (!orderId) return null;
-    const key = String(orderId);
-    if (cache.has(key)) return cache.get(key);
-    try {
-        const res = await fetch(`http://localhost:3000/api/orders/${key}`);
-        if (res.ok) {
-            const data = await res.json();
-            cache.set(key, data);
-            return data;
+    const fetchOrderDetails = async (orderId, cache) => {
+        if (!orderId) return null;
+        const key = String(orderId);
+        if (cache.has(key)) return cache.get(key);
+        try {
+            const res = await fetch(`http://localhost:3000/api/orders/${key}`);
+            if (res.ok) {
+                const data = await res.json();
+                cache.set(key, data);
+                return data;
+            }
+        } catch (err) {
+            console.error('Failed to fetch order detail', err);
         }
-    } catch (err) {
-        console.error('Failed to fetch order detail', err);
-    }
-    cache.set(key, null);
-    return null;
-};
+        cache.set(key, null);
+        return null;
+    };
 
-const enrichReviewsWithOrders = async (reviews) => {
-    const cache = new Map();
-    const enriched = await Promise.all(reviews.map(async (review) => {
-        const existingOrder = normalizeOrderFromReview(review);
-        if (existingOrder && (existingOrder.address || existingOrder.customerName || existingOrder.customerPhone)) {
-            return review;
-        }
-        let orderId = null;
-        if (typeof review.orderId === "string") {
-            orderId = review.orderId;
-        } else if (typeof review.orderId === "object") {
-            orderId = review.orderId?._id || review.orderId?.id || review.orderId?.code || null;
-        } else if (review.order?._id || review.order?.id) {
-            orderId = review.order._id || review.order.id;
-        }
-        const order = await fetchOrderDetails(orderId, cache);
-        if (!order) return review;
-        return { ...review, orderFetched: order };
-    }));
-    return enriched;
-};
+    const enrichReviewsWithOrders = async (reviews) => {
+        const cache = new Map();
+        const enriched = await Promise.all(reviews.map(async (review) => {
+            const existingOrder = normalizeOrderFromReview(review);
+            if (existingOrder && (existingOrder.address || existingOrder.customerName || existingOrder.customerPhone)) {
+                return review;
+            }
+            let orderId = null;
+            if (typeof review.orderId === "string") {
+                orderId = review.orderId;
+            } else if (typeof review.orderId === "object") {
+                orderId = review.orderId?._id || review.orderId?.id || review.orderId?.code || null;
+            } else if (review.order?._id || review.order?.id) {
+                orderId = review.order._id || review.order.id;
+            }
+            const order = await fetchOrderDetails(orderId, cache);
+            if (!order) return review;
+            return { ...review, orderFetched: order };
+        }));
+        return enriched;
+    };
 
-const fetchReviews = async (override = {}) => {
+    const fetchReviews = async (override = {}) => {
         try {
             setLoading(true);
             const q = Object.prototype.hasOwnProperty.call(override, 'q') ? override.q : query;
@@ -276,14 +276,14 @@ const fetchReviews = async (override = {}) => {
                 const data = await res.json();
                 reviewData = data?._id ? data : review;
             }
-            
+
             const [enriched] = await enrichReviewsWithOrders([reviewData]);
             setSelected(enriched);
-            
+
             // Fetch tất cả reviews của đơn hàng này
             // Lấy orderId từ nhiều nguồn có thể
             let orderId = null;
-            
+
             // Thử lấy từ enriched.orderId
             if (enriched.orderId) {
                 if (typeof enriched.orderId === 'string') {
@@ -292,7 +292,7 @@ const fetchReviews = async (override = {}) => {
                     orderId = enriched.orderId._id || enriched.orderId.id;
                 }
             }
-            
+
             // Nếu chưa có, thử lấy từ enriched.orderFetched
             if (!orderId && enriched.orderFetched) {
                 if (typeof enriched.orderFetched === 'string') {
@@ -301,20 +301,20 @@ const fetchReviews = async (override = {}) => {
                     orderId = enriched.orderFetched._id || enriched.orderFetched.id;
                 }
             }
-            
+
             console.log('🔍 Debug openDetail:', {
                 'enriched.orderId': enriched.orderId,
                 'enriched.orderFetched': enriched.orderFetched,
                 'extracted orderId': orderId
             });
-            
+
             if (orderId) {
                 setLoadingOrderReviews(true);
                 try {
                     console.log(`📡 Fetching reviews for order: ${orderId}`);
                     const orderReviewsRes = await fetch(`http://localhost:3000/api/reviews/order/${orderId}`);
                     console.log(`📡 Response status: ${orderReviewsRes.status}`);
-                    
+
                     if (orderReviewsRes.ok) {
                         const orderReviewsData = await orderReviewsRes.json();
                         console.log(`📦 Received reviews data:`, orderReviewsData);
@@ -578,22 +578,22 @@ const fetchReviews = async (override = {}) => {
                                 <div style={{ marginBottom: 12, fontSize: 16, fontWeight: 600, color: '#222' }}>
                                     Tất cả đánh giá của đơn hàng ({orderReviews.length} đánh giá)
                                 </div>
-                                
+
                                 {/* Nhóm reviews theo sản phẩm */}
                                 {(() => {
                                     // Nhóm reviews theo productId + color + size
                                     const groupedReviews = new Map();
-                                    
+
                                     orderReviews.forEach((rev) => {
                                         const productId = rev.productId?._id || rev.productId || 'unknown';
-                                        
+
                                         if (rev.items && rev.items.length > 0) {
                                             // Review có items, duyệt qua TẤT CẢ items để nhóm
                                             rev.items.forEach((item) => {
                                                 const color = String(item.color || '').trim();
                                                 const size = String(item.size || '').trim();
                                                 const key = `${productId}_${color}_${size}`;
-                                                
+
                                                 if (!groupedReviews.has(key)) {
                                                     groupedReviews.set(key, []);
                                                 }
@@ -609,11 +609,11 @@ const fetchReviews = async (override = {}) => {
                                             groupedReviews.get(key).push({ review: rev, item: null });
                                         }
                                     });
-                                    
+
                                     return Array.from(groupedReviews.entries()).map(([key, reviewItems], groupIdx) => {
                                         const firstEntry = reviewItems[0];
                                         const firstItem = firstEntry.item;
-                                        
+
                                         // Lấy tên sản phẩm từ item hoặc từ productId nếu có
                                         let productName = firstItem?.name || 'Sản phẩm không xác định';
                                         // Nếu không có name trong item, thử lấy từ productId (nếu có populate)
@@ -623,15 +623,15 @@ const fetchReviews = async (override = {}) => {
                                                 productName = product.name;
                                             }
                                         }
-                                        
+
                                         const productColor = firstItem?.color || '';
                                         const productSize = firstItem?.size || '';
-                                        
+
                                         return (
-                                            <div key={key} style={{ 
-                                                marginBottom: 20, 
-                                                padding: 16, 
-                                                background: '#f8f9fa', 
+                                            <div key={key} style={{
+                                                marginBottom: 20,
+                                                padding: 16,
+                                                background: '#f8f9fa',
                                                 borderRadius: 8,
                                                 border: '1px solid #e5e7eb'
                                             }}>
@@ -645,12 +645,12 @@ const fetchReviews = async (override = {}) => {
                                                         </div>
                                                     )}
                                                 </div>
-                                                
+
                                                 {/* Hiển thị tất cả reviews cho sản phẩm này */}
                                                 {reviewItems.map((entry, revIdx) => {
                                                     const rev = entry.review;
                                                     return (
-                                                        <div key={revIdx} style={{ 
+                                                        <div key={revIdx} style={{
                                                             marginBottom: revIdx < reviewItems.length - 1 ? 16 : 0,
                                                             paddingBottom: revIdx < reviewItems.length - 1 ? 16 : 0,
                                                             borderBottom: revIdx < reviewItems.length - 1 ? '1px solid #e5e7eb' : 'none'
@@ -665,10 +665,10 @@ const fetchReviews = async (override = {}) => {
                                                                 )}
                                                             </div>
                                                             {rev.comment && (
-                                                                <div style={{ 
-                                                                    padding: 10, 
-                                                                    background: '#fff', 
-                                                                    borderRadius: 6, 
+                                                                <div style={{
+                                                                    padding: 10,
+                                                                    background: '#fff',
+                                                                    borderRadius: 6,
                                                                     color: '#333',
                                                                     fontSize: 13,
                                                                     lineHeight: 1.5

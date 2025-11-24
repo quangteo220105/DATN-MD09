@@ -48,22 +48,6 @@ export default function Categories() {
     const handleModalOk = async () => {
         try {
             const values = await form.validateFields();
-            
-            // Kiểm tra tên trùng trước khi submit
-            const normalizedValue = values.name.trim().toLowerCase();
-            const existingCategory = categories.find(
-                (cat) => 
-                    cat.name.trim().toLowerCase() === normalizedValue &&
-                    (!editingCategory || cat._id !== editingCategory._id)
-            );
-            
-            if (existingCategory) {
-                message.error("Tên danh mục đã tồn tại! Vui lòng chọn tên khác.");
-                return;
-            }
-            
-
-
             console.log('Checking duplicate for:', values.name);
             console.log('Current categories:', categories.map(c => c.name));
             console.log('Editing category:', editingCategory);
@@ -82,6 +66,18 @@ export default function Categories() {
             if (duplicateCategory) {
                 message.error(`Tên danh mục "${values.name}" đã tồn tại. Vui lòng chọn tên khác!`);
                 alert(`Tên danh mục "${values.name}" đã tồn tại. Vui lòng chọn tên khác!`);
+                return;
+            }
+            // Kiểm tra tên trùng trước khi submit
+            const normalizedValue = values.name.trim().toLowerCase();
+            const existingCategory = categories.find(
+                (cat) =>
+                    cat.name.trim().toLowerCase() === normalizedValue &&
+                    (!editingCategory || cat._id !== editingCategory._id)
+            );
+
+            if (existingCategory) {
+                message.error("Tên danh mục đã tồn tại! Vui lòng chọn tên khác.");
                 return;
             }
 
@@ -212,7 +208,7 @@ export default function Categories() {
                                     if (!value || !value.trim()) return Promise.resolve();
                                     const normalizedValue = value.trim().toLowerCase();
                                     const existingCategory = categories.find(
-                                        (cat) => 
+                                        (cat) =>
                                             cat.name && cat.name.trim().toLowerCase() === normalizedValue &&
                                             (!editingCategory || cat._id !== editingCategory._id)
                                     );

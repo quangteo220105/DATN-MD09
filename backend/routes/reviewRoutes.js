@@ -285,33 +285,24 @@ router.post('/', async (req, res) => {
       const firstItem = items[0];
       const itemColor = String(firstItem.color || '').trim();
       const itemSize = String(firstItem.size || '').trim();
-      // Tạo identifier: productId_color_size (đảm bảo productId là string)
       const productIdStr = String(productId);
       itemIdentifier = `${productIdStr}_${itemColor}_${itemSize}`;
+      console.log(`📝 Creating itemIdentifier: ${itemIdentifier} (product: ${productIdStr}, color: ${itemColor}, size: ${itemSize})`);
     } else if (productId) {
-      // Nếu có productId nhưng không có items, chỉ dùng productId (đảm bảo là string)
       itemIdentifier = String(productId);
+      console.log(`📝 Creating itemIdentifier (no items): ${itemIdentifier}`);
     }
 
-    // Kiểm tra đã đánh giá chưa bằng itemIdentifier
+    // Kiểm tra đã đánh giá chưa
     if (itemIdentifier) {
-      const existingReview = await Review.findOne({ 
-        orderId, 
-        userId, 
-        itemIdentifier 
+      const existingReview = await Review.findOne({
+        orderId,
+        userId,
+        itemIdentifier
       });
       if (existingReview) {
+        console.log(`⚠️ Review already exists with itemIdentifier: ${itemIdentifier}`);
         return res.status(400).json({ message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi' });
-      }
-    } else {
-      // Nếu không có itemIdentifier (không có productId), kiểm tra review chung
-      const existingReview = await Review.findOne({ 
-        orderId, 
-        userId, 
-        itemIdentifier: null 
-      });
-      if (existingReview) {
-        return res.status(400).json({ message: 'Bạn đã đánh giá đơn hàng này rồi' });
       }
     }
 
@@ -325,7 +316,9 @@ router.post('/', async (req, res) => {
       items: items || []
     });
 
+    console.log(`💾 Saving review with itemIdentifier: ${itemIdentifier}`);
     await review.save();
+    console.log(`✅ Review saved successfully with _id: ${review._id}`);
 
     // Populate để trả về đầy đủ thông tin
     await review.populate('userId', 'name phone');
@@ -339,7 +332,7 @@ router.post('/', async (req, res) => {
       try {
         const { orderId, userId, items } = req.body;
         const productId = req.body.productId || null;
-        
+
         let itemIdentifier = null;
         if (items && items.length > 0 && productId) {
           const firstItem = items[0];
@@ -350,14 +343,14 @@ router.post('/', async (req, res) => {
         } else if (productId) {
           itemIdentifier = String(productId);
         }
-        
+
         const query = { orderId, userId };
         if (itemIdentifier) {
           query.itemIdentifier = itemIdentifier;
         } else {
           query.itemIdentifier = null;
         }
-        
+
         const existing = await Review.findOne(query);
         if (existing) {
           return res.status(400).json({ message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi' });
