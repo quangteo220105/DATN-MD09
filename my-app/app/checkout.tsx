@@ -25,6 +25,7 @@ const PAYMENT_METHODS = [
   { key: 'cod', label: 'Thanh toán khi nhận hàng (COD)' },
   { key: 'zalopay', label: 'ZaloPay' },
 ];
+const VOUCHER_MAX_ORDER_AMOUNT = 500000;
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -46,6 +47,20 @@ export default function CheckoutScreen() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(false);
   const hasCheckedPaymentRef = useRef(false); // Tránh check nhiều lần trong cùng một session
+  const voucherEligible = total <= VOUCHER_MAX_ORDER_AMOUNT;
+
+  useEffect(() => {
+    if (!voucherEligible) {
+      if (appliedVoucher || voucherDiscount > 0) {
+        setAppliedVoucher(null);
+        setVoucherDiscount(0);
+        setVoucherCode('');
+      }
+      if (showVoucherList) {
+        setShowVoucherList(false);
+      }
+    }
+  }, [voucherEligible, appliedVoucher, voucherDiscount, showVoucherList]);
 
   // � Hàmm xử lý thanh toán thất bại
   const handlePaymentFailure = React.useCallback(async () => {
@@ -500,7 +515,11 @@ export default function CheckoutScreen() {
       setTotal(cartTotal);
 
       // Lấy voucher khả dụng
-      if (cartTotal > 0) fetchAvailableVouchers(cartTotal);
+      if (cartTotal > 0 && cartTotal <= VOUCHER_MAX_ORDER_AMOUNT) {
+        fetchAvailableVouchers(cartTotal);
+      } else {
+        setAvailableVouchers([]);
+      }
     };
     fetchData();
   }, [checkStoppedProducts]);
@@ -725,7 +744,11 @@ export default function CheckoutScreen() {
 
   // 🟢 Fetch voucher khả dụng
   const fetchAvailableVouchers = async (orderAmount: number) => {
-    if (orderAmount <= 0) return;
+    if (orderAmount <= 0 || orderAmount > VOUCHER_MAX_ORDER_AMOUNT) {
+      setAvailableVouchers([]);
+      setLoadingVouchers(false);
+      return;
+    }
     try {
       setLoadingVouchers(true);
       const categoryIds = getCartCategoryIds();
@@ -752,6 +775,10 @@ export default function CheckoutScreen() {
     }
 
     const cartTotal = cart.reduce((sum, i) => sum + i.qty * i.price, 0);
+    if (cartTotal > VOUCHER_MAX_ORDER_AMOUNT) {
+      Alert.alert('Thông báo', 'Đơn hàng trên 500.000 đ không được áp dụng voucher.');
+      return;
+    }
     const categoryIds = getCartCategoryIds();
     try {
       const response = await fetch(`${BASE_URL}/vouchers/check`, {
@@ -810,6 +837,10 @@ export default function CheckoutScreen() {
     }
 
     const cartTotal = cart.reduce((sum, i) => sum + i.qty * i.price, 0);
+    if (cartTotal > VOUCHER_MAX_ORDER_AMOUNT) {
+      Alert.alert('Thông báo', 'Đơn hàng trên 500.000 đ không được áp dụng voucher.');
+      return;
+    }
     const categoryIds = getCartCategoryIds();
 
     try {
@@ -846,7 +877,11 @@ export default function CheckoutScreen() {
     setVoucherDiscount(0);
     setVoucherCode('');
     const cartTotal = cart.reduce((sum, i) => sum + i.qty * i.price, 0);
-    if (cartTotal > 0) fetchAvailableVouchers(cartTotal);
+    if (cartTotal > 0 && cartTotal <= VOUCHER_MAX_ORDER_AMOUNT) {
+      fetchAvailableVouchers(cartTotal);
+    } else {
+      setAvailableVouchers([]);
+    }
   };
 
   // 🟢 Mở ZaloPay sandbox để thanh toán
@@ -1158,90 +1193,96 @@ export default function CheckoutScreen() {
         {/* Voucher */}
         <View style={styles.section}>
           <Text style={styles.heading}>Voucher / Mã giảm giá</Text>
-          {appliedVoucher ? (
-            <View style={styles.voucherAppliedRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: 'bold', color: '#22c55e' }}>✓ {appliedVoucher.code}</Text>
-                <Text style={{ fontSize: 12, color: '#666' }}>{appliedVoucher.description}</Text>
-                <Text style={{ fontSize: 13, color: '#ef233c', marginTop: 2 }}>
-                  Giảm: {voucherDiscount.toLocaleString('vi-VN')} VND
-                </Text>
-              </View>
-              <TouchableOpacity onPress={removeVoucher}>
-                <Ionicons name="close-circle" size={24} color="#ef233c" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View>
-              {availableVouchers.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setShowVoucherList(!showVoucherList)}
-                  style={styles.selectVoucherBtn}
-                >
-                  <Ionicons name="ticket-outline" size={20} color="#ff4757" />
-                  <Text style={{ color: '#ff4757', fontWeight: 'bold', marginLeft: 8 }}>
-                    Chọn voucher ({availableVouchers.length})
+          {voucherEligible ? (
+            appliedVoucher ? (
+              <View style={styles.voucherAppliedRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: 'bold', color: '#22c55e' }}>✓ {appliedVoucher.code}</Text>
+                  <Text style={{ fontSize: 12, color: '#666' }}>{appliedVoucher.description}</Text>
+                  <Text style={{ fontSize: 13, color: '#ef233c', marginTop: 2 }}>
+                    Giảm: {voucherDiscount.toLocaleString('vi-VN')} VND
                   </Text>
-                  <Ionicons
-                    name={showVoucherList ? "chevron-up" : "chevron-down"}
-                    size={20}
-                    color="#ff4757"
-                    style={{ marginLeft: 'auto' }}
-                  />
-                </TouchableOpacity>
-              )}
-
-              {showVoucherList && availableVouchers.length > 0 && (
-                <View style={styles.voucherListContainer}>
-                  {loadingVouchers ? (
-                    <Text style={{ textAlign: 'center', padding: 10, color: '#888' }}>Đang tải...</Text>
-                  ) : (
-                    <ScrollView nestedScrollEnabled>
-                      {availableVouchers.map((voucher, idx) => (
-                        <TouchableOpacity
-                          key={idx}
-                          onPress={() => selectVoucher(voucher)}
-                          style={[styles.voucherItem, idx === availableVouchers.length - 1 && { borderBottomWidth: 0 }]}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                              <Text style={{ fontWeight: 'bold', color: '#222', fontSize: 15 }}>{voucher.code}</Text>
-                              {voucher.discountType === 'percent' ? (
-                                <Text style={{ marginLeft: 8, color: '#22c55e', fontSize: 12 }}>-{voucher.discountValue}%</Text>
-                              ) : (
-                                <Text style={{ marginLeft: 8, color: '#22c55e', fontSize: 12 }}>-{voucher.discountValue.toLocaleString('vi-VN')} đ</Text>
-                              )}
-                            </View>
-                            <Text style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>{voucher.name || voucher.description}</Text>
-                            {voucher.minOrderAmount > 0 && (
-                              <Text style={{ fontSize: 11, color: '#999' }}>Đơn từ {voucher.minOrderAmount.toLocaleString('vi-VN')} đ</Text>
-                            )}
-                            <Text style={{ fontSize: 11, color: '#ef233c', marginTop: 4 }}>Tiết kiệm: {voucher.discount.toLocaleString('vi-VN')} đ</Text>
-                          </View>
-                          <Ionicons name="chevron-forward" size={20} color="#ccc" />
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  )}
                 </View>
-              )}
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: availableVouchers.length > 0 ? 8 : 0 }}>
-                <TextInput
-                  value={voucherCode}
-                  onChangeText={setVoucherCode}
-                  placeholder="Hoặc nhập mã giảm giá"
-                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity
-                  onPress={applyVoucher}
-                  style={[styles.confirmBtn, { paddingVertical: 10, paddingHorizontal: 20, marginTop: 0 }]}
-                >
-                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Áp dụng</Text>
+                <TouchableOpacity onPress={removeVoucher}>
+                  <Ionicons name="close-circle" size={24} color="#ef233c" />
                 </TouchableOpacity>
               </View>
-            </View>
+            ) : (
+              <View>
+                {availableVouchers.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setShowVoucherList(!showVoucherList)}
+                    style={styles.selectVoucherBtn}
+                  >
+                    <Ionicons name="ticket-outline" size={20} color="#ff4757" />
+                    <Text style={{ color: '#ff4757', fontWeight: 'bold', marginLeft: 8 }}>
+                      Chọn voucher ({availableVouchers.length})
+                    </Text>
+                    <Ionicons
+                      name={showVoucherList ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color="#ff4757"
+                      style={{ marginLeft: 'auto' }}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {showVoucherList && availableVouchers.length > 0 && (
+                  <View style={styles.voucherListContainer}>
+                    {loadingVouchers ? (
+                      <Text style={{ textAlign: 'center', padding: 10, color: '#888' }}>Đang tải...</Text>
+                    ) : (
+                      <ScrollView nestedScrollEnabled>
+                        {availableVouchers.map((voucher, idx) => (
+                          <TouchableOpacity
+                            key={idx}
+                            onPress={() => selectVoucher(voucher)}
+                            style={[styles.voucherItem, idx === availableVouchers.length - 1 && { borderBottomWidth: 0 }]}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                <Text style={{ fontWeight: 'bold', color: '#222', fontSize: 15 }}>{voucher.code}</Text>
+                                {voucher.discountType === 'percent' ? (
+                                  <Text style={{ marginLeft: 8, color: '#22c55e', fontSize: 12 }}>-{voucher.discountValue}%</Text>
+                                ) : (
+                                  <Text style={{ marginLeft: 8, color: '#22c55e', fontSize: 12 }}>-{voucher.discountValue.toLocaleString('vi-VN')} đ</Text>
+                                )}
+                              </View>
+                              <Text style={{ fontSize: 12, color: '#666', marginBottom: 2 }}>{voucher.name || voucher.description}</Text>
+                              {voucher.minOrderAmount > 0 && (
+                                <Text style={{ fontSize: 11, color: '#999' }}>Đơn từ {voucher.minOrderAmount.toLocaleString('vi-VN')} đ</Text>
+                              )}
+                              <Text style={{ fontSize: 11, color: '#ef233c', marginTop: 4 }}>Tiết kiệm: {voucher.discount.toLocaleString('vi-VN')} đ</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
+                  </View>
+                )}
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: availableVouchers.length > 0 ? 8 : 0 }}>
+                  <TextInput
+                    value={voucherCode}
+                    onChangeText={setVoucherCode}
+                    placeholder="Hoặc nhập mã giảm giá"
+                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                    autoCapitalize="characters"
+                  />
+                  <TouchableOpacity
+                    onPress={applyVoucher}
+                    style={[styles.confirmBtn, { paddingVertical: 10, paddingHorizontal: 20, marginTop: 0 }]}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Áp dụng</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )
+          ) : (
+            <Text style={styles.voucherLimitNote}>
+              Đơn hàng trên 500.000 đ không được áp dụng voucher. Vui lòng giảm giá trị đơn hoặc hoàn tất thanh toán không cần mã.
+            </Text>
           )}
         </View>
 
@@ -1415,6 +1456,7 @@ const styles = StyleSheet.create({
   selectVoucherBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 12, borderRadius: 7, borderWidth: 1, borderColor: '#ff4757', marginBottom: 8 },
   voucherListContainer: { backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#eee', marginBottom: 8, maxHeight: 300 },
   voucherItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  voucherLimitNote: { backgroundColor: '#fff1f2', borderRadius: 7, borderWidth: 1, borderColor: '#fecdd3', padding: 12, fontSize: 13, color: '#be123c', lineHeight: 18 },
   successModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   successModalContainer: { width: '85%', backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
   successTitle: { fontSize: 20, fontWeight: 'bold', color: '#222', marginBottom: 12 },
