@@ -14,6 +14,7 @@ import {
     Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import axios from "axios";
 import { BASE_URL, DOMAIN } from "../../config/apiConfig";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -787,6 +788,13 @@ export default function HomeScreen() {
         refreshNotifCount();
     }, [user?._id]);
 
+    const availableProducts = filtered.length;
+    const heroStats = [
+        { label: 'Sản phẩm', value: products.length, icon: 'cube-outline' },
+        { label: 'Yêu thích', value: favorites.size, icon: 'heart-outline' },
+        { label: 'Thông báo', value: notifCount, icon: 'notifications-outline' },
+    ];
+
     return (
         <View style={styles.container}>
             <FlatList
@@ -808,36 +816,38 @@ export default function HomeScreen() {
                     )
                 )}
                 ListHeaderComponent={
-                    <>
-                        {/* User Info Section */}
-                        <View style={styles.userInfoSection}>
-                            <View style={styles.userInfoRow}>
-                                <View style={styles.userInfoLeft}>
+                    <View style={styles.headerWrapper}>
+                        <LinearGradient
+                            colors={["#1f2937", "#111827"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.heroCard}
+                        >
+                            <View style={styles.heroTopRow}>
+                                <View style={styles.heroUser}>
                                     {user?.avatar ? (
-                                        <Image
-                                            source={{ uri: `${DOMAIN}${user.avatar}` }}
-                                            style={styles.avatar}
-                                        />
+                                        <Image source={{ uri: `${DOMAIN}${user.avatar}` }} style={styles.avatar} />
                                     ) : (
                                         <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                                            <Ionicons name="person" size={20} color="#666" />
+                                            <Ionicons name="person" size={20} color="#94a3b8" />
                                         </View>
                                     )}
                                     <View style={{ marginLeft: 12 }}>
-                                        <Text style={styles.greetSmall}>Chào 👋</Text>
-                                        <Text style={styles.greetName}>{user?.name || "Guest"}</Text>
+                                        <Text style={styles.heroGreeting}>Xin chào 👋</Text>
+                                        <Text style={styles.heroName}>{user?.name || "Khách"}</Text>
+                                        <Text style={styles.heroSubtitle}>
+                                            Sẵn sàng để khám phá {availableProducts} sản phẩm phù hợp
+                                        </Text>
                                     </View>
                                 </View>
                                 <TouchableOpacity
-                                    style={styles.bellBtn}
+                                    style={styles.heroBellBtn}
                                     onPress={async () => {
-                                        // Guest mode: chuyển sang login khi click vào notifications
                                         if (!user?._id) {
                                             router.push('/(tabs)/login');
                                             return;
                                         }
                                         try { await AsyncStorage.setItem('notifications_last_seen', new Date().toISOString()); } catch { }
-                                        // Đánh dấu đã đọc toàn bộ order notifications để badge không lặp lại sau khi vào màn thông báo
                                         try {
                                             const userStr = await AsyncStorage.getItem('user');
                                             const u = userStr ? JSON.parse(userStr) : null;
@@ -856,31 +866,42 @@ export default function HomeScreen() {
                                         router.push('/notifications');
                                     }}
                                 >
-                                    <Ionicons name="notifications-outline" size={22} color="#222" />
+                                    <Ionicons name="notifications-outline" size={22} color="#fff" />
                                     {user?._id && notifCount > 0 && (
-                                        <View style={styles.bellBadge}>
-                                            <Text style={styles.bellBadgeText}>{notifCount > 99 ? '99+' : notifCount}</Text>
+                                        <View style={styles.heroBellBadge}>
+                                            <Text style={styles.heroBellBadgeText}>{notifCount > 99 ? '99+' : notifCount}</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
                             </View>
-                        </View>
+                            <View style={styles.heroStatsRow}>
+                                {heroStats.map((stat) => (
+                                    <View key={stat.label} style={styles.heroStatCard}>
+                                        <View style={styles.heroStatIcon}>
+                                            <Ionicons name={stat.icon as any} size={16} color="#f8fafc" />
+                                        </View>
+                                        <Text style={styles.heroStatValue}>{stat.value}</Text>
+                                        <Text style={styles.heroStatLabel}>{stat.label}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </LinearGradient>
 
                         {/* Search Section */}
-                        <View style={styles.searchSection}>
+                        <View style={styles.searchCard}>
                             <View style={styles.searchRow}>
                                 <View
                                     style={styles.searchBox}
                                     onStartShouldSetResponder={() => true}
                                     onResponderRelease={() => searchInputRef.current?.focus()}
                                 >
-                                    <Ionicons name="search" size={18} color="#888" style={{ marginRight: 8 }} />
+                                    <Ionicons name="search" size={18} color="#64748b" style={{ marginRight: 8 }} />
                                     <TextInput
-                                        placeholder="Tìm kiếm sản phẩm..."
+                                        placeholder="Tìm kiếm nhanh..."
                                         value={query}
                                         onChangeText={setQuery}
                                         style={styles.searchInput}
-                                        placeholderTextColor="#999"
+                                        placeholderTextColor="#94a3b8"
                                         onFocus={() => {
                                             setShowSuggestions(!!query.trim());
                                             isSelectingSuggestionRef.current = false;
@@ -912,12 +933,11 @@ export default function HomeScreen() {
                                             hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="close-circle" size={20} color="#999" />
+                                            <Ionicons name="close-circle" size={20} color="#94a3b8" />
                                         </TouchableOpacity>
                                     )}
                                 </View>
 
-                                {/* ✅ NÚT FILTER MỚI */}
                                 <TouchableOpacity
                                     style={styles.filterBtn}
                                     onPress={() => setShowFilter(true)}
@@ -952,7 +972,7 @@ export default function HomeScreen() {
                                             }}
                                             activeOpacity={0.7}
                                         >
-                                            <Ionicons name="search-outline" size={16} color="#666" style={{ marginRight: 8 }} />
+                                            <Ionicons name="search-outline" size={16} color="#475569" style={{ marginRight: 8 }} />
                                             <Text numberOfLines={1} style={styles.suggestionText}>{s.name}</Text>
                                         </TouchableOpacity>
                                     ))}
@@ -960,23 +980,32 @@ export default function HomeScreen() {
                             )}
                         </View>
 
-                        {/* Banner Section */}
-                        <View style={styles.bannerSection}>
+                        <View style={styles.sectionCard}>
+                            <View style={styles.sectionCardHeader}>
+                                <View>
+                                    <Text style={styles.sectionTitle}>Ưu đãi nổi bật</Text>
+                                    <Text style={styles.sectionDescription}>Cập nhật mỗi 4 giây</Text>
+                                </View>
+                            </View>
                             {loadingBanner ? (
                                 <View style={styles.bannerLoading}>
-                                    <ActivityIndicator size="small" color="#000" />
+                                    <ActivityIndicator size="small" color="#0f172a" />
                                 </View>
                             ) : (
                                 renderBanner()
                             )}
                         </View>
 
-                        {/* Categories Section */}
-                        <View style={styles.categoriesSection}>
-                            <Text style={styles.sectionTitle}>Danh mục sản phẩm</Text>
+                        <View style={styles.sectionCard}>
+                            <View style={styles.sectionCardHeader}>
+                                <View>
+                                    <Text style={styles.sectionTitle}>Danh mục sản phẩm</Text>
+                                    <Text style={styles.sectionDescription}>Chọn nhanh theo nhu cầu mua sắm</Text>
+                                </View>
+                            </View>
                             {loading ? (
                                 <View style={styles.categoriesLoading}>
-                                    <ActivityIndicator size="small" color="#000" />
+                                    <ActivityIndicator size="small" color="#0f172a" />
                                 </View>
                             ) : (
                                 <ScrollView
@@ -991,7 +1020,6 @@ export default function HomeScreen() {
                                             style={[styles.brandChip, activeFilters.selectedCategory === category.name && styles.brandChipActive]}
                                             onPress={() => {
                                                 setBrand(category.name);
-                                                // Cập nhật activeFilters để lọc sản phẩm
                                                 setActiveFilters(prev => ({
                                                     ...prev,
                                                     selectedCategory: category.name
@@ -1005,10 +1033,12 @@ export default function HomeScreen() {
                             )}
                         </View>
 
-                        {/* Products Section */}
-                        <View style={styles.productsSection}>
+                        <View style={styles.sectionCard}>
                             <View style={styles.productsHeader}>
-                                <Text style={styles.sectionTitle}>Sản phẩm nổi bật</Text>
+                                <View>
+                                    <Text style={styles.sectionTitle}>Sản phẩm nổi bật</Text>
+                                    <Text style={styles.sectionDescription}>Đang hiển thị {availableProducts} sản phẩm</Text>
+                                </View>
                                 {favorites.size > 0 && (
                                     <View style={styles.favoriteCount}>
                                         <Ionicons name="heart" size={16} color="#ff4757" />
@@ -1017,7 +1047,7 @@ export default function HomeScreen() {
                                 )}
                             </View>
                         </View>
-                    </>
+                    </View>
                 }
             />
             {/* Bottom Nav */}
@@ -1096,90 +1126,113 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#fff" },
+    container: { flex: 1, backgroundColor: "#eef2f8" },
     contentContainer: {
         paddingHorizontal: ITEM_PADDING,
-        paddingTop: 0,
-        paddingBottom: 100,
-        backgroundColor: "#f8f9fa"
+        paddingBottom: 110,
+        backgroundColor: "transparent"
     },
-    emptyWrap: {
+    headerWrapper: {
+        gap: 18,
+        paddingBottom: 8
+    },
+    heroCard: {
+        borderRadius: 26,
+        padding: 24,
+        marginTop: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 18,
+        elevation: 8
+    },
+    heroTopRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 16
+    },
+    heroUser: {
+        flexDirection: "row",
+        alignItems: "center",
+        flex: 1
+    },
+    avatar: { width: 46, height: 46, borderRadius: 23 },
+    avatarPlaceholder: {
+        backgroundColor: "rgba(15,23,42,0.25)",
+        justifyContent: "center",
+        alignItems: "center"
+    },
+    heroGreeting: { fontSize: 13, color: "#cbd5f5" },
+    heroName: { fontSize: 20, fontWeight: "700", color: "#fff" },
+    heroSubtitle: { fontSize: 12, color: "rgba(248,250,252,0.8)", marginTop: 4, lineHeight: 18 },
+    heroStatsRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginTop: 8,
+        gap: 12
+    },
+    heroStatCard: {
+        flex: 1,
+        backgroundColor: "rgba(15, 23, 42, 0.35)",
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)"
+    },
+    heroStatIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: "rgba(255,255,255,0.18)",
         alignItems: "center",
         justifyContent: "center",
-        paddingVertical: 40,
-        gap: 8
+        marginBottom: 6
     },
-    emptyTitle: {
-        marginTop: 8,
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#444"
+    heroStatValue: {
+        color: "#fff",
+        fontSize: 18,
+        fontWeight: "700"
     },
-    emptyHint: {
-        fontSize: 13,
-        color: "#888"
+    heroStatLabel: {
+        color: "rgba(248,250,252,0.75)",
+        fontSize: 11,
+        marginTop: 2
     },
-    row: {
-        justifyContent: "space-between",
-        marginBottom: ITEM_MARGIN
-    },
-    userInfoSection: {
-        paddingHorizontal: 20,
-        paddingTop: 15,
-        paddingBottom: 20,
-        backgroundColor: "#fff"
-    },
-    userInfoRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center"
-    },
-    userInfoLeft: {
-        flexDirection: "row",
-        alignItems: "center"
-    },
-    avatar: { width: 45, height: 45, borderRadius: 22.5 },
-    avatarPlaceholder: {
-        backgroundColor: "#f0f0f0",
+    heroBellBtn: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: "rgba(255,255,255,0.15)",
+        alignItems: "center",
         justifyContent: "center",
-        alignItems: "center"
+        position: "relative"
     },
-    greetSmall: { fontSize: 14, color: "#666", marginBottom: 2 },
-    greetName: { fontSize: 18, fontWeight: "bold", color: "#222" },
-    bellBtn: {
-        padding: 10,
-        backgroundColor: "#f8f8f8",
-        borderRadius: 20,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-        position: 'relative'
-    },
-    bellBadge: {
-        position: 'absolute',
-        top: 2,
-        right: 2,
-        minWidth: 16,
-        height: 16,
-        paddingHorizontal: 3,
-        borderRadius: 8,
-        backgroundColor: '#ef4444',
-        alignItems: 'center',
-        justifyContent: 'center',
+    heroBellBadge: {
+        position: "absolute",
+        top: -2,
+        right: -2,
+        backgroundColor: "#ef4444",
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        paddingHorizontal: 4,
         borderWidth: 1,
-        borderColor: '#fff'
+        borderColor: "#fff",
+        alignItems: "center",
+        justifyContent: "center"
     },
-    bellBadgeText: {
-        color: '#fff',
+    heroBellBadgeText: {
+        color: "#fff",
         fontSize: 10,
-        fontWeight: '700'
+        fontWeight: "700"
     },
-    searchSection: {
+    searchCard: {
+        marginTop: -26,
         paddingHorizontal: 20,
-        paddingBottom: 20,
-        backgroundColor: "#fff"
+        paddingTop: 30,
+        zIndex: 2
     },
     searchRow: {
         flexDirection: "row",
@@ -1190,17 +1243,17 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#f8f9fa",
-        borderRadius: 12,
+        backgroundColor: "#f8fbff",
+        borderRadius: 14,
         paddingHorizontal: 16,
-        paddingVertical: 14, // tăng vùng chạm
+        paddingVertical: 14,
         borderWidth: 1,
-        borderColor: "#e9ecef",
+        borderColor: "#e2e8f0",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1
+        shadowRadius: 4,
+        elevation: 2
     },
     clearBtn: {
         marginLeft: 8,
@@ -1209,16 +1262,16 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        minHeight: 22, // tránh text bị cắt/ẩn trên Android emulator
+        minHeight: 22,
         fontSize: 16,
-        color: "#111",
-        includeFontPadding: false, // Android: tránh khoảng trắng thừa
-        paddingVertical: 0 // giữ text hiển thị gọn
+        color: "#0f172a",
+        includeFontPadding: false,
+        paddingVertical: 0
     },
     suggestionsPanel: {
-        marginTop: 8,
+        marginTop: 10,
         backgroundColor: "#fff",
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: "#ececec",
         shadowColor: "#000",
@@ -1243,44 +1296,94 @@ const styles = StyleSheet.create({
     },
     suggestionText: {
         fontSize: 14,
-        color: "#333",
+        color: "#1f2937",
         flex: 1,
     },
-    bannerSection: {
+    sectionCard: {
+        backgroundColor: "#fff",
+        borderRadius: 24,
         paddingHorizontal: 20,
-        paddingBottom: 25,
-        backgroundColor: "#fff"
+        paddingVertical: 20,
+        marginTop: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 4
+    },
+    sectionCardHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 16
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#0f172a"
+    },
+    sectionDescription: {
+        fontSize: 12,
+        color: "#94a3b8",
+        marginTop: 2
     },
     bannerLoading: {
         height: 200,
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "#f8f9fa",
-        borderRadius: 12,
-        marginHorizontal: 0
-    },
-    categoriesSection: {
-        paddingHorizontal: 20,
-        paddingBottom: 25,
-        backgroundColor: "#fff"
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#222",
-        marginBottom: 15,
-        marginTop: 5
+        borderRadius: 16
     },
     categoriesLoading: {
         height: 50,
         justifyContent: "center",
         alignItems: "center"
     },
-    productsSection: {
+    categoriesScrollView: {
+        marginTop: 0,
+    },
+    categoriesScrollContent: {
+        flexDirection: "row",
+        paddingHorizontal: 0,
+        gap: 8,
+        alignItems: "center"
+    },
+    brandChip: {
+        minWidth: 90,
         paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 10,
-        backgroundColor: "#f8f9fa"
+        paddingVertical: 12,
+        backgroundColor: "#f8fafc",
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: "#e2e8f0",
+        shadowColor: "#0f172a",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 5,
+        elevation: 3,
+        flexShrink: 0,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    brandChipActive: {
+        backgroundColor: "#111827",
+        borderColor: "#111827",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 4
+    },
+    brandText: {
+        color: "#475569",
+        fontSize: 13,
+        fontWeight: "600",
+        textAlign: "center",
+        lineHeight: 18,
+    },
+    brandTextActive: {
+        color: "#fff",
+        fontWeight: "600"
     },
     productsHeader: {
         flexDirection: "row",
@@ -1291,12 +1394,12 @@ const styles = StyleSheet.create({
     favoriteCount: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#fff",
-        paddingHorizontal: 8,
+        backgroundColor: "#fff1f2",
+        paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#ff4757"
+        borderColor: "#fecdd3"
     },
     favoriteCountText: {
         marginLeft: 4,
@@ -1336,59 +1439,30 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         elevation: 3
     },
-    brandsRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        marginHorizontal: 0,
-        marginTop: 0,
+    emptyWrap: {
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 40,
         gap: 8
     },
-    categoriesScrollView: {
-        marginTop: 0,
+    emptyTitle: {
+        marginTop: 8,
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#444"
     },
-    categoriesScrollContent: {
-        flexDirection: "row",
-        paddingHorizontal: 0,
-        gap: 8,
-        alignItems: "center"
+    emptyHint: {
+        fontSize: 13,
+        color: "#888"
     },
-    brandChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        backgroundColor: "#f8f9fa",
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: "#e9ecef",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
-        flexShrink: 0, // ✅ Không cho phép co lại
-        minWidth: 80, // ✅ Chiều rộng tối thiểu
-    },
-    brandChipActive: {
-        backgroundColor: "#222",
-        borderColor: "#222",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3
-    },
-    brandText: {
-        color: "#666",
-        fontSize: 14,
-        fontWeight: "500"
-    },
-    brandTextActive: {
-        color: "#fff",
-        fontWeight: "600"
+    row: {
+        justifyContent: "space-between",
+        marginBottom: ITEM_MARGIN
     },
     card: {
         width: ITEM_WIDTH,
         backgroundColor: "#fff",
-        borderRadius: 16,
+        borderRadius: 18,
         overflow: "hidden",
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
@@ -1401,7 +1475,7 @@ const styles = StyleSheet.create({
     },
     imageWrap: {
         width: "100%",
-        aspectRatio: 1, // ảnh vuông
+        aspectRatio: 1,
         position: "relative"
     },
     productImage: {
@@ -1449,6 +1523,12 @@ const styles = StyleSheet.create({
         marginBottom: 6,
         fontWeight: "500"
     },
+    inactiveText: {
+        fontSize: 12,
+        color: "#f59e0b",
+        fontWeight: "600",
+        marginBottom: 4
+    },
     price: {
         fontWeight: "bold",
         fontSize: 16,
@@ -1460,9 +1540,9 @@ const styles = StyleSheet.create({
         alignItems: "center",
         height: 56,
         borderTopWidth: 1,
-        borderTopColor: "#eee"
+        borderTopColor: "#e2e8f0",
+        backgroundColor: "#fff"
     },
-    // Out of Stock Styles
     outOfStockCard: {
         opacity: 0.6,
         backgroundColor: "#f8f9fa"
@@ -1473,13 +1553,6 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         marginBottom: 4
     },
-    inactiveText: {
-        fontSize: 12,
-        color: "#f59e0b",
-        fontWeight: "600",
-        marginBottom: 4
-    },
-    // Dialog Styles
     dialogOverlay: {
         position: "absolute",
         top: 0,
@@ -1504,9 +1577,7 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 8
     },
-    dialogIcon: {
-        marginBottom: 16
-    },
+    dialogIcon: { marginBottom: 16 },
     dialogTitle: {
         fontSize: 18,
         fontWeight: "bold",
@@ -1538,7 +1609,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#ff4757",
         width: 44,
         height: 44,
-        borderRadius: 10,
+        borderRadius: 12,
         alignItems: "center",
         justifyContent: "center",
         shadowColor: "#000",
