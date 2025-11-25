@@ -288,6 +288,81 @@
             margin-left: 16px;
         }
 
+        /* Card input section */
+        .card-form {
+            background: #f8f9ff;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(0, 104, 255, 0.1);
+            margin-bottom: 24px;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+        }
+
+        .card-form h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+        }
+
+        .card-form h3::before {
+            content: '💳';
+            font-size: 18px;
+        }
+
+        .card-label {
+            font-size: 13px;
+            color: #475569;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .card-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border-radius: 12px;
+            border: 1px solid #dbeafe;
+            background: #ffffff;
+            outline: none;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+            letter-spacing: 1px;
+        }
+
+        .card-input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
+
+        .card-input.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+
+        .card-hint {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .card-error {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #ef4444;
+            font-weight: 500;
+            display: none;
+        }
+
+        .card-error.show {
+            display: block;
+        }
+
         /* Action buttons */
         .actions {
             display: flex;
@@ -552,6 +627,46 @@
                 </div>
             </div>
 
+        <div class="card-form">
+            <h3>Thông tin thẻ ngân hàng</h3>
+            
+            <div style="margin-bottom: 16px;">
+                <label class="card-label" for="cardNumberInput">Số thẻ</label>
+                <input type="text" id="cardNumberInput" class="card-input" inputmode="numeric" autocomplete="cc-number"
+                    placeholder="#### #### #### ####" maxlength="19">
+                <div class="card-error" id="cardNumberError"></div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label class="card-label" for="cardNameInput">Tên chủ thẻ</label>
+                <input type="text" id="cardNameInput" class="card-input" autocomplete="cc-name"
+                    placeholder="TEN CHU THE" maxlength="50">
+                <div class="card-error" id="cardNameError"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <div>
+                    <label class="card-label" for="cardExpiryInput">Ngày hết hạn</label>
+                    <input type="text" id="cardExpiryInput" class="card-input" inputmode="numeric" autocomplete="cc-exp"
+                        placeholder="MM/YY" maxlength="5">
+                    <div class="card-error" id="cardExpiryError"></div>
+                </div>
+                <div>
+                    <label class="card-label" for="cardCvvInput">Mã CVV</label>
+                    <input type="text" id="cardCvvInput" class="card-input" inputmode="numeric" autocomplete="cc-csc"
+                        placeholder="123" maxlength="4">
+                    <div class="card-error" id="cardCvvError"></div>
+                </div>
+            </div>
+
+            <p class="card-hint" style="margin-top: 8px; font-size: 11px; line-height: 1.5;">
+                <strong>Thẻ test hợp lệ:</strong><br>
+                Visa/Master/JCB: <strong>4111 1111 1111 1111</strong> (Tên: NGUYEN VAN A, Hạn: 01/25, CVV: 123)<br>
+                ATM: <strong>9704 5400 0000 0062</strong>, <strong>9704 5400 0000 0070</strong>, <strong>9704 5400 0000 0088</strong>, 
+                <strong>9704 5400 0000 0096</strong>, <strong>9704 5410 0000 0094</strong>, <strong>9704 5410 0000 0078</strong>
+            </p>
+        </div>
+
             <div class="actions">
                 <button class="btn btn-success" onclick="handlePayment('success')">
                     <span>Thanh toán thành công</span>
@@ -594,6 +709,165 @@
         const amountNum = parseInt(amount);
         document.getElementById('amountValue').textContent = amountNum.toLocaleString('vi-VN') + 'đ';
 
+        // Danh sách thẻ test hợp lệ từ ZaloPay Developer
+        const VALID_TEST_CARDS = [
+            '4111111111111111', // Visa/Master/JCB
+            '9704540000000062', // ATM hợp lệ
+            '9704540000000070', // ATM hợp lệ
+            '9704540000000088', // ATM hợp lệ
+            '9704540000000096', // ATM hợp lệ
+            '9704541000000094', // ATM hợp lệ
+            '9704541000000078'  // ATM hợp lệ
+        ];
+
+        const REQUIRED_CARD_NAME = 'NGUYEN VAN A';
+        const REQUIRED_CARD_EXPIRY = '01/25';
+        const REQUIRED_CARD_CVV = '123';
+
+        // Định dạng số thẻ và validate
+        const cardInput = document.getElementById('cardNumberInput');
+        const cardNumberError = document.getElementById('cardNumberError');
+        const cardNameInput = document.getElementById('cardNameInput');
+        const cardNameError = document.getElementById('cardNameError');
+        const cardExpiryInput = document.getElementById('cardExpiryInput');
+        const cardExpiryError = document.getElementById('cardExpiryError');
+        const cardCvvInput = document.getElementById('cardCvvInput');
+        const cardCvvError = document.getElementById('cardCvvError');
+
+        function fillCardDefaults() {
+            if (cardNameInput) {
+                cardNameInput.value = REQUIRED_CARD_NAME;
+                clearFieldError(cardNameInput, cardNameError);
+            }
+            if (cardExpiryInput) {
+                cardExpiryInput.value = REQUIRED_CARD_EXPIRY;
+                clearFieldError(cardExpiryInput, cardExpiryError);
+            }
+            if (cardCvvInput) {
+                cardCvvInput.value = REQUIRED_CARD_CVV;
+                clearFieldError(cardCvvInput, cardCvvError);
+            }
+        }
+
+        function clearCardDefaults() {
+            if (cardNameInput) {
+                cardNameInput.value = '';
+                cardNameInput.classList.remove('error');
+            }
+            if (cardExpiryInput) {
+                cardExpiryInput.value = '';
+                cardExpiryInput.classList.remove('error');
+            }
+            if (cardCvvInput) {
+                cardCvvInput.value = '';
+                cardCvvInput.classList.remove('error');
+            }
+            if (cardNameError) {
+                cardNameError.classList.remove('show');
+                cardNameError.textContent = '';
+            }
+            if (cardExpiryError) {
+                cardExpiryError.classList.remove('show');
+                cardExpiryError.textContent = '';
+            }
+            if (cardCvvError) {
+                cardCvvError.classList.remove('show');
+                cardCvvError.textContent = '';
+            }
+        }
+
+        function clearFieldError(input, errorEl) {
+            if (!input || !errorEl) return;
+            input.classList.remove('error');
+            errorEl.classList.remove('show');
+            errorEl.textContent = '';
+        }
+
+        function setFieldError(input, errorEl, message) {
+            if (!input || !errorEl) return;
+            input.classList.add('error');
+            errorEl.classList.add('show');
+            errorEl.textContent = message;
+        }
+        
+        if (cardInput) {
+            cardInput.addEventListener('input', (event) => {
+                const target = event.target;
+                const digitsOnly = target.value.replace(/\D/g, '').slice(0, 16);
+                const groups = digitsOnly.match(/.{1,4}/g) || [];
+                target.value = groups.join(' ');
+                
+                // Validate số thẻ
+                if (digitsOnly.length === 16) {
+                    if (isValidTestCard(digitsOnly)) {
+                        fillCardDefaults();
+                        target.classList.remove('error');
+                        if (cardNumberError) {
+                            cardNumberError.classList.remove('show');
+                            cardNumberError.textContent = '';
+                        }
+                    } else {
+                        target.classList.add('error');
+                        if (cardNumberError) {
+                            cardNumberError.classList.add('show');
+                            cardNumberError.textContent = 'Số thẻ không hợp lệ. Vui lòng sử dụng thẻ test từ ZaloPay Developer.';
+                        }
+                    }
+                } else if (digitsOnly.length > 0) {
+                    target.classList.remove('error');
+                    if (cardNumberError) {
+                        cardNumberError.classList.remove('show');
+                        cardNumberError.textContent = '';
+                    }
+                    clearCardDefaults();
+                } else {
+                    clearCardDefaults();
+                }
+            });
+        }
+
+        // Định dạng ngày hết hạn (MM/YY)
+        if (cardExpiryInput) {
+            cardExpiryInput.addEventListener('input', (event) => {
+                const target = event.target;
+                let value = target.value.replace(/\D/g, '').slice(0, 4);
+                if (value.length >= 2) {
+                    value = value.slice(0, 2) + '/' + value.slice(2);
+                }
+                target.value = value;
+                if (value === REQUIRED_CARD_EXPIRY) {
+                    clearFieldError(target, cardExpiryError);
+                }
+            });
+        }
+
+        // Chỉ cho phép số cho CVV
+        if (cardCvvInput) {
+            cardCvvInput.addEventListener('input', (event) => {
+                const target = event.target;
+                target.value = target.value.replace(/\D/g, '').slice(0, 4);
+                if (target.value === REQUIRED_CARD_CVV) {
+                    clearFieldError(target, cardCvvError);
+                }
+            });
+        }
+
+        // Luôn giữ tên chủ thẻ uppercase
+        if (cardNameInput) {
+            cardNameInput.addEventListener('input', (event) => {
+                event.target.value = event.target.value.toUpperCase();
+                if (event.target.value.trim() === REQUIRED_CARD_NAME) {
+                    clearFieldError(cardNameInput, cardNameError);
+                }
+            });
+        }
+
+        // Kiểm tra số thẻ có hợp lệ không
+        function isValidTestCard(cardNumber) {
+            const digitsOnly = cardNumber.replace(/\D/g, '');
+            return VALID_TEST_CARDS.includes(digitsOnly);
+        }
+
         // Xử lý thanh toán
         async function handlePayment(status) {
             const statusMessage = document.getElementById('statusMessage');
@@ -601,16 +875,91 @@
 
             // Disable buttons
             const buttons = document.querySelectorAll('.btn');
-            buttons.forEach(btn => {
-                btn.disabled = true;
-                btn.style.opacity = '0.6';
-                btn.style.cursor = 'not-allowed';
-            });
+            const toggleButtons = (disabled) => {
+                buttons.forEach(btn => {
+                    btn.disabled = disabled;
+                    btn.style.opacity = disabled ? '0.6' : '1';
+                    btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+                });
+            };
+            toggleButtons(true);
 
             let message = '';
             let statusClass = '';
 
             if (status === 'success') {
+                // Kiểm tra số thẻ trước khi thanh toán
+                const cardNumberInput = document.getElementById('cardNumberInput');
+                const cardNumberErrorEl = document.getElementById('cardNumberError');
+                const cardNumber = cardNumberInput.value.replace(/\D/g, '');
+                const cardNameInput = document.getElementById('cardNameInput');
+                const cardExpiryInput = document.getElementById('cardExpiryInput');
+                const cardCvvInput = document.getElementById('cardCvvInput');
+                const cardNameErrorEl = document.getElementById('cardNameError');
+                const cardExpiryErrorEl = document.getElementById('cardExpiryError');
+                const cardCvvErrorEl = document.getElementById('cardCvvError');
+                const cardName = cardNameInput.value.trim().toUpperCase();
+                const cardExpiry = cardExpiryInput.value.trim();
+                const cardCvv = cardCvvInput.value.trim();
+                
+                // Reset error states
+                clearFieldError(cardNumberInput, cardNumberErrorEl);
+                clearFieldError(cardNameInput, cardNameErrorEl);
+                clearFieldError(cardExpiryInput, cardExpiryErrorEl);
+                clearFieldError(cardCvvInput, cardCvvErrorEl);
+                
+                // Validate số thẻ
+                if (!cardNumber || cardNumber.length < 16) {
+                    toggleButtons(false);
+                    setFieldError(cardNumberInput, cardNumberErrorEl, 'Vui lòng nhập đầy đủ số thẻ (16 chữ số)');
+                    
+                    message = '❌ Vui lòng nhập đầy đủ số thẻ (16 chữ số)';
+                    statusClass = 'status-failure';
+                    statusMessage.textContent = message;
+                    statusMessage.className = 'status-message ' + statusClass;
+                    return;
+                }
+
+                if (!isValidTestCard(cardNumber)) {
+                    toggleButtons(false);
+                    setFieldError(cardNumberInput, cardNumberErrorEl, 'Số thẻ không hợp lệ. Vui lòng sử dụng thẻ test từ ZaloPay Developer.');
+                if (cardName !== REQUIRED_CARD_NAME) {
+                    toggleButtons(false);
+                    setFieldError(cardNameInput, cardNameErrorEl, 'Tên chủ thẻ phải là "NGUYEN VAN A"');
+                    message = '❌ Tên chủ thẻ không hợp lệ.';
+                    statusClass = 'status-failure';
+                    statusMessage.textContent = message;
+                    statusMessage.className = 'status-message ' + statusClass;
+                    return;
+                }
+
+                if (cardExpiry !== REQUIRED_CARD_EXPIRY) {
+                    toggleButtons(false);
+                    setFieldError(cardExpiryInput, cardExpiryErrorEl, 'Ngày hết hạn phải là 01/25');
+                    message = '❌ Ngày hết hạn không hợp lệ.';
+                    statusClass = 'status-failure';
+                    statusMessage.textContent = message;
+                    statusMessage.className = 'status-message ' + statusClass;
+                    return;
+                }
+
+                if (cardCvv !== REQUIRED_CARD_CVV) {
+                    toggleButtons(false);
+                    setFieldError(cardCvvInput, cardCvvErrorEl, 'Mã CVV phải là 123');
+                    message = '❌ Mã CVV không hợp lệ.';
+                    statusClass = 'status-failure';
+                    statusMessage.textContent = message;
+                    statusMessage.className = 'status-message ' + statusClass;
+                    return;
+                }
+
+                    
+                    message = '❌ Số thẻ không hợp lệ! Vui lòng sử dụng thẻ test từ ZaloPay Developer.';
+                    statusClass = 'status-failure';
+                    statusMessage.textContent = message;
+                    statusMessage.className = 'status-message ' + statusClass;
+                    return;
+                }
                 // Hiển thị loading overlay
                 const loadingOverlay = document.getElementById('loadingOverlay');
                 loadingOverlay.classList.add('active');
