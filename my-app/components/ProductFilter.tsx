@@ -31,7 +31,11 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
     const [priceMin, setPriceMin] = useState<number>(0);
     const [priceMax, setPriceMax] = useState<number>(10000000);
     const [minRating, setMinRating] = useState<number>(0);
-    const categoryOptions = [{ id: '__default_all__', name: 'Tất cả' }, ...categories];
+    // Ensure the "Tất cả" option only appears once per section
+    const sanitizedCategories = categories.filter((cat) => cat.name !== 'Tất cả');
+    const sanitizedBrands = brands.filter((brand) => brand !== 'Tất cả');
+    const categoryOptions = [{ id: '__default_all__', name: 'Tất cả' }, ...sanitizedCategories];
+    const brandOptions = ['Tất cả', ...sanitizedBrands];
     const quickRanges = [
         { label: 'Dưới 100.000', min: 0, max: 100000 },
         { label: '100.000 - 200.000', min: 100000, max: 200000 },
@@ -125,7 +129,7 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Thương hiệu</Text>
                             <View style={styles.chipContainer}>
-                                {['Tất cả', ...brands].map((brand) => (
+                                {brandOptions.map((brand) => (
                                     <TouchableOpacity
                                         key={brand}
                                         style={[
