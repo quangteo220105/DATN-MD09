@@ -13,7 +13,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Linking,
-  AppState
+  AppState,
+  ActivityIndicator
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,6 +47,7 @@ export default function CheckoutScreen() {
   const [loadingVouchers, setLoadingVouchers] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showFailureDialog, setShowFailureDialog] = useState(false);
+  const [showPaymentLoading, setShowPaymentLoading] = useState(false);
   const hasCheckedPaymentRef = useRef(false); // Tránh check nhiều lần trong cùng một session
   const voucherEligible = total <= VOUCHER_MAX_ORDER_AMOUNT;
 
@@ -102,7 +104,7 @@ export default function CheckoutScreen() {
         const fullCartStr = await AsyncStorage.getItem(`cart_${user._id}`);
         let fullCart = fullCartStr ? JSON.parse(fullCartStr) : [];
         fullCart = Array.isArray(fullCart) ? fullCart : [];
-        const remaining = fullCart.filter(i => !i?.checked);
+        const remaining = fullCart.filter((i: any) => !i?.checked);
         await AsyncStorage.setItem(`cart_${user._id}`, JSON.stringify(remaining));
         console.log('🎉 Cart cleared');
       } catch { }
@@ -395,6 +397,21 @@ export default function CheckoutScreen() {
     }
   }, [handlePaymentSuccess]);
 
+  const checkPaymentWithSpinner = React.useCallback(async () => {
+    const MIN_SPINNER_TIME = 2000;
+    const MAX_SPINNER_TIME = 3000;
+    const start = Date.now();
+    setShowPaymentLoading(true);
+    try {
+      return await checkPaymentSuccess();
+    } finally {
+      const elapsed = Date.now() - start;
+      const intended = Math.max(MIN_SPINNER_TIME, Math.min(MAX_SPINNER_TIME, elapsed + 500));
+      const remaining = Math.max(0, intended - elapsed);
+      setTimeout(() => setShowPaymentLoading(false), remaining);
+    }
+  }, [checkPaymentSuccess]);
+
   // 🟢 Kiểm tra sản phẩm dừng bán
   const checkStoppedProducts = React.useCallback(async (items: any[]) => {
     if (items.length === 0) return false;
@@ -635,26 +652,26 @@ export default function CheckoutScreen() {
         }
 
         console.log('[Checkout] Valid pending payment detected, checking payment success...');
-        // Kiểm tra ngay khi mount
-        checkPaymentSuccess();
+        // Kiểm tra ngay khi mount (có loading)
+        checkPaymentWithSpinner();
 
         // Kiểm tra lại sau các khoảng thời gian để đảm bảo backend đã cập nhật
         const timeouts = [
           setTimeout(() => {
             console.log('[Checkout] Retry check after 1s...');
-            checkPaymentSuccess();
+            checkPaymentWithSpinner();
           }, 1000),
           setTimeout(() => {
             console.log('[Checkout] Retry check after 2s...');
-            checkPaymentSuccess();
+            checkPaymentWithSpinner();
           }, 2000),
           setTimeout(() => {
             console.log('[Checkout] Retry check after 5s...');
-            checkPaymentSuccess();
+            checkPaymentWithSpinner();
           }, 5000),
           setTimeout(() => {
             console.log('[Checkout] Retry check after 8s...');
-            checkPaymentSuccess();
+            checkPaymentWithSpinner();
           }, 8000)
         ];
 
@@ -667,16 +684,29 @@ export default function CheckoutScreen() {
     };
 
     checkIfPendingPayment();
-  }, [checkPaymentSuccess]);
+  }, [checkPaymentSuccess, checkPaymentWithSpinner]);
 
   // 🟢 Lắng nghe AppState để detect khi app được active lại từ background
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         console.log('[Checkout] App became active, checking payment success...');
-        // Đợi một chút để đảm bảo app đã sẵn sàng
-        setTimeout(() => {
-          checkPaymentSuccess();
+        setTimeout(async () => {
+          try {
+            if (!userId) {
+              await checkPaymentSuccess();
+              return;
+            }
+            const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${userId}`);
+            const shouldShowLoading = !!pendingFlagStr || params.payment === 'success';
+            if (shouldShowLoading) {
+              await checkPaymentWithSpinner();
+            } else {
+              await checkPaymentSuccess();
+            }
+          } catch (error) {
+            console.log('[Checkout] Error checking payment on app active:', error);
+          }
         }, 500);
       }
     });
@@ -684,7 +714,7 @@ export default function CheckoutScreen() {
     return () => {
       subscription.remove();
     };
-  }, [checkPaymentSuccess]);
+  }, [checkPaymentSuccess, checkPaymentWithSpinner, params.payment, userId]);
 
   // 🟢 Kiểm tra flag từ AsyncStorage khi màn hình được focus (CHỈ khi có pending flag)
   useFocusEffect(
@@ -705,19 +735,20 @@ export default function CheckoutScreen() {
           }
 
           console.log('[Checkout] Screen focused - Pending payment detected, checking...');
-          // Kiểm tra ngay khi focus
-          checkPaymentSuccess();
+          const shouldShowLoading = !!pendingFlagStr || hasPaymentParam;
+          const runCheck = shouldShowLoading ? checkPaymentWithSpinner : checkPaymentSuccess;
+          runCheck();
 
           // Kiểm tra lại sau các khoảng thời gian
           const timeouts = [
             setTimeout(() => {
-              checkPaymentSuccess();
+              runCheck();
             }, 1000),
             setTimeout(() => {
-              checkPaymentSuccess();
+              runCheck();
             }, 2000),
             setTimeout(() => {
-              checkPaymentSuccess();
+              runCheck();
             }, 5000)
           ];
 
@@ -730,7 +761,7 @@ export default function CheckoutScreen() {
       };
 
       checkOnFocus();
-    }, [checkPaymentSuccess, params.payment])
+    }, [checkPaymentSuccess, checkPaymentWithSpinner, params.payment])
   );
 
   // 🟢 Lấy danh sách categoryId trong cart
@@ -1104,7 +1135,7 @@ export default function CheckoutScreen() {
         const fullCartStr = await AsyncStorage.getItem(`cart_${user._id}`);
         let fullCart = fullCartStr ? JSON.parse(fullCartStr) : [];
         fullCart = Array.isArray(fullCart) ? fullCart : [];
-        const remaining = fullCart.filter(i => !i?.checked);
+        const remaining = fullCart.filter((i: any) => !i?.checked);
         await AsyncStorage.setItem(`cart_${user._id}`, JSON.stringify(remaining));
       } catch { }
 
@@ -1126,7 +1157,7 @@ export default function CheckoutScreen() {
   };
 
   // 🟢 Render sản phẩm
-  const renderItem = ({ item }) => (
+  const renderItem = ({ item }: { item: any }) => (
     <View style={styles.itemRow}>
       <Image source={{ uri: `${DOMAIN}${item.image}` }} style={styles.productImage} />
       <View style={{ flex: 1 }}>
@@ -1433,6 +1464,15 @@ export default function CheckoutScreen() {
           <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 17 }}>Xác nhận và thanh toán</Text>
         </TouchableOpacity>
       </View>
+
+      {showPaymentLoading && (
+        <View style={styles.zaloLoadingOverlay}>
+          <View style={styles.zaloLoadingCard}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={styles.zaloLoadingText}>Đang xác minh thanh toán ZaloPay...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1465,5 +1505,8 @@ const styles = StyleSheet.create({
   successButton: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', backgroundColor: 'transparent' },
   successButtonLeft: {},
   successButtonRight: {},
-  successButtonText: { color: '#4084f4', fontWeight: 'bold', fontSize: 14 }
+  successButtonText: { color: '#4084f4', fontWeight: 'bold', fontSize: 14 },
+  zaloLoadingOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  zaloLoadingCard: { backgroundColor: '#111827', borderRadius: 16, paddingVertical: 24, paddingHorizontal: 28, alignItems: 'center', width: '80%', maxWidth: 340 },
+  zaloLoadingText: { color: '#fff', marginTop: 12, fontWeight: '600', textAlign: 'center' }
 });
