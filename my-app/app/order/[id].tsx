@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Image, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Image, ScrollView, TouchableOpacity, Alert, Modal, TextInput, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -34,6 +34,7 @@ export default function OrderDetailScreen() {
     const [loadingReviews, setLoadingReviews] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
+    const [refreshing, setRefreshing] = useState(false);
 
     const loadOrder = async () => {
         const userString = await AsyncStorage.getItem('user');
@@ -98,6 +99,16 @@ export default function OrderDetailScreen() {
             loadReviews();
         }
     }, [id]));
+
+    // Pull to refresh
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadOrder();
+        if (order) {
+            await loadReviews();
+        }
+        setRefreshing(false);
+    };
 
     const status = normalizeStatus(order?.status);
     const created = order?.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : '';
@@ -251,7 +262,17 @@ export default function OrderDetailScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f8f9' }}>
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
+            <ScrollView
+                contentContainerStyle={{ padding: 16 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#ff4757']}
+                        tintColor="#ff4757"
+                    />
+                }
+            >
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={{ flex: 1, marginRight: 8 }}>
