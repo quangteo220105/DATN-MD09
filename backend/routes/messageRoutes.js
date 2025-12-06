@@ -116,12 +116,8 @@ router.get('/admin/conversations', async (req, res) => {
 router.get('/unread/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        const filter = { receiverId: userId, read: false };
-        const [unreadCount, latest] = await Promise.all([
-            Message.countDocuments(filter),
-            Message.findOne(filter).sort({ createdAt: -1 }).select('createdAt')
-        ]);
-        res.json({ count: unreadCount, latestAt: latest?.createdAt || null });
+        const unreadCount = await Message.countDocuments({ receiverId: userId, read: false });
+        res.json({ count: unreadCount });
     } catch (error) {
         console.error('GET /api/messages/unread/:userId error:', error);
         res.status(500).json({ message: 'Lỗi server!' });
@@ -142,21 +138,6 @@ router.put('/read/:userId', async (req, res) => {
         res.json({ message: 'Đã đánh dấu đọc!' });
     } catch (error) {
         console.error('PUT /api/messages/read/:userId error:', error);
-        res.status(500).json({ message: 'Lỗi server!' });
-    }
-});
-
-// Đánh dấu tất cả tin nhắn gửi tới user là đã đọc (không cần chỉ định sender)
-router.put('/read-all/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        await Message.updateMany(
-            { receiverId: userId, read: false },
-            { $set: { read: true } }
-        );
-        res.json({ message: 'Đã đánh dấu tất cả tin nhắn là đã đọc!' });
-    } catch (error) {
-        console.error('PUT /api/messages/read-all/:userId error:', error);
         res.status(500).json({ message: 'Lỗi server!' });
     }
 });
