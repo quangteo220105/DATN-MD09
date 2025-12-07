@@ -625,36 +625,6 @@ export default function OrdersScreen() {
                             <Text style={{ color: '#fff', fontWeight: '600' }}>Hủy đơn</Text>
                         </TouchableOpacity>
                     )}
-
-                    {status === 'Đã hủy' && (
-                        <TouchableOpacity
-                            onPress={async () => {
-                                Alert.alert('Xóa đơn', 'Xóa vĩnh viễn đơn hàng này?', [
-                                    { text: 'Không', style: 'cancel' },
-                                    {
-                                        text: 'Xóa', style: 'destructive', onPress: async () => {
-                                            const userString = await AsyncStorage.getItem('user');
-                                            const user = userString ? JSON.parse(userString) : null;
-                                            if (!user || !user._id) return;
-                                            if (item._id) {
-                                                try { await fetch(`${BASE_URL}/orders/${item._id}`, { method: 'DELETE' }); } catch { }
-                                            }
-                                            const historyKey = `order_history_${user._id}`;
-                                            const historyString = await AsyncStorage.getItem(historyKey);
-                                            let history = historyString ? JSON.parse(historyString) : [];
-                                            history = Array.isArray(history) ? history : [];
-                                            history = history.filter((o: any) => (o.id || o._id) !== (item.id || item._id));
-                                            await AsyncStorage.setItem(historyKey, JSON.stringify(history));
-                                            setOrders((prev) => prev.filter((o: any) => (o.id || o._id) !== (item.id || item._id)));
-                                        }
-                                    }
-                                ]);
-                            }}
-                            style={[styles.actionBtn, { backgroundColor: '#6b7280' }]}
-                        >
-                            <Text style={{ color: '#fff', fontWeight: '600' }}>Xóa đơn</Text>
-                        </TouchableOpacity>
-                    )}
                 </View>
             </View>
         );

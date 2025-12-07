@@ -196,6 +196,13 @@ export default function ProductDetailScreen() {
         return [...new Set(product.variants.map(v => v.size))];
     };
 
+    // Kiểm tra stock của một size cụ thể (khi đã chọn màu)
+    const getSizeStock = (size: string): number => {
+        if (!product || !selectedColor) return 0;
+        const variant = product.variants.find(v => v.color === selectedColor && v.size === size);
+        return variant ? variant.stock : 0;
+    };
+
     useEffect(() => {
         if (!product) return;
         const variant = product.variants.find(v => v.color === selectedColor && v.size === selectedSize) || null;
@@ -492,13 +499,31 @@ export default function ProductDetailScreen() {
                         <View style={styles.sizeOptions}>
                             {getAllSizes().map(size => {
                                 const isSelected = selectedSize === size;
+                                // Chỉ kiểm tra stock khi đã chọn màu
+                                const sizeStock = selectedColor ? getSizeStock(size) : null;
+                                const isOutOfStock = !!(selectedColor && sizeStock !== null && sizeStock === 0);
                                 return (
                                     <TouchableOpacity
                                         key={size}
-                                        style={[styles.sizeOption, isSelected && styles.sizeOptionSelected]}
-                                        onPress={() => setSelectedSize(size)}
+                                        style={[
+                                            styles.sizeOption,
+                                            isSelected && styles.sizeOptionSelected,
+                                            isOutOfStock && styles.sizeOptionOutOfStock
+                                        ]}
+                                        onPress={() => {
+                                            if (!isOutOfStock) {
+                                                setSelectedSize(size);
+                                            }
+                                        }}
+                                        disabled={isOutOfStock}
                                     >
-                                        <Text style={[styles.sizeText, isSelected && styles.sizeTextSelected]}>{size}</Text>
+                                        <Text style={[
+                                            styles.sizeText,
+                                            isSelected && styles.sizeTextSelected,
+                                            isOutOfStock && styles.sizeTextOutOfStock
+                                        ]}>
+                                            {size}
+                                        </Text>
                                     </TouchableOpacity>
                                 );
                             })}
@@ -569,8 +594,10 @@ const styles = StyleSheet.create({
     sizeOptions: { flexDirection: 'row', flexWrap: 'wrap' },
     sizeOption: { padding: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 5, marginRight: 8, marginBottom: 8 },
     sizeOptionSelected: { borderColor: '#ff4757', backgroundColor: '#ffe3e3' },
+    sizeOptionOutOfStock: { opacity: 0.4, borderColor: '#ddd' },
     sizeText: { fontSize: 14 },
     sizeTextSelected: { color: '#ff4757', fontWeight: 'bold' },
+    sizeTextOutOfStock: { color: '#999' },
     ratingSection: { marginVertical: 10, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#eee' },
     ratingRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
     starsContainer: { flexDirection: 'row', marginRight: 10 },
