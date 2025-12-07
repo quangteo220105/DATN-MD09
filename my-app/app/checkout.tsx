@@ -23,7 +23,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { DOMAIN, BASE_URL } from '../config/apiConfig';
 
 const PAYMENT_METHODS = [
-  { key: 'cod', label: 'Thanh toán khi nhận hàng (COD)' },
+  { key: 'cod', label: 'Thanh toán tiền mặt' },
   { key: 'zalopay', label: 'ZaloPay' },
 ];
 const VOUCHER_MAX_ORDER_AMOUNT = 500000;

@@ -539,13 +539,15 @@ export default function OrdersScreen() {
                             </Text>
                         )}
                     </View>
-                    <Text style={[styles.badge, { color: STATUS_INFO[status].color }]}>
-                        {STATUS_INFO[status].emoji} {status}
-                    </Text>
+                    {status !== 'Đã hủy' && (
+                        <Text style={[styles.badge, { color: STATUS_INFO[status].color }]}>
+                            {STATUS_INFO[status].emoji} {status}
+                        </Text>
+                    )}
                 </View>
 
-                {/* Stepper */}
-                {renderStepper(status)}
+                {/* Stepper - Ẩn khi đơn hàng đã hủy */}
+                {status !== 'Đã hủy' && renderStepper(status)}
 
                 {/* Danh sách sản phẩm */}
                 <View style={{ marginTop: 8 }}>
@@ -595,7 +597,7 @@ export default function OrdersScreen() {
 
                 {/* Địa chỉ & phương thức */}
                 <Text style={styles.small}>Địa chỉ: {item.address}</Text>
-                <Text style={styles.small}>Phương thức: {item.payment}</Text>
+                <Text style={styles.small}>Phương thức: {item.payment === 'cod' ? 'tiền mặt' : item.payment}</Text>
 
                 {/* Nút hành động */}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
