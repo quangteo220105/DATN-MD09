@@ -128,7 +128,7 @@ export default function ManagerDashboard() {
         // ✅ Kiểm tra từng biến thể
         for (let i = 0; i < formProduct.variants.length; i++) {
             const v = formProduct.variants[i];
-            if (!v.size || !v.color || !v.originalPrice || !v.currentPrice || !v.stock || !v.imageFile) {
+            if (!v.size || !v.color || !v.currentPrice || !v.stock || !v.imageFile) {
                 alert(`Vui lòng điền đủ thông tin biến thể ${i + 1} và chọn ảnh!`);
                 return;
             }
@@ -142,7 +142,6 @@ export default function ManagerDashboard() {
 
                 if (v1.size.trim().toLowerCase() === v2.size.trim().toLowerCase() &&
                     v1.color.trim().toLowerCase() === v2.color.trim().toLowerCase() &&
-                    Number(v1.originalPrice) === Number(v2.originalPrice) &&
                     Number(v1.currentPrice) === Number(v2.currentPrice) &&
                     Number(v1.stock) === Number(v2.stock)) {
                     alert(`Biến thể ${i + 1} và ${j + 1} trùng lặp hoàn toàn (Size: ${v1.size}, Màu: ${v1.color}). Vui lòng kiểm tra lại!`);
@@ -159,10 +158,11 @@ export default function ManagerDashboard() {
         formData.append("isActive", formProduct.isActive ? "true" : "false");
 
         // ✅ Gửi danh sách variants dưới dạng JSON (chưa có ảnh)
+        // Tự động set originalPrice = currentPrice nếu không có giá trị
         const variantsPayload = formProduct.variants.map((v, index) => ({
             size: v.size,
             color: v.color,
-            originalPrice: Number(v.originalPrice),
+            originalPrice: Number(v.originalPrice) || Number(v.currentPrice) || 0,
             currentPrice: Number(v.currentPrice),
             stock: Number(v.stock),
             imageIndex: index, // giúp backend biết ảnh nào khớp với biến thể
@@ -268,7 +268,6 @@ export default function ManagerDashboard() {
 
                 if (v1.size.trim().toLowerCase() === v2.size.trim().toLowerCase() &&
                     v1.color.trim().toLowerCase() === v2.color.trim().toLowerCase() &&
-                    Number(v1.originalPrice) === Number(v2.originalPrice) &&
                     Number(v1.currentPrice) === Number(v2.currentPrice) &&
                     Number(v1.stock) === Number(v2.stock)) {
                     alert(`Biến thể ${i + 1} và ${j + 1} trùng lặp hoàn toàn (Size: ${v1.size}, Màu: ${v1.color}). Vui lòng kiểm tra lại!`);
@@ -287,10 +286,11 @@ export default function ManagerDashboard() {
         // ✅ Cho phép thay toàn bộ biến thể
         formData.append("replaceVariants", "true");
 
+        // Tự động set originalPrice = currentPrice nếu không có giá trị
         const variantsPayload = formProduct.variants.map((v, index) => ({
             size: v.size,
             color: v.color,
-            originalPrice: Number(v.originalPrice) || 0,
+            originalPrice: Number(v.originalPrice) || Number(v.currentPrice) || 0,
             currentPrice: Number(v.currentPrice) || 0,
             stock: Number(v.stock) || 0,
             imageIndex: index,
@@ -585,16 +585,6 @@ export default function ManagerDashboard() {
                                                     placeholder="VD: Đen, Trắng, Xanh..."
                                                     value={variant.color}
                                                     onChange={(e) => updateVariant(index, 'color', e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div style={styles.inputGroup}>
-                                                <label>Giá nhập:</label>
-                                                <input
-                                                    placeholder="Giá nhập"
-                                                    type="number"
-                                                    value={variant.originalPrice}
-                                                    onChange={(e) => updateVariant(index, 'originalPrice', e.target.value)}
                                                 />
                                             </div>
 
