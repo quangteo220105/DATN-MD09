@@ -28,6 +28,14 @@ function normalizeStatus(raw?: string) {
     return STATUS_INFO[s] ? s : 'Chờ xác nhận';
 }
 
+function formatPaymentMethod(payment?: string) {
+    if (!payment) return '—';
+    const p = String(payment).toLowerCase().trim();
+    if (p === 'cod') return 'Tiền mặt';
+    if (p === 'zalopay') return 'ZaloPay';
+    return payment;
+}
+
 export default function OrderDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
@@ -312,19 +320,17 @@ export default function OrderDetailScreen() {
                             </Text>
                         )}
                     </View>
-                    <View style={[styles.statusPill, { borderColor: STATUS_INFO[status].color }]}>
-                        <Text style={[styles.statusBadge, { color: STATUS_INFO[status].color }]} numberOfLines={1}>
-                            {STATUS_INFO[status].emoji} {status}
-                        </Text>
-                    </View>
+                    {status !== 'Đã hủy' && (
+                        <View style={[styles.statusPill, { borderColor: STATUS_INFO[status].color }]}>
+                            <Text style={[styles.statusBadge, { color: STATUS_INFO[status].color }]} numberOfLines={1}>
+                                {STATUS_INFO[status].emoji} {status}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Stepper */}
-                {status === 'Đã hủy' ? (
-                    <View style={styles.cancelWrap}>
-                        <Text style={styles.cancelText}>{STATUS_INFO['Đã hủy'].emoji} Đã hủy</Text>
-                    </View>
-                ) : status === 'Chờ thanh toán' ? (
+                {status === 'Đã hủy' ? null : status === 'Chờ thanh toán' ? (
                     <View style={[styles.cancelWrap, { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}>
                         <Text style={[styles.cancelText, { color: '#f59e0b' }]}>{STATUS_INFO['Chờ thanh toán'].emoji} Chờ thanh toán</Text>
                     </View>
@@ -366,7 +372,7 @@ export default function OrderDetailScreen() {
                 <View style={styles.card}>
                     <Text style={styles.cardTitle}>Thông tin giao hàng</Text>
                     <Text style={styles.text}>{order.address}</Text>
-                    <Text style={[styles.text, { marginTop: 6 }]}>Phương thức thanh toán: {order.payment}</Text>
+                    <Text style={[styles.text, { marginTop: 6 }]}>Phương thức thanh toán: {formatPaymentMethod(order.payment)}</Text>
                 </View>
 
                 {/* Items */}

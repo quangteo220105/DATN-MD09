@@ -37,7 +37,7 @@ const NEGATIVE_KEYWORDS = [
     'giả', 'nhái', 'hàng giả', 'hàng nhái', 'không chính hãng',
     'dm', 'cc', 'đm', 'đcm', 'địt mẹ', 'đụ má', 'đụ mẹ', 'đĩ mẹ', 'đĩ mợ', 'đéo', 'lồn', 'cặc', 'buồi', 'đụ', 'đụt',
     'lon', 'giày quá chán', 'như cut', 'chán quá', 'chán thật', 'chán vl', 'bực mình', 'ức chế', 'phẫn nộ', 'ghét', 'ghê tởm', 'kinh tởm',
-    'bẩn', 'dơ', 'ô nhiễm',
+    'bẩn', 'dơ', 'ô nhiễm', 'dcm', 'tệ hại', 'vớ vẩn', 'vớ vẫn', 'làm ăn bát nháo', 'làm ăn cẩu thả'
 ];
 
 // Hàm phát hiện bình luận tiêu cực
