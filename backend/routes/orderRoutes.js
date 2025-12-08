@@ -338,6 +338,41 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PATCH /api/orders/:id - Update order (for retry payment)
+router.patch('/:id', async (req, res) => {
+  try {
+    console.log('[Order PATCH] Updating order:', req.params.id);
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      console.log('[Order PATCH] Order not found:', req.params.id);
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    const body = req.body || {};
+
+    // Update fields
+    if (body.items) order.items = body.items;
+    if (body.total !== undefined) order.total = body.total;
+    if (body.discount !== undefined) order.discount = body.discount;
+    if (body.voucherCode !== undefined) order.voucherCode = body.voucherCode;
+    if (body.address) order.address = body.address;
+    if (body.payment) order.payment = body.payment;
+    if (body.status) order.status = body.status;
+
+    // Update timestamp
+    order.updatedAt = new Date();
+
+    await order.save();
+    console.log('[Order PATCH] Order updated successfully:', order._id);
+
+    res.status(200).json(order);
+  } catch (e) {
+    console.error('[Order PATCH] Error:', e);
+    res.status(400).json({ message: 'Bad request' });
+  }
+});
+
 // GET /api/users/:userId/orders
 router.get('/user/:userId/list', async (req, res) => {
   try {

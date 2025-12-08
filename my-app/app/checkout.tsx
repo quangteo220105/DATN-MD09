@@ -498,6 +498,148 @@ export default function CheckoutScreen() {
       }
       setUserId(user._id);
 
+      // 🟢 Kiểm tra nếu có orderId trong params (thanh toán lại)
+      if (params.orderId) {
+        try {
+          console.log('[Checkout] Loading order for retry payment:', params.orderId);
+          const orderResponse = await fetch(`${BASE_URL}/orders/${params.orderId}`);
+          if (orderResponse.ok) {
+            const orderData = await orderResponse.json();
+            
+            // Kiểm tra đơn hàng có phải "Chờ thanh toán" không
+            const orderStatus = (orderData.status || '').toLowerCase().trim();
+            if (orderStatus === 'chờ thanh toán' || orderStatus === 'waiting payment' || orderStatus === 'pending payment') {
+              // Load thông tin từ đơn hàng
+              if (orderData.items && Array.isArray(orderData.items) && orderData.items.length > 0) {
+                const items = orderData.items.map((item: any) => ({
+                  id: item.productId || item._id || item.id,
+                  _id: item.productId || item._id || item.id,
+                  productId: item.productId || item._id || item.id,
+                  name: item.name,
+                  size: item.size,
+                  color: item.color,
+                  qty: item.qty,
+                  price: item.price,
+                  image: item.image,
+                  discountAmount: item.discountAmount || 0,
+                  checked: true
+                }));
+                
+                // Kiểm tra sản phẩm dừng bán
+                const hasStopped = await checkStoppedProducts(items);
+                if (hasStopped) {
+                  return;
+                }
+                
+                setCart(items);
+                
+                // Tính tổng từ items
+                const cartTotal = items.reduce((sum, i) => sum + i.qty * i.price, 0);
+                setTotal(cartTotal);
+                
+                // Set payment method
+                if (orderData.payment === 'zalopay') {
+                  setPayment('zalopay');
+                }
+                
+                // Load voucher nếu có - sử dụng discount từ orderData
+                if (orderData.voucherCode) {
+                  setVoucherCode(orderData.voucherCode);
+                  // Sử dụng discount từ orderData (đã được validate khi tạo đơn)
+                  const discount = orderData.discount || 0;
+                  setVoucherDiscount(discount);
+                  
+                  // Thử fetch thông tin voucher để hiển thị (optional)
+                  try {
+                    const categoryIds = Array.from(new Set(items.map((i: any) => i.categoryId).filter(Boolean)));
+                    const voucherResponse = await fetch(`${BASE_URL}/vouchers/check`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        code: orderData.voucherCode, 
+                        orderAmount: cartTotal, 
+                        categoryIds 
+                      })
+                    });
+                    const voucherData = await voucherResponse.json();
+                    if (voucherResponse.ok && voucherData.valid) {
+                      setAppliedVoucher({
+                        code: voucherData.voucher.code,
+                        name: voucherData.voucher.name,
+                        description: voucherData.voucher.description || '',
+                        discountType: voucherData.voucher.discountType,
+                        discountValue: voucherData.voucher.discountValue,
+                        maxDiscountAmount: voucherData.voucher.maxDiscountAmount || 0
+                      });
+                    } else {
+                      // Nếu không validate được, vẫn giữ discount từ orderData
+                      setAppliedVoucher({
+                        code: orderData.voucherCode,
+                        name: orderData.voucherCode,
+                        description: '',
+                        discountType: 'fixed',
+                        discountValue: discount,
+                        maxDiscountAmount: 0
+                      });
+                    }
+                  } catch (e) {
+                    console.log('[Checkout] Error fetching voucher info:', e);
+                    // Fallback: sử dụng discount từ orderData
+                    setAppliedVoucher({
+                      code: orderData.voucherCode,
+                      name: orderData.voucherCode,
+                      description: '',
+                      discountType: 'fixed',
+                      discountValue: discount,
+                      maxDiscountAmount: 0
+                    });
+                  }
+                }
+                
+                // Load address từ đơn hàng
+                if (orderData.address) {
+                  const addressParts = orderData.address.split('\n');
+                  if (addressParts.length >= 2) {
+                    const namePhone = addressParts[0].split(' - ');
+                    const addr = {
+                      name: namePhone[0] || user.name || '',
+                      phone: namePhone[1] || '',
+                      address: addressParts.slice(1).join('\n')
+                    };
+                    setAddressObj(addr);
+                    setInput(addr);
+                  }
+                } else {
+                  // Fallback: lấy từ AsyncStorage
+                  const addressString = await AsyncStorage.getItem(`address_${user._id}`);
+                  const addr = addressString ? JSON.parse(addressString) : { name: user.name || '', phone: '', address: '' };
+                  setAddressObj(addr);
+                  setInput(addr);
+                }
+                
+                // Lấy voucher khả dụng
+                if (cartTotal > 0 && cartTotal <= VOUCHER_MAX_ORDER_AMOUNT) {
+                  fetchAvailableVouchers(cartTotal);
+                } else {
+                  setAvailableVouchers([]);
+                }
+                
+                return; // Đã load xong từ đơn hàng, không cần load cart nữa
+              }
+            } else {
+              Alert.alert('Thông báo', 'Đơn hàng này không còn ở trạng thái "Chờ thanh toán"');
+              router.replace('/orders');
+              return;
+            }
+          }
+        } catch (e) {
+          console.log('[Checkout] Error loading order:', e);
+          Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng');
+          router.replace('/orders');
+          return;
+        }
+      }
+
       // Lấy address
       const addressString = await AsyncStorage.getItem(`address_${user._id}`);
       let addr = addressString ? JSON.parse(addressString) : { name: user.name || '', phone: '', address: '' };
@@ -539,7 +681,7 @@ export default function CheckoutScreen() {
       }
     };
     fetchData();
-  }, [checkStoppedProducts]);
+  }, [checkStoppedProducts, params.orderId]);
 
   // 🔄 Reload khi quay lại màn hình (đảm bảo tên từ profile cập nhật, hoặc địa chỉ vừa chọn)
   useFocusEffect(
@@ -1038,65 +1180,160 @@ export default function CheckoutScreen() {
     const finalTotal = total - voucherDiscount;
     const orderId = Date.now().toString();
 
-    // Tạo đơn lên backend trước
-    let backendOrderId = null;
-    try {
-      const response = await fetch(`${BASE_URL}/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user._id,
-          customerName: user.name || addressObj.name,
-          customerPhone: addressObj.phone || user.phone,
-          items: cart.map(i => ({
-            productId: i._id || i.productId || i.id,
-            name: i.name,
-            size: i.size,
-            color: i.color,
-            qty: i.qty,
-            price: i.price,
-            image: i.image,
-            discountAmount: i.discountAmount || 0
-          })),
-          total: finalTotal,
-          voucherCode: appliedVoucher?.code || null,
-          discount: voucherDiscount,
-          address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
-          payment,
-          status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        backendOrderId = data?._id || data?.id || null;
+    // 🟢 Kiểm tra nếu đang retry payment (có orderId trong params)
+    let isRetryPayment = !!params.orderId;
+    let backendOrderId = params.orderId || null;
+
+    if (isRetryPayment) {
+      // Update đơn hàng cũ thay vì tạo mới
+      try {
+        const updateResponse = await fetch(`${BASE_URL}/orders/${params.orderId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: cart.map(i => ({
+              productId: i._id || i.productId || i.id,
+              name: i.name,
+              size: i.size,
+              color: i.color,
+              qty: i.qty,
+              price: i.price,
+              image: i.image,
+              discountAmount: i.discountAmount || 0
+            })),
+            total: finalTotal,
+            voucherCode: appliedVoucher?.code || null,
+            discount: voucherDiscount,
+            address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+            payment,
+            status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
+          })
+        });
+        if (updateResponse.ok) {
+          const data = await updateResponse.json();
+          backendOrderId = data?._id || data?.id || params.orderId;
+          console.log('[Checkout] Order updated for retry payment:', backendOrderId);
+        } else {
+          console.log('[Checkout] Failed to update order, creating new one');
+          // Nếu update thất bại, tạo đơn mới
+          isRetryPayment = false;
+        }
+      } catch (e) {
+        console.log('[Checkout] Error updating order:', e);
+        // Nếu có lỗi, tạo đơn mới
+        isRetryPayment = false;
       }
-    } catch (e) {
-      console.log('POST /orders failed', e);
     }
 
-    // Chỉ lưu vào AsyncStorage nếu KHÔNG phải ZaloPay
-    // Với ZaloPay, chỉ lưu khi thanh toán thành công (xử lý trong orders.tsx)
-    if (payment !== 'zalopay') {
+    // Tạo đơn mới nếu không phải retry hoặc retry thất bại
+    if (!isRetryPayment) {
+      try {
+        const response = await fetch(`${BASE_URL}/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user._id,
+            customerName: user.name || addressObj.name,
+            customerPhone: addressObj.phone || user.phone,
+            items: cart.map(i => ({
+              productId: i._id || i.productId || i.id,
+              name: i.name,
+              size: i.size,
+              color: i.color,
+              qty: i.qty,
+              price: i.price,
+              image: i.image,
+              discountAmount: i.discountAmount || 0
+            })),
+            total: finalTotal,
+            voucherCode: appliedVoucher?.code || null,
+            discount: voucherDiscount,
+            address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+            payment,
+            status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          backendOrderId = data?._id || data?.id || null;
+        }
+      } catch (e) {
+        console.log('POST /orders failed', e);
+      }
+    }
+
+    // 🟢 Xử lý AsyncStorage
+    // Nếu là retry payment: update đơn hàng cũ trong AsyncStorage
+    // Nếu không phải retry và không phải ZaloPay: tạo đơn mới
+    // Với ZaloPay (không retry): chỉ lưu khi thanh toán thành công (xử lý trong orders.tsx)
+    if (isRetryPayment && backendOrderId) {
+      // Update đơn hàng cũ trong AsyncStorage
       const historyKey = `order_history_${user._id}`;
       const historyString = await AsyncStorage.getItem(historyKey);
       let history = historyString ? JSON.parse(historyString) : [];
       history = Array.isArray(history) ? history : [];
 
-      const newOrder = {
-        id: backendOrderId || orderId,
+      // Tìm và update đơn hàng cũ
+      const orderIdStr = String(backendOrderId);
+      const orderIndex = history.findIndex((o: any) =>
+        (o._id && String(o._id) === orderIdStr) ||
+        (o.id && String(o.id) === orderIdStr)
+      );
+
+      const updatedOrder = {
+        id: backendOrderId,
         _id: backendOrderId,
         items: cart,
         total: finalTotal,
         originalTotal: total,
         discount: voucherDiscount,
         voucherCode: appliedVoucher?.code,
+        voucherAppliedAmount: voucherDiscount,
         address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
         payment,
-        status: 'Chờ xác nhận',
-        createdAt: new Date().toISOString()
+        status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
+        createdAt: history[orderIndex]?.createdAt || new Date().toISOString(), // Giữ nguyên createdAt cũ
+        shippingDate: history[orderIndex]?.shippingDate || null,
+        deliveredDate: history[orderIndex]?.deliveredDate || null,
+        cancelledDate: history[orderIndex]?.cancelledDate || null,
+        voucher: appliedVoucher?.code ? { code: appliedVoucher.code } : undefined
       };
-      history.unshift(newOrder);
+
+      if (orderIndex >= 0) {
+        // Update đơn hàng cũ
+        history[orderIndex] = updatedOrder;
+      } else {
+        // Nếu không tìm thấy, thêm vào đầu danh sách
+        history.unshift(updatedOrder);
+      }
+
       await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+    } else if (payment !== 'zalopay') {
+      // COD: Nếu là retry payment, đã được xử lý ở trên
+      // Nếu không phải retry, tạo đơn mới
+      if (!isRetryPayment) {
+        const historyKey = `order_history_${user._id}`;
+        const historyString = await AsyncStorage.getItem(historyKey);
+        let history = historyString ? JSON.parse(historyString) : [];
+        history = Array.isArray(history) ? history : [];
+
+        const newOrder = {
+          id: backendOrderId || orderId,
+          _id: backendOrderId,
+          items: cart,
+          total: finalTotal,
+          originalTotal: total,
+          discount: voucherDiscount,
+          voucherCode: appliedVoucher?.code,
+          address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+          payment,
+          status: 'Chờ xác nhận',
+          createdAt: new Date().toISOString()
+        };
+        history.unshift(newOrder);
+        await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+      }
+      // Nếu là retry payment COD, đã được update ở trên với status 'Chờ xác nhận'
     }
 
     // Nếu là ZaloPay, mở trình duyệt thanh toán

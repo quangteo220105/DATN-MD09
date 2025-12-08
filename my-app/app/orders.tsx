@@ -23,6 +23,7 @@ const STATUS_ORDER = ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng
 
 const STATUS_INFO: Record<string, { emoji: string; color: string }> = {
     'Chờ xác nhận': { emoji: '🛒', color: '#0ea5e9' },
+    'Thanh toán lại': { emoji: '💳', color: '#f59e0b' },
     'Đã xác nhận': { emoji: '📦', color: '#22c55e' },
     'Đang giao hàng': { emoji: '🚚', color: '#f59e0b' },
     'Đã giao hàng': { emoji: '✅', color: '#16a34a' },
@@ -33,6 +34,8 @@ function normalizeStatus(raw?: string) {
     if (!raw) return 'Chờ xác nhận';
     const s = String(raw).trim();
     if (s === 'Đang xử lý' || s.toLowerCase() === 'pending') return 'Chờ xác nhận';
+    // Map "Chờ thanh toán" từ backend thành "Thanh toán lại" để hiển thị
+    if (s.toLowerCase() === 'chờ thanh toán' || s.toLowerCase() === 'waiting payment' || s.toLowerCase() === 'pending payment') return 'Thanh toán lại';
     if (s.toLowerCase() === 'confirmed') return 'Đã xác nhận';
     if (s.toLowerCase() === 'shipping' || s === 'Đang vận chuyển') return 'Đang giao hàng';
     if (s.toLowerCase() === 'delivered') return 'Đã giao hàng';
@@ -53,14 +56,17 @@ function mergeOrderData(localOrder: any, backendOrder: any) {
         items: Array.isArray(backendOrder?.items) && backendOrder.items.length > 0
             ? backendOrder.items
             : (localOrder?.items || []),
-        status: backendOrder?.status ?? localOrder?.status,
+        // 🟢 Ưu tiên status từ backend để cập nhật đúng trạng thái mới nhất
+        // Ví dụ: "Chờ thanh toán" -> "Đã xác nhận" khi thanh toán lại thành công
+        status: backendOrder?.status !== undefined ? backendOrder.status : localOrder?.status,
         payment: backendOrder?.payment ?? localOrder?.payment,
         total: backendOrder?.total ?? localOrder?.total,
         discount: backendOrder?.discount ?? localOrder?.discount,
         voucherCode: backendOrder?.voucherCode ?? localOrder?.voucherCode,
         voucherAppliedAmount: backendOrder?.discount ?? localOrder?.voucherAppliedAmount,
         address: backendOrder?.address ?? localOrder?.address,
-        createdAt: backendOrder?.createdAt ?? localOrder?.createdAt,
+        // 🟢 Giữ nguyên createdAt từ local để không thay đổi thời gian đặt hàng gốc
+        createdAt: localOrder?.createdAt ?? backendOrder?.createdAt,
         shippingDate: backendOrder?.shippingDate ?? localOrder?.shippingDate,
         deliveredDate: backendOrder?.deliveredDate ?? localOrder?.deliveredDate,
         cancelledDate: backendOrder?.cancelledDate ?? localOrder?.cancelledDate,
@@ -103,7 +109,8 @@ export default function OrdersScreen() {
 
             if (Array.isArray(backendList)) {
                 // Lọc đơn hàng: 
-                // - Với ZaloPay: chỉ lấy đơn hàng đã thanh toán thành công (trạng thái "Đã xác nhận" trở lên)
+                // - Với ZaloPay: lấy đơn hàng đã thanh toán thành công (trạng thái "Đã xác nhận" trở lên)
+                //   hoặc đơn hàng "Chờ thanh toán" từ backend (sẽ hiển thị là "Thanh toán lại")
                 //   hoặc đơn hàng đã có trong AsyncStorage (đã được thêm khi thanh toán thành công)
                 // - Với COD: lấy tất cả
                 const filteredBackendOrders = backendList.filter((order: any) => {
@@ -112,11 +119,12 @@ export default function OrdersScreen() {
                         return true;
                     }
 
-                    // ZaloPay: chỉ lấy đơn hàng đã thanh toán thành công
+                    // ZaloPay: lấy đơn hàng đã thanh toán thành công hoặc đang chờ thanh toán (Thanh toán lại)
                     const status = normalizeStatus(order.status);
                     const isPaid = status === 'Đã xác nhận' ||
                         status === 'Đang giao hàng' ||
                         status === 'Đã giao hàng';
+                    const isWaitingPayment = status === 'Thanh toán lại';
 
                     // Hoặc đơn hàng đã có trong AsyncStorage (đã được thêm khi thanh toán thành công)
                     const orderId = order._id || order.id;
@@ -125,32 +133,48 @@ export default function OrdersScreen() {
                         (o.id && String(o.id) === String(orderId))
                     );
 
-                    return isPaid || existsInLocal;
+                    return isPaid || isWaitingPayment || existsInLocal;
                 });
 
                 // Merge với local history (ưu tiên local vì có thể có thông tin chi tiết hơn)
-                const localOrderIds = new Set(
-                    localHistory.map((o: any) => String(o._id || o.id))
-                );
+                // Tạo Set với cả _id và id để đảm bảo match đúng
+                const localOrderIds = new Set<string>();
+                localHistory.forEach((o: any) => {
+                    if (o._id) localOrderIds.add(String(o._id));
+                    if (o.id) localOrderIds.add(String(o.id));
+                });
 
                 const backendOrderMap = new Map<string, any>();
                 filteredBackendOrders.forEach((order: any) => {
                     const orderId = String(order._id || order.id);
+                    // Lưu với cả _id và id làm key để đảm bảo match
                     backendOrderMap.set(orderId, order);
+                    if (order._id && order.id && String(order._id) !== String(order.id)) {
+                        backendOrderMap.set(String(order._id), order);
+                        backendOrderMap.set(String(order.id), order);
+                    }
                 });
 
                 const mergedLocalHistory = localHistory.map((localOrder: any) => {
-                    const orderId = String(localOrder._id || localOrder.id);
-                    const backendOrder = backendOrderMap.get(orderId);
+                    // Tìm backend order bằng cả _id và id
+                    const localId = localOrder._id ? String(localOrder._id) : null;
+                    const localIdAlt = localOrder.id ? String(localOrder.id) : null;
+                    const backendOrder = (localId && backendOrderMap.get(localId)) || 
+                                       (localIdAlt && backendOrderMap.get(localIdAlt)) || 
+                                       null;
                     return mergeOrderData(localOrder, backendOrder);
                 });
 
+                // 🟢 Tìm các đơn hàng từ backend chưa có trong local
+                // Nhưng cần đảm bảo không tạo duplicate nếu đã được merge ở trên
                 const backendOnlyOrders = filteredBackendOrders.filter((o: any) => {
                     const orderId = String(o._id || o.id);
-                    return !localOrderIds.has(orderId);
+                    const orderIdAlt = o._id && o.id && String(o._id) !== String(o.id) ? String(o._id === orderId ? o.id : o._id) : null;
+                    // Chỉ lấy đơn hàng chưa có trong local (chưa được merge)
+                    return !localOrderIds.has(orderId) && (!orderIdAlt || !localOrderIds.has(orderIdAlt));
                 });
 
-                // Kết hợp: local history trước, sau đó là backend orders chưa có trong local
+                // Kết hợp: local history đã merge trước, sau đó là backend orders chưa có trong local
                 const mergedOrders = [...mergedLocalHistory, ...backendOnlyOrders];
 
                 // Sắp xếp theo thời gian tạo (mới nhất trước)
@@ -160,7 +184,9 @@ export default function OrdersScreen() {
                     return timeB - timeA;
                 });
 
-                await AsyncStorage.setItem(historyKey, JSON.stringify(mergedLocalHistory));
+                // 🟢 Lưu mergedOrders (bao gồm cả backendOnlyOrders) vào AsyncStorage
+                // Điều này đảm bảo các đơn hàng mới từ backend cũng được lưu
+                await AsyncStorage.setItem(historyKey, JSON.stringify(mergedOrders));
 
                 // 🟢 Xóa sản phẩm khỏi giỏ hàng nếu đơn hàng đã giao thành công
                 const deliveredOrders = mergedOrders.filter((o: any) => normalizeStatus(o.status) === 'Đã giao hàng');
@@ -230,26 +256,36 @@ export default function OrdersScreen() {
                     const json = await res.json();
                     const list = Array.isArray(json) ? json : json.data || [];
 
-                    // Tìm đơn hàng ZaloPay mới nhất có trạng thái "Đã xác nhận"
-                    // Chỉ lấy đơn hàng được tạo trong vòng 10 phút gần đây để tránh nhầm với đơn cũ
+                    // Tìm đơn hàng ZaloPay mới nhất có trạng thái "Đã xác nhận" hoặc "Chờ xác nhận"
+                    // Bao gồm cả đơn hàng "Thanh toán lại" đã được thanh toán thành công
+                    // Lấy đơn hàng được cập nhật trong vòng 30 phút gần đây để bao gồm cả đơn thanh toán lại
                     const now = Date.now();
-                    const tenMinutesAgo = now - 10 * 60 * 1000;
+                    const thirtyMinutesAgo = now - 30 * 60 * 1000;
 
                     const zalopayOrders = list.filter((o: any) => {
                         if (o.payment !== 'zalopay') return false;
                         const status = normalizeStatus(o.status);
+                        // Lấy đơn hàng đã xác nhận hoặc đang chờ xác nhận (có thể là đơn thanh toán lại thành công)
                         if (status !== 'Đã xác nhận' && status !== 'Chờ xác nhận') return false;
 
-                        // Kiểm tra thời gian tạo (chỉ lấy đơn hàng trong vòng 10 phút)
+                        // Kiểm tra thời gian tạo hoặc cập nhật (lấy đơn hàng trong vòng 30 phút)
                         const createdAt = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-                        return createdAt >= tenMinutesAgo;
+                        const updatedAt = o.updatedAt ? new Date(o.updatedAt).getTime() : 0;
+                        const relevantTime = Math.max(createdAt, updatedAt);
+                        return relevantTime >= thirtyMinutesAgo;
                     });
 
                     if (zalopayOrders.length > 0) {
-                        // Sắp xếp theo thời gian tạo, lấy đơn mới nhất
+                        // Sắp xếp theo thời gian cập nhật hoặc tạo, lấy đơn mới nhất
                         zalopayOrders.sort((a: any, b: any) => {
-                            const timeA = new Date(a.createdAt || 0).getTime();
-                            const timeB = new Date(b.createdAt || 0).getTime();
+                            const timeA = Math.max(
+                                new Date(a.updatedAt || 0).getTime(),
+                                new Date(a.createdAt || 0).getTime()
+                            );
+                            const timeB = Math.max(
+                                new Date(b.updatedAt || 0).getTime(),
+                                new Date(b.createdAt || 0).getTime()
+                            );
                             return timeB - timeA;
                         });
 
@@ -263,35 +299,40 @@ export default function OrdersScreen() {
 
                         // Kiểm tra xem đơn hàng đã tồn tại chưa (theo _id hoặc id)
                         const orderId = latestOrder._id || latestOrder.id;
-                        const exists = history.some((o: any) =>
-                            (o._id && String(o._id) === String(orderId)) ||
-                            (o.id && String(o.id) === String(orderId))
+                        const orderIdStr = String(orderId);
+                        const orderIndex = history.findIndex((o: any) =>
+                            (o._id && String(o._id) === orderIdStr) ||
+                            (o.id && String(o.id) === orderIdStr)
                         );
 
-                        // Nếu chưa tồn tại, thêm vào AsyncStorage
-                        if (!exists) {
-                            const orderToAdd = {
-                                id: latestOrder._id || latestOrder.id,
-                                _id: latestOrder._id,
-                                items: latestOrder.items || [],
-                                total: latestOrder.total || 0,
-                                originalTotal: latestOrder.total || 0,
-                                discount: latestOrder.discount || 0,
-                                voucherCode: latestOrder.voucherCode,
-                                voucherAppliedAmount: latestOrder.discount || 0,
-                                address: latestOrder.address || '',
-                                payment: latestOrder.payment || 'zalopay',
-                                status: latestOrder.status || 'Đã xác nhận',
-                                createdAt: latestOrder.createdAt || new Date().toISOString(),
-                                shippingDate: latestOrder.shippingDate || null,
-                                deliveredDate: latestOrder.deliveredDate || null,
-                                cancelledDate: latestOrder.cancelledDate || null,
-                                voucher: latestOrder.voucherCode ? { code: latestOrder.voucherCode } : undefined
-                            };
+                        // 🟢 Update đơn hàng cũ nếu đã tồn tại, hoặc thêm mới nếu chưa có
+                        const orderData = {
+                            id: latestOrder._id || latestOrder.id,
+                            _id: latestOrder._id,
+                            items: latestOrder.items || [],
+                            total: latestOrder.total || 0,
+                            originalTotal: latestOrder.total || 0,
+                            discount: latestOrder.discount || 0,
+                            voucherCode: latestOrder.voucherCode,
+                            voucherAppliedAmount: latestOrder.discount || 0,
+                            address: latestOrder.address || '',
+                            payment: latestOrder.payment || 'zalopay',
+                            status: latestOrder.status || 'Đã xác nhận',
+                            createdAt: orderIndex >= 0 ? history[orderIndex].createdAt : (latestOrder.createdAt || new Date().toISOString()), // Giữ nguyên createdAt cũ nếu đã tồn tại
+                            shippingDate: latestOrder.shippingDate || null,
+                            deliveredDate: latestOrder.deliveredDate || null,
+                            cancelledDate: latestOrder.cancelledDate || null,
+                            voucher: latestOrder.voucherCode ? { code: latestOrder.voucherCode } : undefined
+                        };
 
-                            history.unshift(orderToAdd);
-                            await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+                        if (orderIndex >= 0) {
+                            // Update đơn hàng cũ (thanh toán lại thành công)
+                            history[orderIndex] = orderData;
+                        } else {
+                            // Thêm đơn hàng mới nếu chưa tồn tại
+                            history.unshift(orderData);
                         }
+                        await AsyncStorage.setItem(historyKey, JSON.stringify(history));
                     }
                 } catch (e) {
                     console.log('Error fetching order after payment success:', e);
@@ -342,6 +383,13 @@ export default function OrdersScreen() {
             return (
                 <View style={[styles.cancelWrap]}>
                     <Text style={[styles.cancelText]}>{STATUS_INFO['Đã hủy'].emoji} Đã hủy</Text>
+                </View>
+            );
+        }
+        if (status === 'Thanh toán lại') {
+            return (
+                <View style={[styles.cancelWrap, { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}>
+                    <Text style={[styles.cancelText, { color: '#f59e0b' }]}>{STATUS_INFO['Thanh toán lại'].emoji} Thanh toán lại</Text>
                 </View>
             );
         }
@@ -522,6 +570,7 @@ export default function OrdersScreen() {
                 {/* Header */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
+                        <Text style={[styles.date, { fontWeight: 'bold', marginBottom: 4 }]}>Mã đơn: {String(item.id || item._id || 'N/A')}</Text>
                         <Text style={styles.date}>Đặt hàng: {created}</Text>
                         {shippingDate && (
                             <Text style={[styles.date, { color: '#f59e0b', fontSize: 12, marginTop: 4 }]}>
@@ -540,14 +589,14 @@ export default function OrdersScreen() {
                         )}
                     </View>
                     {status !== 'Đã hủy' && (
-                        <Text style={[styles.badge, { color: STATUS_INFO[status].color }]}>
-                            {STATUS_INFO[status].emoji} {status}
+                        <Text style={[styles.badge, { color: STATUS_INFO[status]?.color || '#111827' }]}>
+                            {STATUS_INFO[status]?.emoji || ''} {status}
                         </Text>
                     )}
                 </View>
 
-                {/* Stepper - Ẩn khi đơn hàng đã hủy */}
-                {status !== 'Đã hủy' && renderStepper(status)}
+                {/* Stepper - Ẩn khi đơn hàng đã hủy hoặc thanh toán lại */}
+                {status !== 'Đã hủy' && status !== 'Thanh toán lại' && renderStepper(status)}
 
                 {/* Danh sách sản phẩm */}
                 <View style={{ marginTop: 8 }}>
@@ -608,6 +657,15 @@ export default function OrdersScreen() {
                         <Text style={{ color: '#fff', fontWeight: '600' }}>Xem chi tiết</Text>
                     </TouchableOpacity>
 
+                    {status === 'Thanh toán lại' && (
+                        <TouchableOpacity
+                            onPress={() => router.push(`/checkout?orderId=${item._id || item.id}` as any)}
+                            style={[styles.actionBtn, { backgroundColor: '#22c55e' }]}
+                        >
+                            <Text style={{ color: '#fff', fontWeight: '600' }}>Thanh toán lại</Text>
+                        </TouchableOpacity>
+                    )}
+
                     {status === 'Đã giao hàng' && (
                         <TouchableOpacity
                             onPress={() => handleReviewPress(item)}
@@ -617,7 +675,7 @@ export default function OrdersScreen() {
                         </TouchableOpacity>
                     )}
 
-                    {status !== 'Đã hủy' && status !== 'Đã giao hàng' && (
+                    {status !== 'Đã hủy' && status !== 'Đã giao hàng' && status !== 'Thanh toán lại' && (
                         <TouchableOpacity
                             onPress={() => openCancelDialog(item.id || item._id, item._id)}
                             style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
@@ -630,7 +688,7 @@ export default function OrdersScreen() {
         );
     };
 
-    const tabs = useMemo(() => ['Tất cả', ...STATUS_ORDER, 'Đã hủy'], []);
+    const tabs = useMemo(() => ['Tất cả', 'Thanh toán lại', ...STATUS_ORDER, 'Đã hủy'], []);
 
     const filteredOrders = useMemo(() => {
         let filtered = activeTab === 'Tất cả'
@@ -650,7 +708,7 @@ export default function OrdersScreen() {
                 if (status === 'Đang giao hàng' && order.shippingDate) {
                     return new Date(order.shippingDate).getTime();
                 }
-                // Các trạng thái khác (Chờ xác nhận, Đã xác nhận, Đã hủy) dùng createdAt
+                // Các trạng thái khác (Chờ xác nhận, Đã xác nhận, Thanh toán lại, Đã hủy) dùng createdAt
                 return order.createdAt ? new Date(order.createdAt).getTime() : 0;
             };
 

@@ -8,6 +8,7 @@ import { DOMAIN, BASE_URL } from '../../config/apiConfig';
 const STATUS_ORDER = ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng'] as const;
 
 const STATUS_INFO: Record<string, { emoji: string; color: string }> = {
+    'Chờ thanh toán': { emoji: '💳', color: '#f59e0b' },
     'Chờ xác nhận': { emoji: '🛒', color: '#0ea5e9' },
     'Đã xác nhận': { emoji: '📦', color: '#22c55e' },
     'Đang giao hàng': { emoji: '🚚', color: '#f59e0b' },
@@ -19,6 +20,7 @@ function normalizeStatus(raw?: string) {
     if (!raw) return 'Chờ xác nhận';
     const s = String(raw).trim();
     if (s === 'Đang xử lý' || s.toLowerCase() === 'pending') return 'Chờ xác nhận';
+    if (s.toLowerCase() === 'chờ thanh toán' || s.toLowerCase() === 'waiting payment' || s.toLowerCase() === 'pending payment') return 'Chờ thanh toán';
     if (s.toLowerCase() === 'confirmed') return 'Đã xác nhận';
     if (s.toLowerCase() === 'shipping' || s === 'Đang vận chuyển') return 'Đang giao hàng';
     if (s.toLowerCase() === 'delivered') return 'Đã giao hàng';
@@ -43,23 +45,30 @@ export default function OrderDetailScreen() {
             router.replace('/(tabs)/login');
             return;
         }
-        const historyKey = `order_history_${user._id}`;
-        const historyString = await AsyncStorage.getItem(historyKey);
-        let history = historyString ? JSON.parse(historyString) : [];
-        history = Array.isArray(history) ? history : [];
-        let found = history.find((o: any) => String(o.id || o._id) === String(id));
-        if (!found) {
-            // Try fetch from backend when not found locally
-            try {
-                const res = await fetch(`${DOMAIN}/api/orders/${id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && (data._id || data.id)) {
-                        found = data;
-                    }
+
+        // ✅ Luôn load từ backend trước để có dữ liệu mới nhất
+        let found = null;
+        try {
+            const res = await fetch(`${DOMAIN}/api/orders/${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && (data._id || data.id)) {
+                    found = data;
                 }
-            } catch { }
+            }
+        } catch (e) {
+            console.log('Error loading from backend:', e);
         }
+
+        // Nếu backend không có, fallback sang AsyncStorage
+        if (!found) {
+            const historyKey = `order_history_${user._id}`;
+            const historyString = await AsyncStorage.getItem(historyKey);
+            let history = historyString ? JSON.parse(historyString) : [];
+            history = Array.isArray(history) ? history : [];
+            found = history.find((o: any) => String(o.id || o._id) === String(id));
+        }
+
         setOrder(found || null);
     };
 
@@ -98,6 +107,15 @@ export default function OrderDetailScreen() {
         if (order) {
             loadReviews();
         }
+
+        // Auto-refresh mỗi 3 giây để cập nhật trạng thái từ admin
+        const interval = setInterval(() => {
+            loadOrder();
+        }, 3000);
+
+        return () => {
+            clearInterval(interval);
+        };
     }, [id]));
 
     // Pull to refresh
@@ -306,6 +324,10 @@ export default function OrderDetailScreen() {
                     <View style={styles.cancelWrap}>
                         <Text style={styles.cancelText}>{STATUS_INFO['Đã hủy'].emoji} Đã hủy</Text>
                     </View>
+                ) : status === 'Chờ thanh toán' ? (
+                    <View style={[styles.cancelWrap, { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}>
+                        <Text style={[styles.cancelText, { color: '#f59e0b' }]}>{STATUS_INFO['Chờ thanh toán'].emoji} Chờ thanh toán</Text>
+                    </View>
                 ) : (
                     <View style={styles.stepperWrap}>
                         {/* Horizontal line connecting all circles */}
@@ -446,7 +468,14 @@ export default function OrderDetailScreen() {
                             <Text style={styles.actionText}>Đánh giá</Text>
                         </TouchableOpacity>
                     )}
-                    {status !== 'Đã giao hàng' && status !== 'Đã hủy' && (
+                    {status === 'Chờ thanh toán' ? (
+                        <TouchableOpacity
+                            onPress={() => router.push(`/checkout?orderId=${order._id || order.id}` as any)}
+                            style={[styles.actionBtn, { backgroundColor: '#22c55e' }]}
+                        >
+                            <Text style={styles.actionText}>Thanh toán lại</Text>
+                        </TouchableOpacity>
+                    ) : status !== 'Đã giao hàng' && status !== 'Đã hủy' && (
                         <TouchableOpacity onPress={handleCancel} style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}>
                             <Text style={styles.actionText}>Hủy đơn</Text>
                         </TouchableOpacity>
