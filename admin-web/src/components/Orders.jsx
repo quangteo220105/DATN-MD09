@@ -138,6 +138,7 @@ export default function Orders() {
                 setTotal(data.total || list.length);
                 const counts = data.counts || {};
                 setStatusTotals({
+                    "Chờ thanh toán": counts["Chờ thanh toán"] || 0,
                     "Chờ xác nhận": counts["Chờ xác nhận"] || 0,
                     "Đã xác nhận": counts["Đã xác nhận"] || 0,
                     "Đang giao hàng": counts["Đang giao hàng"] || 0,

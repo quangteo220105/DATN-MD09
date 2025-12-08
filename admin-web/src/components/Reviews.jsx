@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 
 const RATING_OPTIONS = [
     { value: "", label: "Tất cả" },
+    { value: "negative", label: "🚫 Tiêu cực" },
     { value: "5", label: "⭐ 5 sao" },
     { value: "4", label: "⭐ 4 sao" },
     { value: "3", label: "⭐ 3 sao" },
@@ -21,6 +22,30 @@ const createDefaultRatingStats = () => ({
         return acc;
     }, {})
 });
+
+// Danh sách từ khóa tiêu cực tiếng Việt
+const NEGATIVE_KEYWORDS = [
+    'tệ', 'dở', 'kém', 'tồi', 'thất vọng', 'không tốt', 'không đẹp', 'xấu',
+    'kém chất lượng', 'chất lượng kém', 'không như mô tả', 'không giống hình',
+    'lừa đảo', 'gian lận', 'không uy tín', 'không đáng tin', 'không nên mua',
+    'rác', 'phí tiền', 'lãng phí', 'không đáng', 'không nên',
+    'hỏng', 'hư', 'lỗi', 'bể', 'rách', 'bong tróc', 'phai màu',
+    'không vừa', 'không đúng size', 'sai size', 'chật', 'rộng quá',
+    'giao hàng chậm', 'ship lâu', 'không giao đúng hẹn', 'thái độ tệ',
+    'không hài lòng', 'thất bại', 'tệ hại', 'kinh khủng', 'khủng khiếp',
+    'không đáng tiền', 'mất tiền oan', 'không đẹp như hình', 'fake',
+    'giả', 'nhái', 'hàng giả', 'hàng nhái', 'không chính hãng',
+    'dm', 'cc', 'đm', 'đcm', 'địt mẹ', 'đụ má', 'đụ mẹ', 'đĩ mẹ', 'đĩ mợ', 'đéo', 'lồn', 'cặc', 'buồi', 'đụ', 'đụt',
+    'lon', 'giày quá chán', 'như cut', 'chán quá', 'chán thật', 'chán vl', 'bực mình', 'ức chế', 'phẫn nộ', 'ghét', 'ghê tởm', 'kinh tởm',
+    'bẩn', 'dơ', 'ô nhiễm',
+];
+
+// Hàm phát hiện bình luận tiêu cực
+const isNegativeComment = (comment) => {
+    if (!comment || typeof comment !== 'string') return false;
+    const lowerComment = comment.toLowerCase().trim();
+    return NEGATIVE_KEYWORDS.some(keyword => lowerComment.includes(keyword));
+};
 
 function normalizeOrderFromReview(review) {
     if (!review) return null;
@@ -224,18 +249,35 @@ export default function Reviews() {
             const pg = Object.prototype.hasOwnProperty.call(override, 'page') ? override.page : page;
             const lim = Object.prototype.hasOwnProperty.call(override, 'limit') ? override.limit : pageSize;
 
+            // Nếu filter là "negative", cần lấy tất cả reviews để lọc ở frontend
+            const isNegativeFilter = rt === 'negative';
+
             const params = new URLSearchParams({
-                page: String(pg),
-                limit: String(lim),
+                page: isNegativeFilter ? '1' : String(pg),
+                limit: isNegativeFilter ? '1000' : String(lim), // Lấy nhiều để lọc
             });
             if ((q || '').trim()) params.append("q", (q || '').trim());
-            if (rt) params.append("rating", rt);
+            if (rt && !isNegativeFilter) params.append("rating", rt);
 
             const listPromise = (async () => {
                 const res = await fetch(`http://localhost:3000/api/reviews?${params.toString()}`);
                 const data = await res.json();
-                const list = Array.isArray(data) ? data : (data.data || []);
-                const totalCount = Array.isArray(data) ? list.length : (data.total || list.length);
+                let list = Array.isArray(data) ? data : (data.data || []);
+
+                // Nếu filter tiêu cực, lọc ở frontend
+                if (isNegativeFilter) {
+                    list = list.filter(review => isNegativeComment(review.comment));
+                }
+
+                const totalCount = list.length;
+
+                // Phân trang thủ công nếu filter tiêu cực
+                if (isNegativeFilter) {
+                    const startIdx = (pg - 1) * lim;
+                    const endIdx = startIdx + lim;
+                    list = list.slice(startIdx, endIdx);
+                }
+
                 return { list, totalCount };
             })();
 
@@ -253,6 +295,30 @@ export default function Reviews() {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteReview = async (reviewId) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá này không?')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`http://localhost:3000/api/reviews/${reviewId}`, {
+                method: 'DELETE',
+            });
+
+            if (res.ok) {
+                alert('Xóa đánh giá thành công');
+                // Refresh lại danh sách
+                fetchReviews();
+            } else {
+                const data = await res.json();
+                alert(data.message || 'Lỗi khi xóa đánh giá');
+            }
+        } catch (e) {
+            console.error('Error deleting review:', e);
+            alert('Lỗi khi xóa đánh giá');
         }
     };
 
@@ -445,9 +511,10 @@ export default function Reviews() {
                                     const orderId = r.orderId?.code || r.orderId?._id || r.orderId || '—';
                                     const products = (r.items || []).slice(0, 2).map((it, idx) => it.name).join(', ');
                                     const moreProducts = (r.items || []).length > 2 ? ` +${(r.items || []).length - 2} sản phẩm khác` : '';
+                                    const hasNegativeComment = isNegativeComment(r.comment);
 
                                     return (
-                                        <tr key={r._id || r.id}>
+                                        <tr key={r._id || r.id} style={hasNegativeComment ? { background: '#fff3f3' } : {}}>
                                             <td style={td}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                     {renderStars(r.rating || 0)}
@@ -472,9 +539,24 @@ export default function Reviews() {
                                             <td style={td}>
                                                 <div style={{ maxWidth: 300, fontSize: 13, color: '#333' }}>
                                                     {r.comment ? (
-                                                        <span title={r.comment}>
-                                                            {r.comment.length > 50 ? `${r.comment.substring(0, 50)}...` : r.comment}
-                                                        </span>
+                                                        <div>
+                                                            <span title={r.comment}>
+                                                                {r.comment.length > 50 ? `${r.comment.substring(0, 50)}...` : r.comment}
+                                                            </span>
+                                                            {hasNegativeComment && (
+                                                                <span style={{
+                                                                    marginLeft: 8,
+                                                                    padding: '2px 6px',
+                                                                    background: '#ff4d4f',
+                                                                    color: '#fff',
+                                                                    borderRadius: 4,
+                                                                    fontSize: 11,
+                                                                    fontWeight: 600
+                                                                }}>
+                                                                    TIÊU CỰC
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     ) : (
                                                         <span style={{ color: '#999' }}>Không có bình luận</span>
                                                     )}
@@ -484,7 +566,20 @@ export default function Reviews() {
                                             <td style={td}>
                                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                                     <button onClick={() => openDetail(r)} style={btnLink}>Chi tiết</button>
-                                                    {/* Nút xóa đã được ẩn */}
+                                                    {hasNegativeComment && (
+                                                        <button
+                                                            onClick={() => handleDeleteReview(r._id || r.id)}
+                                                            style={{
+                                                                ...btn,
+                                                                background: '#ff4d4f',
+                                                                color: '#fff',
+                                                                fontSize: 12,
+                                                                padding: '4px 8px'
+                                                            }}
+                                                        >
+                                                            Xóa
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
