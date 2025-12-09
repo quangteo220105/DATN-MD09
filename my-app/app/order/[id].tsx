@@ -302,7 +302,7 @@ export default function OrderDetailScreen() {
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={{ flex: 1, marginRight: 8 }}>
-                        <Text style={styles.orderCode}>Mã đơn: {String(order.id || order._id)}</Text>
+                        <Text style={styles.orderCode}>Mã đơn: {String(order.code || order._id || order.id)}</Text>
                         <Text style={styles.meta}>Đặt hàng: {created}</Text>
                         {shippingDate && (
                             <Text style={[styles.meta, { color: '#f59e0b', marginTop: 4 }]}>

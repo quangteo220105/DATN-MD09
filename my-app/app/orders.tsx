@@ -159,9 +159,9 @@ export default function OrdersScreen() {
                     // Tìm backend order bằng cả _id và id
                     const localId = localOrder._id ? String(localOrder._id) : null;
                     const localIdAlt = localOrder.id ? String(localOrder.id) : null;
-                    const backendOrder = (localId && backendOrderMap.get(localId)) || 
-                                       (localIdAlt && backendOrderMap.get(localIdAlt)) || 
-                                       null;
+                    const backendOrder = (localId && backendOrderMap.get(localId)) ||
+                        (localIdAlt && backendOrderMap.get(localIdAlt)) ||
+                        null;
                     return mergeOrderData(localOrder, backendOrder);
                 });
 
@@ -570,7 +570,7 @@ export default function OrdersScreen() {
                 {/* Header */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
-                        <Text style={[styles.date, { fontWeight: 'bold', marginBottom: 4 }]}>Mã đơn: {String(item.id || item._id || 'N/A')}</Text>
+                        <Text style={[styles.date, { fontWeight: 'bold', marginBottom: 4 }]}>Mã đơn: {String(item.code || item._id || item.id || 'N/A')}</Text>
                         <Text style={styles.date}>Đặt hàng: {created}</Text>
                         {shippingDate && (
                             <Text style={[styles.date, { color: '#f59e0b', fontSize: 12, marginTop: 4 }]}>
