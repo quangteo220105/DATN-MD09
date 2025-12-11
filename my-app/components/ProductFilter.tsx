@@ -6,7 +6,6 @@ import {
     TouchableOpacity,
     StyleSheet,
     ScrollView,
-    TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -154,37 +153,6 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                         {/* Khoảng giá */}
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Khoảng giá</Text>
-                            <View style={styles.priceInputRow}>
-                                <View style={styles.priceInputWrapper}>
-                                    <Text style={styles.priceLabel}>Từ</Text>
-                                    <TextInput
-                                        style={styles.priceInput}
-                                        value={priceMin === 0 ? '' : priceMin.toLocaleString('vi-VN')}
-                                        onChangeText={(text) => {
-                                            const num = parseInt(text.replace(/\D/g, '')) || 0;
-                                            setPriceMin(num);
-                                        }}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                    />
-                                    <Text style={styles.priceCurrency}>đ</Text>
-                                </View>
-                                <Text style={styles.priceSeparator}>-</Text>
-                                <View style={styles.priceInputWrapper}>
-                                    <Text style={styles.priceLabel}>Đến</Text>
-                                    <TextInput
-                                        style={styles.priceInput}
-                                        value={priceMax === 10000000 ? '' : priceMax.toLocaleString('vi-VN')}
-                                        onChangeText={(text) => {
-                                            const num = parseInt(text.replace(/\D/g, '')) || 10000000;
-                                            setPriceMax(num);
-                                        }}
-                                        keyboardType="numeric"
-                                        placeholder="10,000,000"
-                                    />
-                                    <Text style={styles.priceCurrency}>đ</Text>
-                                </View>
-                            </View>
                             {/* Quick price range buttons */}
                             <View style={styles.quickPriceContainer}>
                                 {quickRanges.map((range) => (
@@ -320,9 +288,9 @@ const styles = StyleSheet.create({
     summaryRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12,
-        paddingHorizontal: 20,
-        paddingVertical: 14,
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         backgroundColor: '#f1f5f9',
         borderBottomWidth: 1,
         borderBottomColor: '#e2e8f0',
@@ -330,24 +298,26 @@ const styles = StyleSheet.create({
     summaryCard: {
         width: '47%',
         backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 12,
+        borderRadius: 10,
+        padding: 8,
         borderWidth: 1,
         borderColor: '#e3e8ff',
         shadowColor: '#0f172a',
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
     },
     summaryLabel: {
-        fontSize: 12,
+        fontSize: 10,
         color: '#94a3b8',
-        marginBottom: 4,
+        marginBottom: 2,
+        fontWeight: '500',
     },
     summaryValue: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: '#0f172a',
+        lineHeight: 16,
     },
     content: {
         paddingHorizontal: 24,
@@ -417,61 +387,12 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontWeight: '700',
     },
-    priceInputRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        marginBottom: 16,
-        marginTop: 8,
-    },
-    priceInputWrapper: {
-        flex: 1,
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        shadowColor: '#0f172a',
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-        elevation: 2,
-    },
-    priceLabel: {
-        fontSize: 13,
-        color: '#666',
-        marginBottom: 8,
-        fontWeight: '600',
-    },
-    priceInput: {
-        borderWidth: 2,
-        borderColor: '#E5E5E5',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 14,
-        fontSize: 15,
-        color: '#1A1A1A',
-        backgroundColor: '#FAFAFA',
-        fontWeight: '600',
-    },
-    priceCurrency: {
-        position: 'absolute',
-        right: 14,
-        bottom: 14,
-        fontSize: 15,
-        color: '#888',
-        fontWeight: '600',
-    },
-    priceSeparator: {
-        marginHorizontal: 14,
-        fontSize: 18,
-        color: '#999',
-        fontWeight: '700',
-        marginBottom: 12,
-    },
+
     quickPriceContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 12,
-        marginTop: 16,
+        marginTop: 8,
     },
     quickPriceBtn: {
         paddingHorizontal: 12,
@@ -541,52 +462,52 @@ const styles = StyleSheet.create({
     },
     footer: {
         flexDirection: 'row',
-        paddingHorizontal: 24,
-        paddingTop: 16,
-        paddingBottom: 16,
-        gap: 14,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
+        gap: 10,
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
         backgroundColor: '#f8fafc',
         shadowColor: '#0f172a',
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        elevation: 8,
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 4,
     },
     resetBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 15,
-        borderRadius: 14,
+        paddingVertical: 10,
+        borderRadius: 10,
         backgroundColor: '#F5F5F5',
-        borderWidth: 1.5,
+        borderWidth: 1,
         borderColor: '#E0E0E0',
-        gap: 8,
+        gap: 6,
     },
     resetBtnText: {
-        fontSize: 15,
-        fontWeight: '700',
+        fontSize: 13,
+        fontWeight: '600',
         color: '#555',
     },
     applyBtn: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 15,
-        borderRadius: 14,
+        paddingVertical: 10,
+        borderRadius: 10,
         backgroundColor: '#FF4757',
         shadowColor: '#FF4757',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     applyBtnText: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 14,
+        fontWeight: '600',
         color: '#FFFFFF',
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
     },
 });
