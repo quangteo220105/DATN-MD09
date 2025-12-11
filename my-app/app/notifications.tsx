@@ -36,6 +36,7 @@ export default function NotificationsScreen() {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [userId, setUserId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'all' | 'chat' | 'voucher' | 'order'>('all');
 
     const loadUserId = async () => {
         try {
@@ -95,18 +96,18 @@ export default function NotificationsScreen() {
                     const historyStr = await AsyncStorage.getItem(historyKey);
                     const history = historyStr ? JSON.parse(historyStr) : [];
                     if (Array.isArray(history)) source = history;
-                } catch {}
+                } catch { }
             }
 
             // Debug: log để kiểm tra
             console.log('[Notifications] Total orders:', source.length);
-            
+
             // Lọc đơn hàng đã giao - kiểm tra kỹ hơn
             const delivered = source.filter((o: any) => {
                 const rawStatus = String(o?.status || '').trim();
                 const normalized = normalizeStatus(rawStatus);
                 // Kiểm tra nhiều cách: normalized status, raw status, hoặc có chứa "giao hàng"
-                const isDelivered = normalized === 'Đã giao hàng' 
+                const isDelivered = normalized === 'Đã giao hàng'
                     || rawStatus === 'Đã giao hàng'
                     || rawStatus.toLowerCase().includes('giao hàng')
                     || rawStatus.toLowerCase() === 'delivered';
@@ -133,19 +134,19 @@ export default function NotificationsScreen() {
                 } else if (typeof parsed === 'object') {
                     notifiedMap = parsed;
                 }
-            } catch {}
+            } catch { }
 
             console.log('[Notifications] Already notified IDs count:', Object.keys(notifiedMap).length);
 
             // Chỉ lấy đơn hàng chưa thông báo HOẶC được cập nhật gần đây (trong 7 ngày)
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            
+
             const newDelivered = delivered.filter((o: any) => {
                 const orderId = String(o._id || o.id);
                 const lastNotifiedAt = notifiedMap[orderId];
                 const isNew = !lastNotifiedAt;
-                
+
                 // Nếu đã thông báo trước đó, kiểm tra xem đơn hàng có được cập nhật gần đây không
                 let shouldNotify = isNew;
                 if (!isNew && o.updatedAt) {
@@ -164,13 +165,13 @@ export default function NotificationsScreen() {
                     // Nếu không có updatedAt (một số bản ghi cũ), cho phép thông báo một lần
                     shouldNotify = true;
                 }
-                
+
                 if (shouldNotify) {
                     console.log('[Notifications] ✅ Will notify order:', orderId, 'Status:', o.status, 'UpdatedAt:', o.updatedAt || 'N/A');
                 } else {
                     console.log('[Notifications] ⏭️ Skip order (already notified):', orderId);
                 }
-                
+
                 return shouldNotify;
             });
 
@@ -286,7 +287,7 @@ export default function NotificationsScreen() {
                 // Cập nhật mốc đã xem thông báo để tính voucher mới
                 const now = new Date().toISOString();
                 try { await AsyncStorage.setItem('notifications_last_seen', now); } catch { }
-                
+
                 // Đánh dấu order notifications là đã đọc khi vào màn hình (nhưng KHÔNG đánh dấu chat)
                 try {
                     const uid = userId || await loadUserId();
@@ -299,11 +300,11 @@ export default function NotificationsScreen() {
                             const updated = cached.map((n: any) => ({ ...n, read: true }));
                             await AsyncStorage.setItem(cacheKey, JSON.stringify(updated));
                         }
-                        
+
                         // KHÔNG đánh dấu tin nhắn chat là đã đọc ở đây - chỉ đánh dấu khi người dùng bấm vào thông báo chat
                     }
-                } catch {}
-                
+                } catch { }
+
                 await refresh();
             })();
         }, [userId])
@@ -334,7 +335,7 @@ export default function NotificationsScreen() {
                     // đồng bộ state hiện tại
                     setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
                 }
-            } catch {}
+            } catch { }
             router.push('/orders');
             return;
         }
@@ -361,22 +362,96 @@ export default function NotificationsScreen() {
         );
     };
 
+    // Lọc thông báo theo tab
+    const filteredNotifications = notifications.filter(item => {
+        if (activeTab === 'all') return true;
+        return item.type === activeTab;
+    });
+
+    // Đếm số lượng thông báo theo loại
+    const counts = {
+        all: notifications.length,
+        chat: notifications.filter(n => n.type === 'chat').length,
+        voucher: notifications.filter(n => n.type === 'voucher').length,
+        order: notifications.filter(n => n.type === 'order').length,
+    };
+
+    const tabs = [
+        { key: 'all', label: 'Tất cả', icon: 'notifications', count: counts.all },
+        { key: 'chat', label: 'Tin nhắn', icon: 'chatbubbles', count: counts.chat },
+        { key: 'voucher', label: 'Ưu đãi', icon: 'pricetags', count: counts.voucher },
+        { key: 'order', label: 'Đơn hàng', icon: 'cube', count: counts.order },
+    ];
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
-            <View style={{ padding: 16 }}>
-                {notifications.length === 0 ? (
+            {/* Header với tabs */}
+            <View style={styles.header}>
+                <View style={styles.tabContainer}>
+                    {tabs.map((tab) => (
+                        <TouchableOpacity
+                            key={tab.key}
+                            style={[
+                                styles.tab,
+                                activeTab === tab.key && styles.tabActive
+                            ]}
+                            onPress={() => setActiveTab(tab.key as any)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.tabContent}>
+                                <View style={styles.tabIconContainer}>
+                                    <Ionicons
+                                        name={tab.icon as any}
+                                        size={18}
+                                        color={activeTab === tab.key ? '#fff' : '#666'}
+                                    />
+                                    {tab.count > 0 && (
+                                        <View style={[
+                                            styles.badge,
+                                            activeTab === tab.key && styles.badgeActive
+                                        ]}>
+                                            <Text style={[
+                                                styles.badgeText,
+                                                activeTab === tab.key && styles.badgeTextActive
+                                            ]}>
+                                                {tab.count > 99 ? '99+' : tab.count}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <Text style={[
+                                    styles.tabText,
+                                    activeTab === tab.key && styles.tabTextActive
+                                ]}>
+                                    {tab.label}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {/* Nội dung thông báo */}
+            <View style={{ flex: 1, padding: 16 }}>
+                {filteredNotifications.length === 0 ? (
                     <View style={styles.empty}>
                         <Ionicons name="notifications-off-outline" size={42} color="#bbb" />
-                        <Text style={styles.emptyText}>Chưa có thông báo</Text>
+                        <Text style={styles.emptyText}>
+                            {activeTab === 'all' ? 'Chưa có thông báo' :
+                                activeTab === 'chat' ? 'Chưa có tin nhắn mới' :
+                                    activeTab === 'voucher' ? 'Chưa có ưu đãi mới' :
+                                        'Chưa có thông báo đơn hàng'}
+                        </Text>
                     </View>
                 ) : (
                     <FlatList
-                        data={notifications}
+                        data={filteredNotifications}
                         keyExtractor={(item) => item.id}
                         renderItem={renderItem}
                         contentContainerStyle={{ paddingVertical: 4 }}
                         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
                         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+                        showsVerticalScrollIndicator={false}
                     />
                 )}
             </View>
@@ -385,7 +460,95 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-    pageTitle: { fontSize: 20, fontWeight: 'bold', color: '#222', marginBottom: 12 },
+    header: {
+        backgroundColor: '#fff',
+        paddingTop: 16,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2
+    },
+    pageTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#1a1a1a',
+        marginBottom: 20,
+        textAlign: 'center'
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#f8f9fa',
+        borderRadius: 25,
+        padding: 4,
+        marginBottom: 8
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderRadius: 20,
+        backgroundColor: 'transparent',
+        marginHorizontal: 2
+    },
+    tabActive: {
+        backgroundColor: '#007bff',
+        shadowColor: '#007bff',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4
+    },
+    tabContent: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6
+    },
+    tabIconContainer: {
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    tabText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#666',
+        textAlign: 'center'
+    },
+    tabTextActive: {
+        color: '#fff',
+        fontWeight: '700'
+    },
+    badge: {
+        position: 'absolute',
+        top: -8,
+        right: -8,
+        backgroundColor: '#ff4757',
+        borderRadius: 10,
+        minWidth: 16,
+        height: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 2,
+        borderColor: '#fff'
+    },
+    badgeActive: {
+        backgroundColor: '#fff',
+        borderColor: '#007bff'
+    },
+    badgeText: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: '#fff'
+    },
+    badgeTextActive: {
+        color: '#ff4757'
+    },
     card: {
         backgroundColor: '#fff',
         borderRadius: 12,
@@ -397,11 +560,32 @@ const styles = StyleSheet.create({
         borderColor: '#bae6fd',
         backgroundColor: '#f0f9ff'
     },
-    title: { fontSize: 15, fontWeight: '700', color: '#111' },
-    message: { marginTop: 6, color: '#444' },
-    time: { marginTop: 8, fontSize: 12, color: '#777' },
-    empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 10 },
-    emptyText: { color: '#999' }
+    title: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#111'
+    },
+    message: {
+        marginTop: 6,
+        color: '#444',
+        lineHeight: 18
+    },
+    time: {
+        marginTop: 8,
+        fontSize: 12,
+        color: '#777'
+    },
+    empty: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 60,
+        gap: 12
+    },
+    emptyText: {
+        color: '#999',
+        fontSize: 16,
+        textAlign: 'center'
+    }
 });
 
 
