@@ -1,6 +1,64 @@
 import React, { useEffect, useState, useRef } from "react";
 
 export default function ManagerDashboard() {
+    // Add CSS animations and styles
+    useEffect(() => {
+        const styleSheet = document.createElement("style");
+        styleSheet.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes slideUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            input:focus, select:focus, textarea:focus {
+                outline: none;
+                border-color: #667eea !important;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+            }
+            input[type="number"] {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .variantCard {
+                overflow: visible !important;
+            }
+            .variantFormGrid > * {
+                min-width: 0;
+                overflow: hidden;
+            }
+            button:hover {
+                transform: translateY(-2px);
+            }
+            button:active {
+                transform: translateY(0);
+            }
+            .variantCard:hover {
+                border-color: #cbd5e1 !important;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+            }
+            .imagePreviewContainer:hover .imagePreviewOverlay {
+                opacity: 1 !important;
+            }
+        `;
+        document.head.appendChild(styleSheet);
+        return () => {
+            if (document.head.contains(styleSheet)) {
+                document.head.removeChild(styleSheet);
+            }
+        };
+    }, []);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -476,176 +534,267 @@ export default function ManagerDashboard() {
 
             {/* ===== Modal Thêm/Sửa sản phẩm ===== */}
             {showModal && (
-                <div style={styles.modalOverlay}>
+                <div style={styles.modalOverlay} onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                        setShowModal(false);
+                        setEditingProduct(null);
+                        resetForm();
+                    }
+                }}>
                     <div style={styles.modal}>
-                        <h3 style={{ marginBottom: 16 }}>{editingProduct ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}</h3>
-
-                        <div style={styles.formGroup}>
-                            <label>Tên sản phẩm:</label>
-                            <input
-                                type="text"
-                                value={formProduct.name}
-                                onChange={(e) => setFormProduct({ ...formProduct, name: e.target.value })}
-                            />
-                        </div>
-
-                        <div style={styles.formGroup}>
-                            <label>Thương hiệu:</label>
-                            <input
-                                type="text"
-                                value={formProduct.brand}
-                                onChange={(e) => setFormProduct({ ...formProduct, brand: e.target.value })}
-                            />
-                        </div>
-
-                        <div style={styles.formGroup}>
-                            <label>Mô tả:</label>
-                            <textarea
-                                value={formProduct.description}
-                                onChange={(e) => setFormProduct({ ...formProduct, description: e.target.value })}
-                            />
-                        </div>
-
-                        <div style={styles.formGroup}>
-                            <label>Danh mục:</label>
-                            <select
-                                value={formProduct.categoryId}
-                                onChange={(e) => setFormProduct({ ...formProduct, categoryId: e.target.value })}
+                        {/* Header */}
+                        <div style={styles.modalHeader}>
+                            <div>
+                                <h2 style={styles.modalTitle}>
+                                    {editingProduct ? "✏️ Chỉnh sửa sản phẩm" : "➕ Thêm sản phẩm mới"}
+                                </h2>
+                                <p style={styles.modalSubtitle}>
+                                    {editingProduct ? "Cập nhật thông tin sản phẩm" : "Điền thông tin để tạo sản phẩm mới"}
+                                </p>
+                            </div>
+                            <button
+                                style={styles.closeBtn}
+                                onClick={() => {
+                                    setShowModal(false);
+                                    setEditingProduct(null);
+                                    resetForm();
+                                }}
+                                title="Đóng"
                             >
-                                <option value="">-- Chọn danh mục --</option>
-                                {categories.map((c) => (
-                                    <option key={c._id} value={c._id}>{c.name}</option>
-                                ))}
-                            </select>
+                                ×
+                            </button>
                         </div>
 
-                        <div style={styles.formGroup}>
-                            <label>Trạng thái:</label>
-                            <select
-                                value={formProduct.isActive}
-                                onChange={(e) => setFormProduct({ ...formProduct, isActive: e.target.value === "true" })}
-                            >
-                                <option value="true">Còn hàng</option>
-                                <option value="false">Ngừng kinh doanh</option>
-                            </select>
-                        </div>
+                        {/* Main Form Content */}
+                        <div style={styles.modalBody}>
+                            {/* Thông tin cơ bản */}
+                            <div style={styles.formSection}>
+                                <h3 style={styles.sectionTitle}>📋 Thông tin cơ bản</h3>
+                                <div style={styles.formGrid}>
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>
+                                            Tên sản phẩm <span style={styles.required}>*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            style={styles.input}
+                                            placeholder="Nhập tên sản phẩm"
+                                            value={formProduct.name}
+                                            onChange={(e) => setFormProduct({ ...formProduct, name: e.target.value })}
+                                        />
+                                    </div>
 
-                        <div style={styles.variantsSection}>
-                            <div style={styles.variantsHeader}>
-                                <h4>Biến thể sản phẩm</h4>
-                                <button type="button" style={styles.addVariantBtn} onClick={addVariant}>
-                                    + Thêm biến thể
-                                </button>
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>
+                                            Thương hiệu
+                                        </label>
+                                        <input
+                                            type="text"
+                                            style={styles.input}
+                                            placeholder="Nhập thương hiệu"
+                                            value={formProduct.brand}
+                                            onChange={(e) => setFormProduct({ ...formProduct, brand: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>
+                                            Danh mục <span style={styles.required}>*</span>
+                                        </label>
+                                        <select
+                                            style={styles.select}
+                                            value={formProduct.categoryId}
+                                            onChange={(e) => setFormProduct({ ...formProduct, categoryId: e.target.value })}
+                                        >
+                                            <option value="">-- Chọn danh mục --</option>
+                                            {categories.map((c) => (
+                                                <option key={c._id} value={c._id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>
+                                            Trạng thái
+                                        </label>
+                                        <select
+                                            style={styles.select}
+                                            value={formProduct.isActive}
+                                            onChange={(e) => setFormProduct({ ...formProduct, isActive: e.target.value === "true" })}
+                                        >
+                                            <option value="true">✅ Còn hàng</option>
+                                            <option value="false">⏸️ Ngừng kinh doanh</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style={styles.formGroup}>
+                                    <label style={styles.label}>
+                                        Mô tả sản phẩm
+                                    </label>
+                                    <textarea
+                                        style={styles.textarea}
+                                        placeholder="Nhập mô tả chi tiết về sản phẩm..."
+                                        rows={4}
+                                        value={formProduct.description}
+                                        onChange={(e) => setFormProduct({ ...formProduct, description: e.target.value })}
+                                    />
+                                </div>
                             </div>
 
-                            <div style={styles.variantGrid}>
-                                {formProduct.variants.map((variant, index) => (
-                                    <div
-                                        key={index}
-                                        style={styles.variantCard}
-                                        ref={index === formProduct.variants.length - 1 ? lastVariantRef : null}
-                                    >
-                                        <div style={styles.variantHeader}>
-                                            <h5>Biến thể {index + 1}</h5>
-                                            <div style={styles.variantHeaderActions}>
-                                                <button
-                                                    type="button"
-                                                    style={styles.addInlineBtn}
-                                                    onClick={addVariant}
-                                                    title="Thêm biến thể"
-                                                >
-                                                    +
-                                                </button>
-                                                {formProduct.variants.length > 1 && (
+                            {/* Biến thể sản phẩm */}
+                            <div style={styles.variantsSection}>
+                                <div style={styles.variantsHeader}>
+                                    <div>
+                                        <h3 style={styles.sectionTitle}>🎨 Biến thể sản phẩm</h3>
+                                        <p style={styles.sectionDescription}>
+                                            Thêm các biến thể với size, màu sắc, giá và số lượng khác nhau
+                                        </p>
+                                    </div>
+                                    <button type="button" style={styles.addVariantBtn} onClick={addVariant}>
+                                        ➕ Thêm biến thể
+                                    </button>
+                                </div>
+
+                                <div style={styles.variantGrid}>
+                                    {formProduct.variants.map((variant, index) => (
+                                        <div
+                                            key={index}
+                                            className="variantCard"
+                                            style={styles.variantCard}
+                                            ref={index === formProduct.variants.length - 1 ? lastVariantRef : null}
+                                        >
+                                            <div style={styles.variantHeader}>
+                                                <div style={styles.variantHeaderLeft}>
+                                                    <div style={styles.variantNumberBadge}>
+                                                        #{index + 1}
+                                                    </div>
+                                                    <h5 style={styles.variantTitle}>Biến thể {index + 1}</h5>
+                                                </div>
+                                                <div style={styles.variantHeaderActions}>
                                                     <button
                                                         type="button"
-                                                        style={styles.removeVariantBtn}
-                                                        onClick={() => removeVariant(index)}
-                                                        title="Xóa biến thể này"
+                                                        style={styles.addInlineBtn}
+                                                        onClick={addVariant}
+                                                        title="Thêm biến thể mới"
                                                     >
-                                                        ×
+                                                        ➕
                                                     </button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div style={styles.variantRow}>
-                                            <div style={styles.inputGroup}>
-                                                <label>Size:</label>
-                                                <input
-                                                    placeholder="VD: 40, 41, 42..."
-                                                    value={variant.size}
-                                                    onChange={(e) => updateVariant(index, 'size', e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div style={styles.inputGroup}>
-                                                <label>Màu:</label>
-                                                <input
-                                                    placeholder="VD: Đen, Trắng, Xanh..."
-                                                    value={variant.color}
-                                                    onChange={(e) => updateVariant(index, 'color', e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div style={styles.inputGroup}>
-                                                <label>Giá bán:</label>
-                                                <input
-                                                    placeholder="Giá bán"
-                                                    type="number"
-                                                    value={variant.currentPrice}
-                                                    onChange={(e) => updateVariant(index, 'currentPrice', e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div style={styles.inputGroup}>
-                                                <label>Số lượng:</label>
-                                                <input
-                                                    placeholder="Số lượng"
-                                                    type="number"
-                                                    value={variant.stock}
-                                                    onChange={(e) => updateVariant(index, 'stock', e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div style={styles.inputGroup}>
-                                                <label>Ảnh:</label>
-                                                <div style={styles.imageUpload}>
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        onChange={(e) => {
-                                                            if (e.target.files && e.target.files[0]) {
-                                                                updateVariantImage(index, e.target.files[0]);
-                                                            }
-                                                        }}
-                                                    />
-                                                    {/* Preview ảnh */}
-                                                    {(variant.imageFile || variant.existingImage) && (
-                                                        <img
-                                                            src={variant.imageFile ?
-                                                                URL.createObjectURL(variant.imageFile) :
-                                                                `http://localhost:3000${variant.existingImage}`
-                                                            }
-                                                            alt="Preview"
-                                                            style={styles.previewImage}
-                                                        />
+                                                    {formProduct.variants.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            style={styles.removeVariantBtn}
+                                                            onClick={() => removeVariant(index)}
+                                                            title="Xóa biến thể này"
+                                                        >
+                                                            🗑️
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
+
+                                            <div style={styles.variantContent}>
+                                                <div style={styles.variantFormGrid}>
+                                                    <div style={styles.inputGroup}>
+                                                        <label style={styles.variantLabel}>
+                                                            Size <span style={styles.required}>*</span>
+                                                        </label>
+                                                        <input
+                                                            style={styles.variantInput}
+                                                            placeholder="VD: 40, 41, 42..."
+                                                            value={variant.size}
+                                                            onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    <div style={styles.inputGroup}>
+                                                        <label style={styles.variantLabel}>
+                                                            Màu sắc <span style={styles.required}>*</span>
+                                                        </label>
+                                                        <input
+                                                            style={styles.variantInput}
+                                                            placeholder="VD: Đen, Trắng, Xanh..."
+                                                            value={variant.color}
+                                                            onChange={(e) => updateVariant(index, 'color', e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    <div style={styles.inputGroup}>
+                                                        <label style={styles.variantLabel}>
+                                                            Giá bán (₫) <span style={styles.required}>*</span>
+                                                        </label>
+                                                        <input
+                                                            style={styles.variantInput}
+                                                            placeholder="Nhập giá bán"
+                                                            type="number"
+                                                            min="0"
+                                                            value={variant.currentPrice}
+                                                            onChange={(e) => updateVariant(index, 'currentPrice', e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    <div style={styles.inputGroup}>
+                                                        <label style={styles.variantLabel}>
+                                                            Số lượng <span style={styles.required}>*</span>
+                                                        </label>
+                                                        <input
+                                                            style={styles.variantInput}
+                                                            placeholder="Nhập số lượng"
+                                                            type="number"
+                                                            min="0"
+                                                            value={variant.stock}
+                                                            onChange={(e) => updateVariant(index, 'stock', e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div style={styles.imageUploadSection}>
+                                                    <label style={styles.variantLabel}>
+                                                        Ảnh sản phẩm <span style={styles.required}>*</span>
+                                                    </label>
+                                                    <div style={styles.imageUploadContainer}>
+                                                        <label style={styles.imageUploadLabel}>
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                style={{ display: 'none' }}
+                                                                onChange={(e) => {
+                                                                    if (e.target.files && e.target.files[0]) {
+                                                                        updateVariantImage(index, e.target.files[0]);
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <div style={styles.imageUploadButton}>
+                                                                📷 Chọn ảnh
+                                                            </div>
+                                                        </label>
+                                                        {/* Preview ảnh */}
+                                                        {(variant.imageFile || variant.existingImage) && (
+                                                            <div className="imagePreviewContainer" style={styles.imagePreviewContainer}>
+                                                                <img
+                                                                    src={variant.imageFile ?
+                                                                        URL.createObjectURL(variant.imageFile) :
+                                                                        `http://localhost:3000${variant.existingImage}`
+                                                                    }
+                                                                    alt="Preview"
+                                                                    style={styles.previewImage}
+                                                                />
+                                                                <div className="imagePreviewOverlay" style={styles.imagePreviewOverlay}>
+                                                                    <span style={styles.imagePreviewText}>Xem trước</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
+                        {/* Footer Actions */}
                         <div style={styles.modalActions}>
-                            <button
-                                style={styles.primaryBtn}
-                                onClick={editingProduct ? handleUpdate : handleSubmit}
-                            >
-                                {editingProduct ? "Cập nhật" : "Lưu"}
-                            </button>
                             <button
                                 style={styles.cancelBtn}
                                 onClick={() => {
@@ -654,7 +803,13 @@ export default function ManagerDashboard() {
                                     resetForm();
                                 }}
                             >
-                                Hủy
+                                ❌ Hủy
+                            </button>
+                            <button
+                                style={styles.saveBtn}
+                                onClick={editingProduct ? handleUpdate : handleSubmit}
+                            >
+                                {editingProduct ? "💾 Cập nhật sản phẩm" : "✅ Lưu sản phẩm"}
                             </button>
                         </div>
                     </div>
@@ -772,153 +927,397 @@ const styles = {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
-        backdropFilter: "blur(4px)",
+        backgroundColor: "rgba(0, 0, 0, 0.65)",
+        backdropFilter: "blur(8px)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         zIndex: 999,
         padding: "20px",
+        animation: "fadeIn 0.2s ease-out",
     },
     modal: {
         backgroundColor: "#ffffff",
-        padding: "32px",
-        borderRadius: "16px",
-        width: "90%",
-        maxWidth: "1000px",
-        maxHeight: "90vh",
-        overflowY: "auto",
+        padding: 0,
+        borderRadius: "20px",
+        width: "95%",
+        maxWidth: "1200px",
+        maxHeight: "95vh",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        boxShadow: "0 25px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08)",
+        animation: "slideUp 0.3s ease-out",
+    },
+    modalHeader: {
+        padding: "28px 32px",
+        borderBottom: "2px solid #f1f5f9",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        color: "#ffffff",
+    },
+    modalTitle: {
+        margin: 0,
+        fontSize: "24px",
+        fontWeight: 700,
+        color: "#ffffff",
+        letterSpacing: "-0.5px",
+    },
+    modalSubtitle: {
+        margin: "6px 0 0 0",
+        fontSize: "14px",
+        color: "rgba(255, 255, 255, 0.9)",
+        fontWeight: 400,
+    },
+    closeBtn: {
+        backgroundColor: "rgba(255, 255, 255, 0.2)",
+        border: "none",
+        borderRadius: "50%",
+        width: "36px",
+        height: "36px",
+        cursor: "pointer",
+        fontSize: "24px",
+        color: "#ffffff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.2s ease",
+        fontWeight: 300,
+        lineHeight: 1,
+    },
+    modalBody: {
+        padding: "32px",
+        overflowY: "auto",
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        gap: "32px",
+    },
+    formSection: {
+        backgroundColor: "#f8fafc",
+        padding: "24px",
+        borderRadius: "16px",
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+    },
+    sectionTitle: {
+        fontSize: "18px",
+        fontWeight: 700,
+        color: "#1e293b",
+        margin: "0 0 8px 0",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+    },
+    sectionDescription: {
+        fontSize: "13px",
+        color: "#64748b",
+        margin: "0 0 20px 0",
+    },
+    formGrid: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
         gap: "20px",
-        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)",
-        animation: "modalFadeIn 0.2s ease-out",
+        marginBottom: "20px",
+        width: "100%",
+        boxSizing: "border-box",
     },
     formGroup: {
         display: "flex",
         flexDirection: "column",
-        marginBottom: "16px",
+        gap: "8px",
+    },
+    label: {
+        fontSize: "14px",
+        fontWeight: 600,
+        color: "#334155",
+        marginBottom: "4px",
+    },
+    required: {
+        color: "#ef4444",
+        marginLeft: "2px",
+    },
+    input: {
+        padding: "12px 16px",
+        border: "2px solid #e2e8f0",
+        borderRadius: "10px",
+        fontSize: "14px",
+        transition: "all 0.2s ease",
+        backgroundColor: "#ffffff",
+        fontFamily: "inherit",
+        width: "100%",
+        boxSizing: "border-box",
+        maxWidth: "100%",
+    },
+    select: {
+        padding: "12px 16px",
+        border: "2px solid #e2e8f0",
+        borderRadius: "10px",
+        fontSize: "14px",
+        transition: "all 0.2s ease",
+        backgroundColor: "#ffffff",
+        fontFamily: "inherit",
+        cursor: "pointer",
+        width: "100%",
+        boxSizing: "border-box",
+        maxWidth: "100%",
+    },
+    textarea: {
+        padding: "12px 16px",
+        border: "2px solid #e2e8f0",
+        borderRadius: "10px",
+        fontSize: "14px",
+        transition: "all 0.2s ease",
+        backgroundColor: "#ffffff",
+        fontFamily: "inherit",
+        resize: "vertical",
+        minHeight: "100px",
+        width: "100%",
+        boxSizing: "border-box",
+        maxWidth: "100%",
     },
     variantsSection: {
-        border: "2px solid #e5e7eb",
-        borderRadius: "12px",
-        padding: "20px",
-        backgroundColor: "#f9fafb",
-        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+        border: "2px solid #e2e8f0",
+        borderRadius: "16px",
+        padding: "28px",
+        backgroundColor: "#f8fafc",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
     },
     variantGrid: {
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-        gap: "16px",
+        gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
+        gap: "24px",
+        marginTop: "24px",
     },
     variantsHeader: {
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "20px",
+        alignItems: "flex-start",
+        marginBottom: "8px",
     },
     addVariantBtn: {
         background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
         color: "#fff",
         border: "none",
-        padding: "10px 18px",
-        borderRadius: "8px",
+        padding: "12px 24px",
+        borderRadius: "12px",
         cursor: "pointer",
         fontSize: "14px",
         fontWeight: "600",
-        boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+        boxShadow: "0 4px 16px rgba(16, 185, 129, 0.35)",
         transition: "all 0.2s ease",
     },
     variantCard: {
-        border: "2px solid #e5e7eb",
-        borderRadius: "12px",
-        padding: "20px",
+        border: "2px solid #e2e8f0",
+        borderRadius: "16px",
+        padding: "24px",
         backgroundColor: "#ffffff",
-        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-        transition: "all 0.2s ease",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+        transition: "all 0.3s ease",
         display: "flex",
         flexDirection: "column",
-        gap: "12px",
-        height: "100%",
+        gap: "20px",
+        minHeight: "fit-content",
+        width: "100%",
+        boxSizing: "border-box",
+        overflow: "visible",
+        position: "relative",
     },
     variantHeader: {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 12,
+        marginBottom: "16px",
+        paddingBottom: "16px",
+        borderBottom: "2px solid #e2e8f0",
+    },
+    variantHeaderLeft: {
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+    },
+    variantNumberBadge: {
+        backgroundColor: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        color: "#ffffff",
+        width: "32px",
+        height: "32px",
+        borderRadius: "8px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "14px",
+        fontWeight: 700,
+        boxShadow: "0 2px 8px rgba(102, 126, 234, 0.3)",
+    },
+    variantTitle: {
+        margin: 0,
+        fontSize: "16px",
+        fontWeight: 600,
+        color: "#1e293b",
     },
     variantHeaderActions: {
         display: "flex",
-        gap: 8,
+        gap: "8px",
         alignItems: "center",
     },
     removeVariantBtn: {
         backgroundColor: "#ef4444",
         color: "#fff",
         border: "none",
-        borderRadius: "50%",
-        width: 24,
-        height: 24,
+        borderRadius: "8px",
+        width: "32px",
+        height: "32px",
         cursor: "pointer",
-        fontSize: 16,
+        fontSize: "14px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        transition: "all 0.2s ease",
+        boxShadow: "0 2px 8px rgba(239, 68, 68, 0.25)",
     },
     addInlineBtn: {
         backgroundColor: "#10b981",
         color: "#fff",
         border: "none",
-        borderRadius: "50%",
-        width: 24,
-        height: 24,
+        borderRadius: "8px",
+        width: "32px",
+        height: "32px",
         cursor: "pointer",
-        fontSize: 16,
+        fontSize: "14px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        transition: "all 0.2s ease",
+        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
     },
-    variantRow: {
+    variantContent: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "20px",
+    },
+    variantFormGrid: {
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-        gap: 12,
+        gridTemplateColumns: "repeat(2, 1fr)",
+        gap: "16px",
+        width: "100%",
     },
     inputGroup: {
         display: "flex",
         flexDirection: "column",
-        gap: 4,
+        gap: "6px",
+        width: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
     },
-    imageUpload: {
+    variantLabel: {
+        fontSize: "13px",
+        fontWeight: 600,
+        color: "#475569",
+        marginBottom: "4px",
+    },
+    variantInput: {
+        padding: "10px 14px",
+        border: "2px solid #e2e8f0",
+        borderRadius: "10px",
+        fontSize: "14px",
+        transition: "all 0.2s ease",
+        backgroundColor: "#ffffff",
+        fontFamily: "inherit",
+        width: "100%",
+        boxSizing: "border-box",
+        minWidth: 0,
+        maxWidth: "100%",
+    },
+    imageUploadSection: {
         display: "flex",
         flexDirection: "column",
-        gap: 8,
+        gap: "12px",
+    },
+    imageUploadContainer: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+    },
+    imageUploadLabel: {
+        cursor: "pointer",
+    },
+    imageUploadButton: {
+        padding: "12px 20px",
+        backgroundColor: "#f1f5f9",
+        border: "2px dashed #cbd5e1",
+        borderRadius: "10px",
+        textAlign: "center",
+        fontSize: "14px",
+        fontWeight: 600,
+        color: "#475569",
+        transition: "all 0.2s ease",
+    },
+    imagePreviewContainer: {
+        position: "relative",
+        display: "inline-block",
     },
     previewImage: {
-        width: 80,
-        height: 80,
+        width: "120px",
+        height: "120px",
         objectFit: "cover",
-        borderRadius: 6,
-        border: "1px solid #d1d5db",
+        borderRadius: "12px",
+        border: "2px solid #e2e8f0",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+    },
+    imagePreviewOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        borderRadius: "12px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: 0,
+        transition: "opacity 0.2s ease",
+    },
+    imagePreviewText: {
+        color: "#ffffff",
+        fontSize: "12px",
+        fontWeight: 600,
     },
     modalActions: {
         display: "flex",
         justifyContent: "flex-end",
-        gap: "14px",
-        marginTop: "24px",
-        paddingTop: "20px",
-        borderTop: "2px solid #f3f4f6",
+        gap: "12px",
+        padding: "24px 32px",
+        borderTop: "2px solid #f1f5f9",
+        backgroundColor: "#f8fafc",
     },
     cancelBtn: {
         background: "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)",
         color: "#fff",
         border: "none",
-        padding: "12px 24px",
-        borderRadius: "10px",
+        padding: "14px 28px",
+        borderRadius: "12px",
         cursor: "pointer",
-        minWidth: "120px",
+        minWidth: "140px",
         fontSize: "15px",
         fontWeight: "600",
-        boxShadow: "0 4px 12px rgba(107, 114, 128, 0.3)",
+        boxShadow: "0 4px 16px rgba(107, 114, 128, 0.3)",
+        transition: "all 0.2s ease",
+    },
+    saveBtn: {
+        background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+        color: "#fff",
+        border: "none",
+        padding: "14px 28px",
+        borderRadius: "12px",
+        cursor: "pointer",
+        minWidth: "180px",
+        fontSize: "15px",
+        fontWeight: "600",
+        boxShadow: "0 4px 16px rgba(37, 99, 235, 0.4)",
         transition: "all 0.2s ease",
     },
 };

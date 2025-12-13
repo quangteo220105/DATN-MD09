@@ -578,6 +578,51 @@
         .amount-value {
             animation: pulse 2s ease-in-out infinite;
         }
+
+        /* Tab styles */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 14px 20px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 15px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            position: relative;
+            outline: none;
+        }
+
+        .tab:hover {
+            color: #0068ff;
+            background: rgba(0, 104, 255, 0.05);
+        }
+
+        .tab.active {
+            color: #0068ff;
+            border-bottom-color: #0068ff;
+            background: rgba(0, 104, 255, 0.05);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
     </style>
 </head>
 
@@ -627,53 +672,105 @@
                 </div>
             </div>
 
-        <div class="card-form">
-            <h3>Thông tin thẻ ngân hàng</h3>
-            
-            <div style="margin-bottom: 16px;">
-                <label class="card-label" for="cardNumberInput">Số thẻ</label>
-                <input type="text" id="cardNumberInput" class="card-input" inputmode="numeric" autocomplete="cc-number"
-                    placeholder="#### #### #### ####" maxlength="19">
-                <div class="card-error" id="cardNumberError"></div>
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('visa')">Thanh toán Visa</button>
+                <button class="tab" onclick="switchTab('atm')">Thanh toán ATM</button>
             </div>
 
-            <div style="margin-bottom: 16px;">
-                <label class="card-label" for="cardNameInput">Tên chủ thẻ</label>
-                <input type="text" id="cardNameInput" class="card-input" autocomplete="cc-name"
-                    placeholder="TEN CHU THE" maxlength="50">
-                <div class="card-error" id="cardNameError"></div>
-            </div>
+            <!-- Tab Thanh toán Visa -->
+            <div id="visaTab" class="tab-content active">
+                <div class="card-form">
+                    <h3>Thông tin thẻ ngân hàng</h3>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <label class="card-label" for="cardNumberInput">Số thẻ</label>
+                        <input type="text" id="cardNumberInput" class="card-input" inputmode="numeric" autocomplete="cc-number"
+                            placeholder="#### #### #### ####" maxlength="19">
+                        <div class="card-error" id="cardNumberError"></div>
+                    </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-                <div>
-                    <label class="card-label" for="cardExpiryInput">Ngày hết hạn</label>
-                    <input type="text" id="cardExpiryInput" class="card-input" inputmode="numeric" autocomplete="cc-exp"
-                        placeholder="MM/YY" maxlength="5">
-                    <div class="card-error" id="cardExpiryError"></div>
+                    <div style="margin-bottom: 16px;">
+                        <label class="card-label" for="cardNameInput">Tên chủ thẻ</label>
+                        <input type="text" id="cardNameInput" class="card-input" autocomplete="cc-name"
+                            placeholder="TEN CHU THE" maxlength="50">
+                        <div class="card-error" id="cardNameError"></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                        <div>
+                            <label class="card-label" for="cardExpiryInput">Ngày hết hạn</label>
+                            <input type="text" id="cardExpiryInput" class="card-input" inputmode="numeric" autocomplete="cc-exp"
+                                placeholder="MM/YY" maxlength="5">
+                            <div class="card-error" id="cardExpiryError"></div>
+                        </div>
+                        <div>
+                            <label class="card-label" for="cardCvvInput">Mã CVV</label>
+                            <input type="text" id="cardCvvInput" class="card-input" inputmode="numeric" autocomplete="cc-csc"
+                                placeholder="123" maxlength="4">
+                            <div class="card-error" id="cardCvvError"></div>
+                        </div>
+                    </div>
+
+                    <p class="card-hint" style="margin-top: 8px; font-size: 11px; line-height: 1.5;">
+                        <strong>Thẻ test hợp lệ:</strong><br>
+                        Visa/Master/JCB: <strong>4111 1111 1111 1111</strong> (Tên: NGUYEN VAN A, Hạn: 01/25, CVV: 123)<br>
+                        ATM: <strong>9704 5400 0000 0062</strong>, <strong>9704 5400 0000 0070</strong>, <strong>9704 5400 0000 0088</strong>, 
+                        <strong>9704 5400 0000 0096</strong>, <strong>9704 5410 0000 0094</strong>, <strong>9704 5410 0000 0078</strong>
+                    </p>
                 </div>
-                <div>
-                    <label class="card-label" for="cardCvvInput">Mã CVV</label>
-                    <input type="text" id="cardCvvInput" class="card-input" inputmode="numeric" autocomplete="cc-csc"
-                        placeholder="123" maxlength="4">
-                    <div class="card-error" id="cardCvvError"></div>
+
+                <div class="actions">
+                    <button class="btn btn-success" onclick="handlePayment('success', 'visa')">
+                        <span>Thanh toán</span>
+                    </button>
+                    <button class="btn btn-failure" onclick="handlePayment('failure')">
+                        <span>Hủy</span>
+                    </button>
                 </div>
             </div>
 
-            <p class="card-hint" style="margin-top: 8px; font-size: 11px; line-height: 1.5;">
-                <strong>Thẻ test hợp lệ:</strong><br>
-                Visa/Master/JCB: <strong>4111 1111 1111 1111</strong> (Tên: NGUYEN VAN A, Hạn: 01/25, CVV: 123)<br>
-                ATM: <strong>9704 5400 0000 0062</strong>, <strong>9704 5400 0000 0070</strong>, <strong>9704 5400 0000 0088</strong>, 
-                <strong>9704 5400 0000 0096</strong>, <strong>9704 5410 0000 0094</strong>, <strong>9704 5410 0000 0078</strong>
-            </p>
-        </div>
+            <!-- Tab Thanh toán ATM -->
+            <div id="atmTab" class="tab-content">
+                <div class="card-form">
+                    <h3>Thông tin thẻ ATM</h3>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <label class="card-label" for="atmCardNumberInput">Số thẻ</label>
+                        <input type="text" id="atmCardNumberInput" class="card-input" inputmode="numeric" autocomplete="cc-number"
+                            placeholder="#### #### #### ####" maxlength="19">
+                        <div class="card-error" id="atmCardNumberError"></div>
+                    </div>
 
-            <div class="actions">
-                <button class="btn btn-success" onclick="handlePayment('success')">
-                    <span>Thanh toán</span>
-                </button>
-                <button class="btn btn-failure" onclick="handlePayment('failure')">
-                    <span>Hủy</span>
-                </button>
+                    <div style="margin-bottom: 16px;">
+                        <label class="card-label" for="atmCardNameInput">Tên chủ thẻ</label>
+                        <input type="text" id="atmCardNameInput" class="card-input" autocomplete="cc-name"
+                            placeholder="TEN CHU THE" maxlength="50">
+                        <div class="card-error" id="atmCardNameError"></div>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label class="card-label" for="atmCardIssueDateInput">Ngày phát hành</label>
+                        <input type="text" id="atmCardIssueDateInput" class="card-input" inputmode="numeric"
+                            placeholder="MM/YY" maxlength="5">
+                        <div class="card-error" id="atmCardIssueDateError"></div>
+                    </div>
+
+                    <p class="card-hint" style="margin-top: 8px; font-size: 11px; line-height: 1.5;">
+                        <strong>Thẻ ATM test hợp lệ:</strong><br>
+                        <strong>9704 5400 0000 0062</strong><br>
+                        (Tên: NGUYEN VAN A, Ngày phát hành: 01/20)
+                    </p>
+                </div>
+
+                <div class="actions">
+                    <button class="btn btn-success" onclick="handlePayment('success', 'atm')">
+                        <span>Thanh toán</span>
+                    </button>
+                    <button class="btn btn-failure" onclick="handlePayment('failure')">
+                        <span>Hủy</span>
+                    </button>
+                </div>
             </div>
 
             <div class="status-message" id="statusMessage"></div>
@@ -689,6 +786,28 @@
     </div>
 
     <script>
+        // Hàm chuyển đổi tab
+        function switchTab(tabName) {
+            // Ẩn tất cả tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Xóa active class từ tất cả tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Hiển thị tab được chọn
+            if (tabName === 'visa') {
+                document.getElementById('visaTab').classList.add('active');
+                document.querySelectorAll('.tab')[0].classList.add('active');
+            } else if (tabName === 'atm') {
+                document.getElementById('atmTab').classList.add('active');
+                document.querySelectorAll('.tab')[1].classList.add('active');
+            }
+        }
+
         // Lấy thông tin từ URL query params
         const urlParams = new URLSearchParams(window.location.search);
         const appid = urlParams.get('appid') || '2554';
@@ -724,7 +843,7 @@
         const REQUIRED_CARD_EXPIRY = '01/25';
         const REQUIRED_CARD_CVV = '123';
 
-        // Định dạng số thẻ và validate
+        // Định dạng số thẻ và validate - Visa tab
         const cardInput = document.getElementById('cardNumberInput');
         const cardNumberError = document.getElementById('cardNumberError');
         const cardNameInput = document.getElementById('cardNameInput');
@@ -734,45 +853,85 @@
         const cardCvvInput = document.getElementById('cardCvvInput');
         const cardCvvError = document.getElementById('cardCvvError');
 
-        function fillCardDefaults() {
-            if (cardNameInput) {
-                cardNameInput.value = REQUIRED_CARD_NAME;
-                clearFieldError(cardNameInput, cardNameError);
-            }
-            if (cardExpiryInput) {
-                cardExpiryInput.value = REQUIRED_CARD_EXPIRY;
-                clearFieldError(cardExpiryInput, cardExpiryError);
-            }
-            if (cardCvvInput) {
-                cardCvvInput.value = REQUIRED_CARD_CVV;
-                clearFieldError(cardCvvInput, cardCvvError);
+        // Định dạng số thẻ và validate - ATM tab
+        const atmCardInput = document.getElementById('atmCardNumberInput');
+        const atmCardNumberError = document.getElementById('atmCardNumberError');
+        const atmCardNameInput = document.getElementById('atmCardNameInput');
+        const atmCardNameError = document.getElementById('atmCardNameError');
+        const atmCardIssueDateInput = document.getElementById('atmCardIssueDateInput');
+        const atmCardIssueDateError = document.getElementById('atmCardIssueDateError');
+
+        const REQUIRED_ATM_ISSUE_DATE = '01/20';
+
+        function fillCardDefaults(type = 'visa') {
+            if (type === 'visa') {
+                if (cardNameInput) {
+                    cardNameInput.value = REQUIRED_CARD_NAME;
+                    clearFieldError(cardNameInput, cardNameError);
+                }
+                if (cardExpiryInput) {
+                    cardExpiryInput.value = REQUIRED_CARD_EXPIRY;
+                    clearFieldError(cardExpiryInput, cardExpiryError);
+                }
+                if (cardCvvInput) {
+                    cardCvvInput.value = REQUIRED_CARD_CVV;
+                    clearFieldError(cardCvvInput, cardCvvError);
+                }
+            } else if (type === 'atm') {
+                if (atmCardNameInput) {
+                    atmCardNameInput.value = REQUIRED_CARD_NAME;
+                    clearFieldError(atmCardNameInput, atmCardNameError);
+                }
+                if (atmCardIssueDateInput) {
+                    atmCardIssueDateInput.value = REQUIRED_ATM_ISSUE_DATE;
+                    clearFieldError(atmCardIssueDateInput, atmCardIssueDateError);
+                }
             }
         }
 
-        function clearCardDefaults() {
-            if (cardNameInput) {
-                cardNameInput.value = '';
-                cardNameInput.classList.remove('error');
-            }
-            if (cardExpiryInput) {
-                cardExpiryInput.value = '';
-                cardExpiryInput.classList.remove('error');
-            }
-            if (cardCvvInput) {
-                cardCvvInput.value = '';
-                cardCvvInput.classList.remove('error');
-            }
-            if (cardNameError) {
-                cardNameError.classList.remove('show');
-                cardNameError.textContent = '';
-            }
-            if (cardExpiryError) {
-                cardExpiryError.classList.remove('show');
-                cardExpiryError.textContent = '';
-            }
-            if (cardCvvError) {
-                cardCvvError.classList.remove('show');
-                cardCvvError.textContent = '';
+        function clearCardDefaults(type = 'visa') {
+            if (type === 'visa') {
+                if (cardNameInput) {
+                    cardNameInput.value = '';
+                    cardNameInput.classList.remove('error');
+                }
+                if (cardExpiryInput) {
+                    cardExpiryInput.value = '';
+                    cardExpiryInput.classList.remove('error');
+                }
+                if (cardCvvInput) {
+                    cardCvvInput.value = '';
+                    cardCvvInput.classList.remove('error');
+                }
+                if (cardNameError) {
+                    cardNameError.classList.remove('show');
+                    cardNameError.textContent = '';
+                }
+                if (cardExpiryError) {
+                    cardExpiryError.classList.remove('show');
+                    cardExpiryError.textContent = '';
+                }
+                if (cardCvvError) {
+                    cardCvvError.classList.remove('show');
+                    cardCvvError.textContent = '';
+                }
+            } else if (type === 'atm') {
+                if (atmCardNameInput) {
+                    atmCardNameInput.value = '';
+                    atmCardNameInput.classList.remove('error');
+                }
+                if (atmCardIssueDateInput) {
+                    atmCardIssueDateInput.value = '';
+                    atmCardIssueDateInput.classList.remove('error');
+                }
+                if (atmCardNameError) {
+                    atmCardNameError.classList.remove('show');
+                    atmCardNameError.textContent = '';
+                }
+                if (atmCardIssueDateError) {
+                    atmCardIssueDateError.classList.remove('show');
+                    atmCardIssueDateError.textContent = '';
+                }
             }
         }
 
@@ -800,7 +959,7 @@
                 // Validate số thẻ
                 if (digitsOnly.length === 16) {
                     if (isValidTestCard(digitsOnly)) {
-                        fillCardDefaults();
+                        fillCardDefaults('visa');
                         target.classList.remove('error');
                         if (cardNumberError) {
                             cardNumberError.classList.remove('show');
@@ -819,9 +978,9 @@
                         cardNumberError.classList.remove('show');
                         cardNumberError.textContent = '';
                     }
-                    clearCardDefaults();
+                    clearCardDefaults('visa');
                 } else {
-                    clearCardDefaults();
+                    clearCardDefaults('visa');
                 }
             });
         }
@@ -862,14 +1021,82 @@
             });
         }
 
+        // Xử lý input cho tab ATM
+        if (atmCardInput) {
+            atmCardInput.addEventListener('input', (event) => {
+                const target = event.target;
+                const digitsOnly = target.value.replace(/\D/g, '').slice(0, 16);
+                const groups = digitsOnly.match(/.{1,4}/g) || [];
+                target.value = groups.join(' ');
+                
+                // Validate số thẻ ATM (chỉ chấp nhận 9704540000000062)
+                if (digitsOnly.length === 16) {
+                    if (isValidATMCard(digitsOnly)) {
+                        fillCardDefaults('atm');
+                        target.classList.remove('error');
+                        if (atmCardNumberError) {
+                            atmCardNumberError.classList.remove('show');
+                            atmCardNumberError.textContent = '';
+                        }
+                    } else {
+                        target.classList.add('error');
+                        if (atmCardNumberError) {
+                            atmCardNumberError.classList.add('show');
+                            atmCardNumberError.textContent = 'Số thẻ không hợp lệ';
+                        }
+                    }
+                } else if (digitsOnly.length > 0) {
+                    target.classList.remove('error');
+                    if (atmCardNumberError) {
+                        atmCardNumberError.classList.remove('show');
+                        atmCardNumberError.textContent = '';
+                    }
+                    clearCardDefaults('atm');
+                } else {
+                    clearCardDefaults('atm');
+                }
+            });
+        }
+
+        // Định dạng ngày phát hành cho ATM (MM/YY)
+        if (atmCardIssueDateInput) {
+            atmCardIssueDateInput.addEventListener('input', (event) => {
+                const target = event.target;
+                let value = target.value.replace(/\D/g, '').slice(0, 4);
+                if (value.length >= 2) {
+                    value = value.slice(0, 2) + '/' + value.slice(2);
+                }
+                target.value = value;
+                if (value === REQUIRED_ATM_ISSUE_DATE) {
+                    clearFieldError(target, atmCardIssueDateError);
+                }
+            });
+        }
+
+        // Luôn giữ tên chủ thẻ uppercase cho ATM
+        if (atmCardNameInput) {
+            atmCardNameInput.addEventListener('input', (event) => {
+                event.target.value = event.target.value.toUpperCase();
+                if (event.target.value.trim() === REQUIRED_CARD_NAME) {
+                    clearFieldError(atmCardNameInput, atmCardNameError);
+                }
+            });
+        }
+
         // Kiểm tra số thẻ có hợp lệ không
         function isValidTestCard(cardNumber) {
             const digitsOnly = cardNumber.replace(/\D/g, '');
             return VALID_TEST_CARDS.includes(digitsOnly);
         }
 
+        // Kiểm tra số thẻ ATM hợp lệ (chỉ chấp nhận 9704540000000062)
+        function isValidATMCard(cardNumber) {
+            const digitsOnly = cardNumber.replace(/\D/g, '');
+            return digitsOnly === '9704540000000062';
+        }
+
         // Xử lý thanh toán
-        async function handlePayment(status) {
+        async function handlePayment(status, type = 'visa') {
             const statusMessage = document.getElementById('statusMessage');
             statusMessage.style.display = 'block';
 
@@ -888,25 +1115,44 @@
             let statusClass = '';
 
             if (status === 'success') {
-                // Kiểm tra số thẻ trước khi thanh toán
-                const cardNumberInput = document.getElementById('cardNumberInput');
-                const cardNumberErrorEl = document.getElementById('cardNumberError');
+                // Xác định các input dựa trên loại thẻ
+                let cardNumberInput, cardNumberErrorEl, cardNameInput, cardNameErrorEl;
+                let cardExpiryInput, cardExpiryErrorEl, cardCvvInput, cardCvvErrorEl;
+                let atmCardIssueDateInput, atmCardIssueDateErrorEl;
+                
+                if (type === 'visa') {
+                    cardNumberInput = document.getElementById('cardNumberInput');
+                    cardNumberErrorEl = document.getElementById('cardNumberError');
+                    cardNameInput = document.getElementById('cardNameInput');
+                    cardExpiryInput = document.getElementById('cardExpiryInput');
+                    cardCvvInput = document.getElementById('cardCvvInput');
+                    cardNameErrorEl = document.getElementById('cardNameError');
+                    cardExpiryErrorEl = document.getElementById('cardExpiryError');
+                    cardCvvErrorEl = document.getElementById('cardCvvError');
+                } else if (type === 'atm') {
+                    cardNumberInput = document.getElementById('atmCardNumberInput');
+                    cardNumberErrorEl = document.getElementById('atmCardNumberError');
+                    cardNameInput = document.getElementById('atmCardNameInput');
+                    atmCardIssueDateInput = document.getElementById('atmCardIssueDateInput');
+                    cardNameErrorEl = document.getElementById('atmCardNameError');
+                    atmCardIssueDateErrorEl = document.getElementById('atmCardIssueDateError');
+                }
+                
                 const cardNumber = cardNumberInput.value.replace(/\D/g, '');
-                const cardNameInput = document.getElementById('cardNameInput');
-                const cardExpiryInput = document.getElementById('cardExpiryInput');
-                const cardCvvInput = document.getElementById('cardCvvInput');
-                const cardNameErrorEl = document.getElementById('cardNameError');
-                const cardExpiryErrorEl = document.getElementById('cardExpiryError');
-                const cardCvvErrorEl = document.getElementById('cardCvvError');
                 const cardName = cardNameInput.value.trim().toUpperCase();
-                const cardExpiry = cardExpiryInput.value.trim();
-                const cardCvv = cardCvvInput.value.trim();
+                const cardExpiry = type === 'visa' ? cardExpiryInput.value.trim() : null;
+                const cardCvv = type === 'visa' ? cardCvvInput.value.trim() : null;
+                const atmIssueDate = type === 'atm' ? atmCardIssueDateInput.value.trim() : null;
                 
                 // Reset error states
                 clearFieldError(cardNumberInput, cardNumberErrorEl);
                 clearFieldError(cardNameInput, cardNameErrorEl);
-                clearFieldError(cardExpiryInput, cardExpiryErrorEl);
-                clearFieldError(cardCvvInput, cardCvvErrorEl);
+                if (type === 'visa') {
+                    clearFieldError(cardExpiryInput, cardExpiryErrorEl);
+                    clearFieldError(cardCvvInput, cardCvvErrorEl);
+                } else if (type === 'atm') {
+                    clearFieldError(atmCardIssueDateInput, atmCardIssueDateErrorEl);
+                }
                 
                 // Validate số thẻ
                 if (!cardNumber || cardNumber.length < 16) {
@@ -920,9 +1166,29 @@
                     return;
                 }
 
-                if (!isValidTestCard(cardNumber)) {
-                    toggleButtons(false);
-                    setFieldError(cardNumberInput, cardNumberErrorEl, 'Số thẻ không hợp lệ. Vui lòng sử dụng thẻ test từ ZaloPay Developer.');
+                // Validate số thẻ theo loại
+                if (type === 'visa') {
+                    if (!isValidTestCard(cardNumber)) {
+                        toggleButtons(false);
+                        setFieldError(cardNumberInput, cardNumberErrorEl, 'Số thẻ không hợp lệ. Vui lòng sử dụng thẻ test từ ZaloPay Developer.');
+                        message = '❌ Số thẻ không hợp lệ! Vui lòng sử dụng thẻ test từ ZaloPay Developer.';
+                        statusClass = 'status-failure';
+                        statusMessage.textContent = message;
+                        statusMessage.className = 'status-message ' + statusClass;
+                        return;
+                    }
+                } else if (type === 'atm') {
+                    if (!isValidATMCard(cardNumber)) {
+                        toggleButtons(false);
+                        setFieldError(cardNumberInput, cardNumberErrorEl, 'Số thẻ không hợp lệ');
+                        message = '❌ Số thẻ không hợp lệ';
+                        statusClass = 'status-failure';
+                        statusMessage.textContent = message;
+                        statusMessage.className = 'status-message ' + statusClass;
+                        return;
+                    }
+                }
+
                 if (cardName !== REQUIRED_CARD_NAME) {
                     toggleButtons(false);
                     setFieldError(cardNameInput, cardNameErrorEl, 'Tên chủ thẻ phải là "NGUYEN VAN A"');
@@ -933,32 +1199,37 @@
                     return;
                 }
 
-                if (cardExpiry !== REQUIRED_CARD_EXPIRY) {
-                    toggleButtons(false);
-                    setFieldError(cardExpiryInput, cardExpiryErrorEl, 'Ngày hết hạn phải là 01/25');
-                    message = '❌ Ngày hết hạn không hợp lệ.';
-                    statusClass = 'status-failure';
-                    statusMessage.textContent = message;
-                    statusMessage.className = 'status-message ' + statusClass;
-                    return;
-                }
+                // Validate theo loại thẻ
+                if (type === 'visa') {
+                    if (cardExpiry !== REQUIRED_CARD_EXPIRY) {
+                        toggleButtons(false);
+                        setFieldError(cardExpiryInput, cardExpiryErrorEl, 'Ngày hết hạn phải là 01/25');
+                        message = '❌ Ngày hết hạn không hợp lệ.';
+                        statusClass = 'status-failure';
+                        statusMessage.textContent = message;
+                        statusMessage.className = 'status-message ' + statusClass;
+                        return;
+                    }
 
-                if (cardCvv !== REQUIRED_CARD_CVV) {
-                    toggleButtons(false);
-                    setFieldError(cardCvvInput, cardCvvErrorEl, 'Mã CVV phải là 123');
-                    message = '❌ Mã CVV không hợp lệ.';
-                    statusClass = 'status-failure';
-                    statusMessage.textContent = message;
-                    statusMessage.className = 'status-message ' + statusClass;
-                    return;
-                }
-
-                    
-                    message = '❌ Số thẻ không hợp lệ! Vui lòng sử dụng thẻ test từ ZaloPay Developer.';
-                    statusClass = 'status-failure';
-                    statusMessage.textContent = message;
-                    statusMessage.className = 'status-message ' + statusClass;
-                    return;
+                    if (cardCvv !== REQUIRED_CARD_CVV) {
+                        toggleButtons(false);
+                        setFieldError(cardCvvInput, cardCvvErrorEl, 'Mã CVV phải là 123');
+                        message = '❌ Mã CVV không hợp lệ.';
+                        statusClass = 'status-failure';
+                        statusMessage.textContent = message;
+                        statusMessage.className = 'status-message ' + statusClass;
+                        return;
+                    }
+                } else if (type === 'atm') {
+                    if (atmIssueDate !== REQUIRED_ATM_ISSUE_DATE) {
+                        toggleButtons(false);
+                        setFieldError(atmCardIssueDateInput, atmCardIssueDateErrorEl, 'Ngày phát hành phải là 01/20');
+                        message = '❌ Ngày phát hành không hợp lệ.';
+                        statusClass = 'status-failure';
+                        statusMessage.textContent = message;
+                        statusMessage.className = 'status-message ' + statusClass;
+                        return;
+                    }
                 }
                 // Hiển thị loading overlay
                 const loadingOverlay = document.getElementById('loadingOverlay');
