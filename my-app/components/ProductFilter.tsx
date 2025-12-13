@@ -6,7 +6,6 @@ import {
     TouchableOpacity,
     StyleSheet,
     ScrollView,
-    TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -163,6 +162,7 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
 
                         {/* Khoảng giá */}
                         <View style={styles.section}>
+<<<<<<< HEAD
                             <View style={styles.sectionHeading}>
                                 <Ionicons name="cash" size={18} color="#475569" />
                                 <Text style={styles.sectionTitle}>Khoảng giá</Text>
@@ -199,6 +199,9 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                                     <Text style={styles.priceCurrency}>đ</Text>
                                 </View>
                             </View>
+=======
+                            <Text style={styles.sectionTitle}>Khoảng giá</Text>
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
                             {/* Quick price range buttons */}
                             <View style={styles.quickPriceContainer}>
                                 {quickRanges.map((range) => (
@@ -340,9 +343,15 @@ const styles = StyleSheet.create({
     summaryRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
+<<<<<<< HEAD
         gap: 12,
         paddingHorizontal: 20,
         paddingVertical: 14,
+=======
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
         backgroundColor: '#f1f5f9',
         borderBottomWidth: 1,
         borderBottomColor: '#e2e8f0',
@@ -350,6 +359,7 @@ const styles = StyleSheet.create({
     summaryCard: {
         width: '47%',
         backgroundColor: '#fff',
+<<<<<<< HEAD
         borderRadius: 14,
         padding: 12,
         borderWidth: 1,
@@ -368,6 +378,28 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#0f172a',
+=======
+        borderRadius: 10,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: '#e3e8ff',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    summaryLabel: {
+        fontSize: 10,
+        color: '#94a3b8',
+        marginBottom: 2,
+        fontWeight: '500',
+    },
+    summaryValue: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#0f172a',
+        lineHeight: 16,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     content: {
         paddingHorizontal: 20,
@@ -434,6 +466,7 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontWeight: '700',
     },
+<<<<<<< HEAD
     priceInputRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
@@ -476,11 +509,18 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#94a3b8',
     },
+=======
+
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     quickPriceContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 12,
+<<<<<<< HEAD
         marginTop: 16,
+=======
+        marginTop: 8,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     quickPriceBtn: {
         paddingHorizontal: 12,
@@ -545,23 +585,37 @@ const styles = StyleSheet.create({
     },
     footer: {
         flexDirection: 'row',
+<<<<<<< HEAD
         paddingHorizontal: 24,
         paddingTop: 16,
         paddingBottom: 16,
         gap: 14,
+=======
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
+        gap: 10,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
         backgroundColor: '#f8fafc',
         shadowColor: '#0f172a',
+<<<<<<< HEAD
         shadowOpacity: 0.08,
         shadowRadius: 10,
         elevation: 8,
+=======
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 4,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     resetBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+<<<<<<< HEAD
         paddingVertical: 14,
         borderRadius: 10,
         backgroundColor: '#f8fafc',
@@ -573,11 +627,25 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: '#475569',
+=======
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: '#F5F5F5',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        gap: 6,
+    },
+    resetBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#555',
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     applyBtn: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+<<<<<<< HEAD
         paddingVertical: 14,
         borderRadius: 10,
         backgroundColor: '#0f172a',
@@ -585,11 +653,21 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 12,
         elevation: 6,
+=======
+        paddingVertical: 10,
+        borderRadius: 10,
+        backgroundColor: '#FF4757',
+        shadowColor: '#FF4757',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     applyBtnText: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 14,
+        fontWeight: '600',
         color: '#FFFFFF',
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
     },
 });

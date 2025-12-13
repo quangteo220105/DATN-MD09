@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Image, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Image, ScrollView, TouchableOpacity, Alert, Modal, TextInput, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { DOMAIN, BASE_URL } from '../../config/apiConfig';
 const STATUS_ORDER = ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng', 'Đã giao hàng'] as const;
 
 const STATUS_INFO: Record<string, { emoji: string; color: string }> = {
+    'Chờ thanh toán': { emoji: '💳', color: '#f59e0b' },
     'Chờ xác nhận': { emoji: '🛒', color: '#0ea5e9' },
     'Đã xác nhận': { emoji: '📦', color: '#22c55e' },
     'Đang giao hàng': { emoji: '🚚', color: '#f59e0b' },
@@ -19,11 +20,20 @@ function normalizeStatus(raw?: string) {
     if (!raw) return 'Chờ xác nhận';
     const s = String(raw).trim();
     if (s === 'Đang xử lý' || s.toLowerCase() === 'pending') return 'Chờ xác nhận';
+    if (s.toLowerCase() === 'chờ thanh toán' || s.toLowerCase() === 'waiting payment' || s.toLowerCase() === 'pending payment') return 'Chờ thanh toán';
     if (s.toLowerCase() === 'confirmed') return 'Đã xác nhận';
     if (s.toLowerCase() === 'shipping' || s === 'Đang vận chuyển') return 'Đang giao hàng';
     if (s.toLowerCase() === 'delivered') return 'Đã giao hàng';
     if (s.toLowerCase() === 'cancelled' || s.toLowerCase() === 'canceled') return 'Đã hủy';
     return STATUS_INFO[s] ? s : 'Chờ xác nhận';
+}
+
+function formatPaymentMethod(payment?: string) {
+    if (!payment) return '—';
+    const p = String(payment).toLowerCase().trim();
+    if (p === 'cod') return 'Tiền mặt';
+    if (p === 'zalopay') return 'ZaloPay';
+    return payment;
 }
 
 export default function OrderDetailScreen() {
@@ -34,6 +44,7 @@ export default function OrderDetailScreen() {
     const [loadingReviews, setLoadingReviews] = useState(false);
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
+    const [refreshing, setRefreshing] = useState(false);
 
     const loadOrder = async () => {
         const userString = await AsyncStorage.getItem('user');
@@ -42,23 +53,30 @@ export default function OrderDetailScreen() {
             router.replace('/(tabs)/login');
             return;
         }
-        const historyKey = `order_history_${user._id}`;
-        const historyString = await AsyncStorage.getItem(historyKey);
-        let history = historyString ? JSON.parse(historyString) : [];
-        history = Array.isArray(history) ? history : [];
-        let found = history.find((o: any) => String(o.id || o._id) === String(id));
-        if (!found) {
-            // Try fetch from backend when not found locally
-            try {
-                const res = await fetch(`${DOMAIN}/api/orders/${id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && (data._id || data.id)) {
-                        found = data;
-                    }
+
+        // ✅ Luôn load từ backend trước để có dữ liệu mới nhất
+        let found = null;
+        try {
+            const res = await fetch(`${DOMAIN}/api/orders/${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && (data._id || data.id)) {
+                    found = data;
                 }
-            } catch { }
+            }
+        } catch (e) {
+            console.log('Error loading from backend:', e);
         }
+
+        // Nếu backend không có, fallback sang AsyncStorage
+        if (!found) {
+            const historyKey = `order_history_${user._id}`;
+            const historyString = await AsyncStorage.getItem(historyKey);
+            let history = historyString ? JSON.parse(historyString) : [];
+            history = Array.isArray(history) ? history : [];
+            found = history.find((o: any) => String(o.id || o._id) === String(id));
+        }
+
         setOrder(found || null);
     };
 
@@ -97,7 +115,26 @@ export default function OrderDetailScreen() {
         if (order) {
             loadReviews();
         }
+
+        // Auto-refresh mỗi 3 giây để cập nhật trạng thái từ admin
+        const interval = setInterval(() => {
+            loadOrder();
+        }, 3000);
+
+        return () => {
+            clearInterval(interval);
+        };
     }, [id]));
+
+    // Pull to refresh
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadOrder();
+        if (order) {
+            await loadReviews();
+        }
+        setRefreshing(false);
+    };
 
     const status = normalizeStatus(order?.status);
     const created = order?.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : '';
@@ -251,11 +288,21 @@ export default function OrderDetailScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f8f9' }}>
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
+            <ScrollView
+                contentContainerStyle={{ padding: 16 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#ff4757']}
+                        tintColor="#ff4757"
+                    />
+                }
+            >
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={{ flex: 1, marginRight: 8 }}>
-                        <Text style={styles.orderCode}>Mã đơn: {String(order.id || order._id)}</Text>
+                        <Text style={styles.orderCode}>Mã đơn: {String(order.code || order._id || order.id)}</Text>
                         <Text style={styles.meta}>Đặt hàng: {created}</Text>
                         {shippingDate && (
                             <Text style={[styles.meta, { color: '#f59e0b', marginTop: 4 }]}>
@@ -273,17 +320,19 @@ export default function OrderDetailScreen() {
                             </Text>
                         )}
                     </View>
-                    <View style={[styles.statusPill, { borderColor: STATUS_INFO[status].color }]}>
-                        <Text style={[styles.statusBadge, { color: STATUS_INFO[status].color }]} numberOfLines={1}>
-                            {STATUS_INFO[status].emoji} {status}
-                        </Text>
-                    </View>
+                    {status !== 'Đã hủy' && (
+                        <View style={[styles.statusPill, { borderColor: STATUS_INFO[status].color }]}>
+                            <Text style={[styles.statusBadge, { color: STATUS_INFO[status].color }]} numberOfLines={1}>
+                                {STATUS_INFO[status].emoji} {status}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Stepper */}
-                {status === 'Đã hủy' ? (
-                    <View style={styles.cancelWrap}>
-                        <Text style={styles.cancelText}>{STATUS_INFO['Đã hủy'].emoji} Đã hủy</Text>
+                {status === 'Đã hủy' ? null : status === 'Chờ thanh toán' ? (
+                    <View style={[styles.cancelWrap, { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}>
+                        <Text style={[styles.cancelText, { color: '#f59e0b' }]}>{STATUS_INFO['Chờ thanh toán'].emoji} Chờ thanh toán</Text>
                     </View>
                 ) : (
                     <View style={styles.stepperWrap}>
@@ -323,7 +372,7 @@ export default function OrderDetailScreen() {
                 <View style={styles.card}>
                     <Text style={styles.cardTitle}>Thông tin giao hàng</Text>
                     <Text style={styles.text}>{order.address}</Text>
-                    <Text style={[styles.text, { marginTop: 6 }]}>Phương thức thanh toán: {order.payment}</Text>
+                    <Text style={[styles.text, { marginTop: 6 }]}>Phương thức thanh toán: {formatPaymentMethod(order.payment)}</Text>
                 </View>
 
                 {/* Items */}
@@ -425,7 +474,14 @@ export default function OrderDetailScreen() {
                             <Text style={styles.actionText}>Đánh giá</Text>
                         </TouchableOpacity>
                     )}
-                    {status !== 'Đã giao hàng' && status !== 'Đã hủy' && (
+                    {status === 'Chờ thanh toán' ? (
+                        <TouchableOpacity
+                            onPress={() => router.push(`/checkout?orderId=${order._id || order.id}` as any)}
+                            style={[styles.actionBtn, { backgroundColor: '#22c55e' }]}
+                        >
+                            <Text style={styles.actionText}>Thanh toán lại</Text>
+                        </TouchableOpacity>
+                    ) : status !== 'Đã giao hàng' && status !== 'Đã hủy' && (
                         <TouchableOpacity onPress={handleCancel} style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}>
                             <Text style={styles.actionText}>Hủy đơn</Text>
                         </TouchableOpacity>

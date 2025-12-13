@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const STATUS_OPTIONS = [
     { value: "", label: "Tất cả" },
+    { value: "Chờ thanh toán", label: "💳 Chờ thanh toán" },
     { value: "Chờ xác nhận", label: "🛒 Chờ xác nhận" },
     { value: "Đã xác nhận", label: "📦 Đã xác nhận" },
     { value: "Đang giao hàng", label: "🚚 Đang giao hàng" },
@@ -11,6 +12,7 @@ const STATUS_OPTIONS = [
 
 // Trình tự trạng thái đơn hàng (theo thứ tự)
 const STATUS_SEQUENCE = [
+    "Chờ thanh toán",
     "Chờ xác nhận",
     "Đã xác nhận",
     "Đang giao hàng",
@@ -19,8 +21,11 @@ const STATUS_SEQUENCE = [
 
 // Lấy các trạng thái có thể chuyển từ trạng thái hiện tại
 const getAvailableStatuses = (currentStatus) => {
-    if (!currentStatus || currentStatus === "Đã hủy" || currentStatus === "Đã giao hàng") {
-        // Nếu đã hủy hoặc đã giao hàng, không thể chuyển trạng thái
+    // Nếu đã hủy, đã giao hàng, hoặc đang chờ thanh toán → không thể chuyển trạng thái
+    if (!currentStatus ||
+        currentStatus === "Đã hủy" ||
+        currentStatus === "Đã giao hàng" ||
+        currentStatus === "Chờ thanh toán") {
         return [currentStatus];
     }
 
@@ -45,6 +50,7 @@ export default function Orders() {
     const [orders, setOrders] = useState([]);
     const [total, setTotal] = useState(0);
     const [statusTotals, setStatusTotals] = useState({
+        "Chờ thanh toán": 0,
         "Chờ xác nhận": 0,
         "Đã xác nhận": 0,
         "Đang giao hàng": 0,
@@ -132,6 +138,7 @@ export default function Orders() {
                 setTotal(data.total || list.length);
                 const counts = data.counts || {};
                 setStatusTotals({
+                    "Chờ thanh toán": counts["Chờ thanh toán"] || 0,
                     "Chờ xác nhận": counts["Chờ xác nhận"] || 0,
                     "Đã xác nhận": counts["Đã xác nhận"] || 0,
                     "Đang giao hàng": counts["Đang giao hàng"] || 0,
@@ -318,7 +325,7 @@ export default function Orders() {
                                             <td style={td}>
                                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                                     <button onClick={() => openDetail(o)} style={btnLink}>Chi tiết</button>
-                                                    {o.status !== 'Đã hủy' && o.status !== 'Đã giao hàng' && (
+                                                    {o.status !== 'Đã hủy' && o.status !== 'Đã giao hàng' && o.status !== 'Chờ thanh toán' && (
                                                         <button onClick={() => handleCancel(o)} style={{ ...btnLink, color: '#ef4444' }}>Hủy đơn</button>
                                                     )}
                                                 </div>

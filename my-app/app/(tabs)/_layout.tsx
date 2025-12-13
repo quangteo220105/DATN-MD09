@@ -16,6 +16,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: { display: 'none' }, // ✅ Ẩn thanh tabs
       }}
     >
       {/* --- Màn hình Splash --- */}

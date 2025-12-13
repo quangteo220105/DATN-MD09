@@ -23,7 +23,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { DOMAIN, BASE_URL } from '../config/apiConfig';
 
 const PAYMENT_METHODS = [
-  { key: 'cod', label: 'Thanh toán khi nhận hàng (COD)' },
+  { key: 'cod', label: 'Thanh toán tiền mặt' },
   { key: 'zalopay', label: 'ZaloPay' },
 ];
 const VOUCHER_MAX_ORDER_AMOUNT = 500000;
@@ -49,6 +49,10 @@ export default function CheckoutScreen() {
   const [showFailureDialog, setShowFailureDialog] = useState(false);
   const [showPaymentLoading, setShowPaymentLoading] = useState(false);
   const hasCheckedPaymentRef = useRef(false); // Tránh check nhiều lần trong cùng một session
+<<<<<<< HEAD
+=======
+  const hasOpenedZaloPayRef = useRef(false); // Đánh dấu đã mở ZaloPay
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
   const voucherEligible = total <= VOUCHER_MAX_ORDER_AMOUNT;
 
   useEffect(() => {
@@ -80,6 +84,8 @@ export default function CheckoutScreen() {
       // Hiển thị dialog thất bại
       console.log('❌❌❌ SETTING showFailureDialog to TRUE ❌❌❌');
       setShowFailureDialog(true);
+      // ✅ Reset ZaloPay flag khi hiển thị dialog
+      hasOpenedZaloPayRef.current = false;
       console.log('❌ Failure dialog state updated!');
     } catch (error) {
       console.error('[Checkout] Error handling payment failure:', error);
@@ -126,276 +132,175 @@ export default function CheckoutScreen() {
         await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
       } catch { }
 
-      // ⚠️ KHÔNG xóa success flag ở đây - chỉ xóa khi user nhấn nút đóng dialog
-      // Điều này đảm bảo dialog sẽ hiển thị lại nếu user thoát app trước khi đóng dialog
 
-      // Hiển thị dialog thành công
+
+      // Hiển thị dialog thành công với delay nhỏ để đảm bảo state update
       console.log('🎉🎉🎉 SETTING showSuccessDialog to TRUE 🎉🎉🎉');
-      setShowSuccessDialog(true);
-      console.log('🎉 Dialog state updated! Current value should be TRUE');
+      setTimeout(() => {
+        setShowSuccessDialog(true);
+        // ✅ Reset ZaloPay flag khi hiển thị dialog
+        hasOpenedZaloPayRef.current = false;
+        console.log('🎉 Dialog state updated! Current value should be TRUE');
+      }, 100);
     } catch (error) {
       console.error('[Checkout] Error handling payment success:', error);
     }
   }, []);
 
-  // 🟢 Hàm kiểm tra thanh toán thành công (dùng chung)
+  // 🟢 Hàm kiểm tra có nên check payment không - ĐƠN GIẢN HÓA TRIỆT ĐỂ
+  const shouldCheckPayment = React.useCallback(async () => {
+    try {
+      const userString = await AsyncStorage.getItem('user');
+      const user = userString ? JSON.parse(userString) : null;
+      if (!user || !user._id) return false;
+
+      // ✅ CHỈ check khi có payment=success param HOẶC có pending flag
+      const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
+      const hasPaymentParam = params.payment === 'success';
+
+      const shouldCheck = !!(pendingFlagStr || hasPaymentParam);
+
+      console.log('[shouldCheckPayment] SIMPLIFIED CHECK:', {
+        userId: user._id,
+        hasPendingFlag: !!pendingFlagStr,
+        hasPaymentParam,
+        RESULT: shouldCheck
+      });
+
+      return shouldCheck;
+    } catch {
+      return false;
+    }
+  }, [params.payment]);
+
+  // 🟢 Hàm kiểm tra thanh toán thành công - ĐƠN GIẢN HÓA TRIỆT ĐỂ
   const checkPaymentSuccess = React.useCallback(async () => {
     try {
       const userString = await AsyncStorage.getItem('user');
       const user = userString ? JSON.parse(userString) : null;
+      if (!user || !user._id) return false;
 
-      console.log('[Checkout] Checking payment success for user:', user ? user._id : 'NO USER');
+      console.log('[Checkout] 🔍 SIMPLIFIED CHECK - Checking payment success for user:', user._id);
 
-      if (!user || !user._id) {
-        console.log('[Checkout] ❌ No user found, cannot check payment');
+      // ✅ SIMPLIFIED: Chỉ kiểm tra pending flag và backend
+      const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
+      console.log('[Checkout] 🔍 SIMPLIFIED - PENDING FLAG:', { hasPendingFlag: !!pendingFlagStr });
+
+      if (!pendingFlagStr && !params.payment) {
+        console.log('[Checkout] ✅ SIMPLIFIED - NO PENDING FLAG AND NO PAYMENT PARAM - SKIP');
         return false;
       }
 
-      // Xóa flag cũ (legacy cleanup)
-      try {
-        const oldProcessedFlag = await AsyncStorage.getItem(`zalopay_processed_${user._id}`);
-        if (oldProcessedFlag) {
-          console.log('[Checkout] Removing old processed flag...');
-          await AsyncStorage.removeItem(`zalopay_processed_${user._id}`);
-        }
-        // Xóa luôn success flag cũ (không dùng nữa)
-        const oldSuccessFlag = await AsyncStorage.getItem(`zalopay_success_${user._id}`);
-        if (oldSuccessFlag) {
-          console.log('[Checkout] Removing old success flag...');
-          await AsyncStorage.removeItem(`zalopay_success_${user._id}`);
-        }
-      } catch { }
-
-      // ✅ LUÔN kiểm tra backend để tìm đơn ZaloPay chưa được processed
-      // Điều này đảm bảo dialog hiển thị ngay cả khi restart app hoặc đăng xuất/đăng nhập
-      try {
-        console.log('[Checkout] Checking backend for unprocessed ZaloPay orders...');
-        const response = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
-        console.log('[Checkout] Backend response status:', response.status);
-
-        if (response.ok) {
-          const json = await response.json();
-          const orders = Array.isArray(json) ? json : json.data || [];
-          console.log('[Checkout] Total orders:', orders.length);
-
-          // ✅ GIẢI PHÁP CUỐI CÙNG: Dùng timestamp thay vì flag processed
-          // Lấy timestamp lần cuối user đóng dialog ZaloPay
-          const lastDismissedStr = await AsyncStorage.getItem(`zalopay_last_dismissed_${user._id}`);
-          const lastDismissedTime = lastDismissedStr ? parseInt(lastDismissedStr) : 0;
-
-          console.log('[Checkout] Checking for user:', user._id);
-          console.log('[Checkout] Last dismissed time:', lastDismissedTime ? new Date(lastDismissedTime).toISOString() : 'Never');
-
-          // Tìm TẤT CẢ đơn ZaloPay (không giới hạn thời gian)
-          const allZaloPayOrders = orders.filter((o: any) => o.payment === 'zalopay');
-          console.log('[Checkout] All ZaloPay orders:', allZaloPayOrders.length);
-
-          // Tìm đơn mới nhất được tạo SAU khi user đóng dialog lần cuối
-          // VÀ trong vòng 24 giờ gần đây (để tránh hiển thị đơn cũ khi reset app)
-          const now = Date.now();
-          const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
-
-          let newestUnseenOrder = null;
-          for (const order of allZaloPayOrders) {
-            const orderTime = order.createdAt ? new Date(order.createdAt).getTime() : 0;
-
-            // Chỉ xét đơn được tạo SAU khi user đóng dialog VÀ trong vòng 24 giờ
-            if (orderTime > lastDismissedTime && orderTime > twentyFourHoursAgo) {
-              if (!newestUnseenOrder || orderTime > new Date(newestUnseenOrder.createdAt).getTime()) {
-                newestUnseenOrder = order;
-              }
-            }
-          }
-
-          if (newestUnseenOrder) {
-            const orderId = newestUnseenOrder._id || newestUnseenOrder.id;
-            const orderTime = new Date(newestUnseenOrder.createdAt).getTime();
-            const hoursAgo = Math.round((Date.now() - orderTime) / (1000 * 60 * 60));
-
-            const orderStatus = (newestUnseenOrder.status || '').toLowerCase().trim();
-
-            console.log('✅✅✅ NEW ZALOPAY ORDER FOUND! ✅✅✅', {
-              orderId: orderId,
-              status: newestUnseenOrder.status,
-              statusLower: orderStatus,
-              createdAt: newestUnseenOrder.createdAt,
-              hoursAgo: hoursAgo,
-              orderTime: new Date(orderTime).toISOString(),
-              lastDismissed: lastDismissedTime ? new Date(lastDismissedTime).toISOString() : 'Never'
-            });
-
-            // Kiểm tra trạng thái đơn hàng
-            console.log('[Checkout] Checking order status:', {
-              original: newestUnseenOrder.status,
-              lowercase: orderStatus,
-              isWaitingPayment: orderStatus === 'chờ thanh toán',
-              isConfirmed: orderStatus === 'đã xác nhận' || orderStatus.includes('xác nhận')
-            });
-
-            if (orderStatus === 'chờ thanh toán') {
-              // Thanh toán thất bại - đơn vẫn ở trạng thái chờ thanh toán
-              console.log('❌❌❌ Payment FAILED - Order status: Chờ thanh toán');
-              await handlePaymentFailure();
-              return true;
-            } else if (orderStatus === 'đã xác nhận' || orderStatus.includes('xác nhận') || orderStatus === 'confirmed') {
-              // Thanh toán thành công - đơn đã được xác nhận (MỚI thanh toán xong)
-              console.log('🚀 Payment SUCCESS - Order confirmed');
-              await handlePaymentSuccess();
-              console.log('✅ handlePaymentSuccess completed!');
-              return true;
-            } else {
-              // ⚠️ Trạng thái khác (Đang giao hàng, Đã giao hàng) - KHÔNG hiển thị dialog
-              // Vì đây là đơn cũ đã được xử lý rồi, chỉ là chưa dismiss
-              console.log('[Checkout] Order already processed (status:', newestUnseenOrder.status, '), skipping dialog');
-
-              // Tự động cập nhật dismissed timestamp để không check lại đơn này
-              try {
-                const userString = await AsyncStorage.getItem('user');
-                const user = userString ? JSON.parse(userString) : null;
-                if (user && user._id) {
-                  await AsyncStorage.setItem(`zalopay_last_dismissed_${user._id}`, Date.now().toString());
-                  console.log('[Checkout] Auto-updated dismissed timestamp for old order');
-                }
-              } catch (e) {
-                console.error('[Checkout] Error auto-updating timestamp:', e);
-              }
-
-              return false;
-            }
-          } else {
-            console.log('[Checkout] No new ZaloPay orders since last dismissal');
-          }
-
-          console.log('[Checkout] All recent ZaloPay orders have been processed');
-        } else {
-          console.error('[Checkout] Backend response not OK:', response.status);
-        }
-      } catch (error) {
-        console.error('[Checkout] Error checking backend for unprocessed orders:', error);
+      // Lấy danh sách đơn hàng từ backend
+      const response = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
+      if (!response.ok) {
+        console.log('[Checkout] ❌ SIMPLIFIED - BACKEND REQUEST FAILED:', response.status);
+        return false;
       }
 
-      // Kiểm tra đơn hàng ZaloPay mới nhất từ backend (fallback - legacy support)
-      const pendingFlag = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
-      if (pendingFlag) {
-        const pendingData = JSON.parse(pendingFlag);
-        const timeSincePayment = Date.now() - pendingData.timestamp;
+      const json = await response.json();
+      const orders = Array.isArray(json) ? json : json.data || [];
+      console.log('[Checkout] 📊 SIMPLIFIED - TOTAL ORDERS:', orders.length);
 
-        // Chỉ kiểm tra nếu thanh toán trong vòng 10 phút
-        if (timeSincePayment < 10 * 60 * 1000) {
-          try {
-            console.log('[Checkout] [Legacy] Checking backend for payment success...', {
-              orderId: pendingData.orderId,
-              timeSincePayment: Math.round(timeSincePayment / 1000) + 's'
-            });
+      let targetOrder = null;
 
-            const response = await fetch(`${BASE_URL}/orders/user/${user._id}/list`);
-            if (response.ok) {
-              const json = await response.json();
-              const orders = Array.isArray(json) ? json : json.data || [];
+      // ✅ CASE 1: Có pending flag → Tìm đơn theo orderId
+      if (pendingFlagStr) {
+        try {
+          const pendingData = JSON.parse(pendingFlagStr);
+          console.log('[Checkout] 📋 SIMPLIFIED - PENDING DATA:', {
+            orderId: pendingData.orderId,
+            isRetryPayment: pendingData.isRetryPayment,
+            minutesAgo: Math.round((Date.now() - pendingData.timestamp) / (1000 * 60))
+          });
 
-              // Tìm đơn hàng theo orderId trong pendingFlag
-              let zalopayOrder = null;
-              if (pendingData.orderId) {
-                console.log('[Checkout] Looking for order with ID:', pendingData.orderId);
-                zalopayOrder = orders.find((o: any) => {
-                  const orderId = String(o._id || o.id || '');
-                  const matches = orderId === String(pendingData.orderId) && o.payment === 'zalopay';
-                  if (orderId === String(pendingData.orderId)) {
-                    console.log('[Checkout] Found matching order:', {
-                      orderId: orderId,
-                      payment: o.payment,
-                      status: o.status,
-                      matches: matches
-                    });
-                  }
-                  return matches;
-                });
-              }
+          // Tìm đơn theo orderId
+          targetOrder = orders.find((o: any) => {
+            const orderId = String(o._id || o.id || '');
+            return orderId === String(pendingData.orderId) && o.payment === 'zalopay';
+          });
 
-              // ✅ Nếu tìm thấy đơn theo ID → Kiểm tra status
-              if (zalopayOrder) {
-                const orderStatus = (zalopayOrder.status || '').toLowerCase().trim();
+          console.log('[Checkout] 🎯 SIMPLIFIED - ORDER FROM PENDING FLAG:', !!targetOrder);
+        } catch (e) {
+          console.log('[Checkout] ❌ SIMPLIFIED - ERROR PARSING PENDING FLAG:', e);
+        }
+      }
 
-                console.log('✅✅✅ ZALOPAY ORDER FOUND! ✅✅✅', {
-                  orderId: zalopayOrder._id || zalopayOrder.id,
-                  status: zalopayOrder.status,
-                  statusLower: orderStatus,
-                  payment: zalopayOrder.payment
-                });
+      // ✅ CASE 2: Không có pending flag hoặc không tìm thấy đơn → Tìm đơn ZaloPay mới nhất
+      if (!targetOrder && params.payment === 'success') {
+        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+        const recentZaloPayOrders = orders.filter((o: any) => {
+          if (o.payment !== 'zalopay') return false;
+          const orderTime = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+          return orderTime > oneHourAgo;
+        });
 
-                await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
+        if (recentZaloPayOrders.length > 0) {
+          targetOrder = recentZaloPayOrders.sort((a: any, b: any) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+          console.log('[Checkout] 🎯 SIMPLIFIED - LATEST ZALOPAY ORDER:', !!targetOrder);
+        }
+      }
 
-                // Kiểm tra trạng thái
-                if (orderStatus === 'chờ thanh toán') {
-                  // Thanh toán thất bại
-                  console.log('❌❌❌ [Legacy] Payment FAILED - Order status: Chờ thanh toán');
-                  await handlePaymentFailure();
-                  return true;
-                } else {
-                  // Thanh toán thành công
-                  console.log('🚀 [Legacy] About to call handlePaymentSuccess...');
-                  await handlePaymentSuccess();
-                  console.log('✅ [Legacy] handlePaymentSuccess completed!');
-                  return true;
-                }
-              }
+      // ✅ KIỂM TRA TRẠNG THÁI VÀ HIỂN THỊ DIALOG
+      if (targetOrder) {
+        const orderStatus = (targetOrder.status || '').toLowerCase().trim();
+        console.log('[Checkout] 🎯 SIMPLIFIED - TARGET ORDER:', {
+          orderId: targetOrder._id || targetOrder.id,
+          status: targetOrder.status,
+          statusLower: orderStatus
+        });
 
-              // Nếu không tìm thấy theo orderId, tìm đơn ZaloPay mới nhất trong 5 phút
-              console.log('[Checkout] Order not found by ID, searching for recent ZaloPay order...');
-              const recentZaloPayOrders = orders.filter((o: any) => {
-                if (o.payment !== 'zalopay') return false;
-                const orderTime = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-                const timeDiff = Date.now() - orderTime;
-                return timeDiff < 5 * 60 * 1000; // 5 phút
-              });
-
-              console.log('[Checkout] Recent ZaloPay orders (last 5 min):', recentZaloPayOrders.length);
-
-              if (recentZaloPayOrders.length > 0) {
-                zalopayOrder = recentZaloPayOrders[0];
-                const orderStatus = (zalopayOrder.status || '').toLowerCase().trim();
-
-                console.log('✅✅✅ RECENT ZALOPAY ORDER FOUND! ✅✅✅', {
-                  orderId: zalopayOrder._id || zalopayOrder.id,
-                  status: zalopayOrder.status,
-                  statusLower: orderStatus,
-                  createdAt: zalopayOrder.createdAt
-                });
-
-                await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
-
-                // Kiểm tra trạng thái
-                if (orderStatus === 'chờ thanh toán') {
-                  // Thanh toán thất bại
-                  console.log('❌❌❌ [Legacy] Payment FAILED - Recent order status: Chờ thanh toán');
-                  await handlePaymentFailure();
-                  return true;
-                } else {
-                  // Thanh toán thành công
-                  console.log('🚀 [Legacy] About to call handlePaymentSuccess (recent order)...');
-                  await handlePaymentSuccess();
-                  console.log('✅ [Legacy] handlePaymentSuccess completed!');
-                  return true;
-                }
-              } else {
-                console.log('[Checkout] No recent ZaloPay order found, will retry...');
-              }
-            }
-          } catch (error) {
-            console.error('[Checkout] Error checking backend order:', error);
-          }
-        } else {
-          // Xóa flag cũ nếu quá thời gian
-          console.log('[Checkout] Pending flag expired, removing...');
+        // Xóa pending flag
+        if (pendingFlagStr) {
           await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
+          console.log('[Checkout] 🧹 SIMPLIFIED - PENDING FLAG CLEARED');
+        }
+
+        if (orderStatus === 'chờ thanh toán') {
+          console.log('[Checkout] ❌ SIMPLIFIED - PAYMENT FAILED');
+          await handlePaymentFailure();
+          return true;
+        } else if (orderStatus === 'đã xác nhận' || orderStatus.includes('xác nhận')) {
+          console.log('[Checkout] 🎉 SIMPLIFIED - PAYMENT SUCCESS');
+          await handlePaymentSuccess();
+          return true;
+        } else {
+          console.log('[Checkout] ⚠️ SIMPLIFIED - UNEXPECTED STATUS, ASSUMING SUCCESS:', orderStatus);
+          await handlePaymentSuccess();
+          return true;
+        }
+      } else {
+        console.log('[Checkout] ❌ SIMPLIFIED - NO TARGET ORDER FOUND');
+        // Xóa pending flag nếu có
+        if (pendingFlagStr) {
+          await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
+          console.log('[Checkout] 🧹 SIMPLIFIED - CLEARED ORPHANED PENDING FLAG');
         }
       }
+
       return false;
     } catch (error) {
-      console.error('[Checkout] Error checking payment success flag:', error);
+      console.error('[Checkout] ❌ SIMPLIFIED - ERROR:', error);
       return false;
     }
-  }, [handlePaymentSuccess]);
+  }, [params.payment, handlePaymentSuccess, handlePaymentFailure]);
+
+  const checkPaymentWithSpinner = React.useCallback(async () => {
+    const MIN_SPINNER_TIME = 2000;
+    const MAX_SPINNER_TIME = 3000;
+    const start = Date.now();
+    setShowPaymentLoading(true);
+    try {
+      return await checkPaymentSuccess();
+    } finally {
+      const elapsed = Date.now() - start;
+      const intended = Math.max(MIN_SPINNER_TIME, Math.min(MAX_SPINNER_TIME, elapsed + 500));
+      const remaining = Math.max(0, intended - elapsed);
+      setTimeout(() => setShowPaymentLoading(false), remaining);
+    }
+  }, [checkPaymentSuccess]);
 
   const checkPaymentWithSpinner = React.useCallback(async () => {
     const MIN_SPINNER_TIME = 2000;
@@ -479,24 +384,191 @@ export default function CheckoutScreen() {
         return;
       }
 
-      // ✅ Xóa pending flag của user hiện tại nếu không phải từ thanh toán ZaloPay
-      // (tránh hiển thị dialog khi vào checkout bình thường)
-      try {
-        const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
-        if (pendingFlagStr && !params.payment) {
-          const pendingData = JSON.parse(pendingFlagStr);
-          const timeSincePending = Date.now() - (pendingData.timestamp || 0);
-
-          // Nếu pending flag quá 5 phút và không có payment param, xóa nó
-          if (timeSincePending > 5 * 60 * 1000) {
-            console.log('[Checkout] Removing old pending flag on mount');
-            await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
-          }
-        }
-      } catch (e) {
-        console.log('[Checkout] Error checking pending flag:', e);
-      }
       setUserId(user._id);
+
+      // ✅ CHỈ xóa pending flag CŨ (KHÔNG PHẢI retry payment) nếu đây là mua ngay bình thường
+      console.log('[Checkout] 🔍 CHECKING PARAMS:', { orderId: params.orderId, payment: params.payment });
+      if (!params.orderId && !params.payment) {
+        try {
+          const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
+          console.log('[Checkout] 🔍 PENDING FLAG CHECK:', { hasPendingFlag: !!pendingFlagStr });
+          if (pendingFlagStr) {
+            try {
+              const pendingData = JSON.parse(pendingFlagStr);
+              console.log('[Checkout] 📋 PENDING FLAG DATA:', pendingData);
+
+              // ✅ CHỈ xóa nếu KHÔNG PHẢI retry payment HOẶC đã quá 10 phút
+              const timeSincePending = Date.now() - (pendingData.timestamp || 0);
+              const isExpired = timeSincePending > 10 * 60 * 1000; // 10 phút
+
+              if (!pendingData.isRetryPayment || isExpired) {
+                console.log('[Checkout] 🧹 CLEARING OLD/EXPIRED PENDING FLAG:', {
+                  isRetryPayment: pendingData.isRetryPayment,
+                  isExpired,
+                  minutesAgo: Math.round(timeSincePending / (1000 * 60))
+                });
+                await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
+                console.log('[Checkout] ✅ OLD PENDING FLAG CLEARED');
+              } else {
+                console.log('[Checkout] 🔄 KEEPING RETRY PAYMENT FLAG (still fresh):', {
+                  minutesAgo: Math.round(timeSincePending / (1000 * 60))
+                });
+              }
+            } catch (parseError) {
+              console.log('[Checkout] ❌ ERROR PARSING PENDING FLAG, CLEARING IT:', parseError);
+              await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
+            }
+          } else {
+            console.log('[Checkout] ✅ NO OLD PENDING FLAG TO CLEAR');
+          }
+        } catch (e) {
+          console.log('[Checkout] ❌ ERROR CHECKING PENDING FLAG:', e);
+        }
+      } else {
+        console.log('[Checkout] 🔄 NOT NORMAL PURCHASE - KEEPING PENDING FLAG (orderId or payment param exists)');
+      }
+
+      // 🟢 Kiểm tra nếu có orderId trong params (thanh toán lại)
+      if (params.orderId) {
+        try {
+          console.log('[Checkout] Loading order for retry payment:', params.orderId);
+          const orderResponse = await fetch(`${BASE_URL}/orders/${params.orderId}`);
+          if (orderResponse.ok) {
+            const orderData = await orderResponse.json();
+
+            // Kiểm tra đơn hàng có phải "Chờ thanh toán" không
+            const orderStatus = (orderData.status || '').toLowerCase().trim();
+            if (orderStatus === 'chờ thanh toán' || orderStatus === 'waiting payment' || orderStatus === 'pending payment') {
+              // Load thông tin từ đơn hàng
+              if (orderData.items && Array.isArray(orderData.items) && orderData.items.length > 0) {
+                const items = orderData.items.map((item: any) => ({
+                  id: item.productId || item._id || item.id,
+                  _id: item.productId || item._id || item.id,
+                  productId: item.productId || item._id || item.id,
+                  name: item.name,
+                  size: item.size,
+                  color: item.color,
+                  qty: item.qty,
+                  price: item.price,
+                  image: item.image,
+                  discountAmount: item.discountAmount || 0,
+                  checked: true
+                }));
+
+                // Kiểm tra sản phẩm dừng bán
+                const hasStopped = await checkStoppedProducts(items);
+                if (hasStopped) {
+                  return;
+                }
+
+                setCart(items);
+
+                // Tính tổng từ items
+                const cartTotal = items.reduce((sum: number, i: any) => sum + i.qty * i.price, 0);
+                setTotal(cartTotal);
+
+                // Set payment method
+                if (orderData.payment === 'zalopay') {
+                  setPayment('zalopay');
+                }
+
+                // Load voucher nếu có - sử dụng discount từ orderData
+                if (orderData.voucherCode) {
+                  setVoucherCode(orderData.voucherCode);
+                  // Sử dụng discount từ orderData (đã được validate khi tạo đơn)
+                  const discount = orderData.discount || 0;
+                  setVoucherDiscount(discount);
+
+                  // Thử fetch thông tin voucher để hiển thị (optional)
+                  try {
+                    const categoryIds = Array.from(new Set(items.map((i: any) => i.categoryId).filter(Boolean)));
+                    const voucherResponse = await fetch(`${BASE_URL}/vouchers/check`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        code: orderData.voucherCode,
+                        orderAmount: cartTotal,
+                        categoryIds
+                      })
+                    });
+                    const voucherData = await voucherResponse.json();
+                    if (voucherResponse.ok && voucherData.valid) {
+                      setAppliedVoucher({
+                        code: voucherData.voucher.code,
+                        name: voucherData.voucher.name,
+                        description: voucherData.voucher.description || '',
+                        discountType: voucherData.voucher.discountType,
+                        discountValue: voucherData.voucher.discountValue,
+                        maxDiscountAmount: voucherData.voucher.maxDiscountAmount || 0
+                      });
+                    } else {
+                      // Nếu không validate được, vẫn giữ discount từ orderData
+                      setAppliedVoucher({
+                        code: orderData.voucherCode,
+                        name: orderData.voucherCode,
+                        description: '',
+                        discountType: 'fixed',
+                        discountValue: discount,
+                        maxDiscountAmount: 0
+                      });
+                    }
+                  } catch (e) {
+                    console.log('[Checkout] Error fetching voucher info:', e);
+                    // Fallback: sử dụng discount từ orderData
+                    setAppliedVoucher({
+                      code: orderData.voucherCode,
+                      name: orderData.voucherCode,
+                      description: '',
+                      discountType: 'fixed',
+                      discountValue: discount,
+                      maxDiscountAmount: 0
+                    });
+                  }
+                }
+
+                // Load address từ đơn hàng
+                if (orderData.address) {
+                  const addressParts = orderData.address.split('\n');
+                  if (addressParts.length >= 2) {
+                    const namePhone = addressParts[0].split(' - ');
+                    const addr = {
+                      name: namePhone[0] || user.name || '',
+                      phone: namePhone[1] || '',
+                      address: addressParts.slice(1).join('\n')
+                    };
+                    setAddressObj(addr);
+                    setInput(addr);
+                  }
+                } else {
+                  // Fallback: lấy từ AsyncStorage
+                  const addressString = await AsyncStorage.getItem(`address_${user._id}`);
+                  const addr = addressString ? JSON.parse(addressString) : { name: user.name || '', phone: '', address: '' };
+                  setAddressObj(addr);
+                  setInput(addr);
+                }
+
+                // Lấy voucher khả dụng
+                if (cartTotal > 0 && cartTotal <= VOUCHER_MAX_ORDER_AMOUNT) {
+                  fetchAvailableVouchers(cartTotal);
+                } else {
+                  setAvailableVouchers([]);
+                }
+
+                return; // Đã load xong từ đơn hàng, không cần load cart nữa
+              }
+            } else {
+              Alert.alert('Thông báo', 'Đơn hàng này không còn ở trạng thái "Chờ thanh toán"');
+              router.replace('/orders');
+              return;
+            }
+          }
+        } catch (e) {
+          console.log('[Checkout] Error loading order:', e);
+          Alert.alert('Lỗi', 'Không thể tải thông tin đơn hàng');
+          router.replace('/orders');
+          return;
+        }
+      }
 
       // Lấy address
       const addressString = await AsyncStorage.getItem(`address_${user._id}`);
@@ -539,7 +611,7 @@ export default function CheckoutScreen() {
       }
     };
     fetchData();
-  }, [checkStoppedProducts]);
+  }, [checkStoppedProducts, params.orderId]);
 
   // 🔄 Reload khi quay lại màn hình (đảm bảo tên từ profile cập nhật, hoặc địa chỉ vừa chọn)
   useFocusEffect(
@@ -584,51 +656,35 @@ export default function CheckoutScreen() {
     }, [cart, checkStoppedProducts])
   );
 
-  // 🟢 Xử lý deep link khi thanh toán ZaloPay thành công
+  // 🟢 Xử lý payment=success param - ĐƠN GIẢN HÓA
   useEffect(() => {
-    // Kiểm tra params từ URL (Expo Router)
     if (params.payment === 'success') {
-      console.log('Payment success detected from URL params');
-      handlePaymentSuccess();
+      console.log('[Checkout] Payment success param detected, checking payment...');
+      // Delay nhỏ để component mount xong
+      setTimeout(() => {
+        checkPaymentSuccess();
+      }, 500);
     }
+  }, [params.payment, checkPaymentSuccess]);
 
-    // Lắng nghe deep link khi app đang mở
-    const subscription = Linking.addEventListener('url', (event) => {
-      const { url } = event;
-      console.log('Deep link received in checkout:', url);
-
-      // Kiểm tra nếu có query param payment=success
-      if (url.includes('payment=success') || url.includes('checkout?payment=success')) {
-        handlePaymentSuccess();
-      }
-    });
-
-    // Kiểm tra deep link khi app mở từ trạng thái đóng
-    Linking.getInitialURL().then((url) => {
-      if (url && (url.includes('payment=success') || url.includes('checkout?payment=success'))) {
-        handlePaymentSuccess();
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [params.payment]);
-
-  // 🟢 Kiểm tra khi component mount (CHỈ khi có pending flag - tức là đang chờ kết quả thanh toán)
+  // 🟢 Kiểm tra pending payment khi mount - ĐƠN GIẢN HÓA
   useEffect(() => {
-    const checkIfPendingPayment = async () => {
+    const checkPendingOnMount = async () => {
       try {
         const userString = await AsyncStorage.getItem('user');
         const user = userString ? JSON.parse(userString) : null;
         if (!user || !user._id) return;
 
-        // CHỈ check nếu có pending flag (đang chờ kết quả thanh toán ZaloPay)
+        // Không check nếu đang retry payment hoặc có payment param
+        if (params.orderId || params.payment) return;
+
+        // Chỉ check nếu có pending flag
         const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
-        if (!pendingFlagStr) {
-          console.log('[Checkout] No pending payment, skipping check');
-          return;
+        if (pendingFlagStr) {
+          console.log('[Checkout] Found pending payment on mount, checking...');
+          checkPaymentWithSpinner();
         }
+<<<<<<< HEAD
 
         // Kiểm tra thời gian của pending flag - chỉ check nếu trong vòng 15 phút
         try {
@@ -678,18 +734,26 @@ export default function CheckoutScreen() {
         return () => {
           timeouts.forEach(timeout => clearTimeout(timeout));
         };
+=======
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
       } catch (error) {
-        console.log('[Checkout] Error checking pending payment:', error);
+        console.log('[Checkout] Error checking pending on mount:', error);
       }
     };
 
+<<<<<<< HEAD
     checkIfPendingPayment();
   }, [checkPaymentSuccess, checkPaymentWithSpinner]);
+=======
+    checkPendingOnMount();
+  }, [params.orderId, params.payment, checkPaymentWithSpinner]);
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
 
-  // 🟢 Lắng nghe AppState để detect khi app được active lại từ background
+  // 🟢 Lắng nghe AppState - LUÔN CHECK PENDING FLAG KHI APP ACTIVE
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
+<<<<<<< HEAD
         console.log('[Checkout] App became active, checking payment success...');
         setTimeout(async () => {
           try {
@@ -706,34 +770,66 @@ export default function CheckoutScreen() {
             }
           } catch (error) {
             console.log('[Checkout] Error checking payment on app active:', error);
+=======
+        console.log('[Checkout] 🔄 APP BECAME ACTIVE - CHECKING FOR PENDING PAYMENTS');
+        setTimeout(async () => {
+          try {
+            if (!userId) {
+              console.log('[Checkout] ❌ No userId, skipping check');
+              return;
+            }
+
+            // ✅ CHỈ skip nếu đang retry payment NHƯNG chưa mở ZaloPay
+            if (params.orderId && !hasOpenedZaloPayRef.current) {
+              console.log('[Checkout] 🔄 Retry payment in progress (not opened ZaloPay yet), skipping auto-check');
+              return;
+            }
+
+            if (params.orderId && hasOpenedZaloPayRef.current) {
+              console.log('[Checkout] 🎯 Retry payment + ZaloPay opened - CHECKING PAYMENT STATUS');
+            }
+
+            // ✅ LUÔN kiểm tra pending flag khi app active (không cần shouldCheckPayment)
+            const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${userId}`);
+            console.log('[Checkout] 🔍 APP ACTIVE - PENDING FLAG CHECK:', { hasPendingFlag: !!pendingFlagStr });
+
+            if (pendingFlagStr) {
+              console.log('[Checkout] 🎯 FOUND PENDING FLAG ON APP ACTIVE - CHECKING PAYMENT STATUS');
+              checkPaymentWithSpinner();
+            } else {
+              console.log('[Checkout] ✅ NO PENDING FLAG - NO CHECK NEEDED');
+            }
+          } catch (error) {
+            console.log('[Checkout] ❌ ERROR ON APP ACTIVE:', error);
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
           }
         }, 500);
       }
     });
 
+<<<<<<< HEAD
     return () => {
       subscription.remove();
     };
   }, [checkPaymentSuccess, checkPaymentWithSpinner, params.payment, userId]);
+=======
+    return () => subscription.remove();
+  }, [userId, params.orderId, checkPaymentWithSpinner]);
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
 
-  // 🟢 Kiểm tra flag từ AsyncStorage khi màn hình được focus (CHỈ khi có pending flag)
+  // 🟢 Kiểm tra khi focus - LUÔN CHECK PENDING FLAG
   useFocusEffect(
     React.useCallback(() => {
       const checkOnFocus = async () => {
         try {
           const userString = await AsyncStorage.getItem('user');
           const user = userString ? JSON.parse(userString) : null;
-          if (!user || !user._id) return;
-
-          // CHỈ check nếu có pending flag hoặc payment param
-          const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
-          const hasPaymentParam = params.payment === 'success';
-
-          if (!pendingFlagStr && !hasPaymentParam) {
-            console.log('[Checkout] Screen focused - No pending payment or payment param, skipping check');
+          if (!user || !user._id) {
+            console.log('[Checkout] 🔍 FOCUS - No user found');
             return;
           }
 
+<<<<<<< HEAD
           console.log('[Checkout] Screen focused - Pending payment detected, checking...');
           const shouldShowLoading = !!pendingFlagStr || hasPaymentParam;
           const runCheck = shouldShowLoading ? checkPaymentWithSpinner : checkPaymentSuccess;
@@ -751,17 +847,39 @@ export default function CheckoutScreen() {
               runCheck();
             }, 5000)
           ];
+=======
+          // ✅ CHỈ skip nếu đang retry payment NHƯNG chưa mở ZaloPay
+          if (params.orderId && !hasOpenedZaloPayRef.current) {
+            console.log('[Checkout] 🔍 FOCUS - Retry payment in progress (not opened ZaloPay yet), skipping auto-check');
+            return;
+          }
 
-          return () => {
-            timeouts.forEach(timeout => clearTimeout(timeout));
-          };
+          if (params.orderId && hasOpenedZaloPayRef.current) {
+            console.log('[Checkout] 🔍 FOCUS - Retry payment + ZaloPay opened - CHECKING PAYMENT STATUS');
+          }
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
+
+          // ✅ LUÔN kiểm tra pending flag khi focus (không cần shouldCheckPayment)
+          const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
+          console.log('[Checkout] 🔍 FOCUS - PENDING FLAG CHECK:', { hasPendingFlag: !!pendingFlagStr });
+
+          if (pendingFlagStr) {
+            console.log('[Checkout] 🎯 FOUND PENDING FLAG ON FOCUS - CHECKING PAYMENT STATUS');
+            checkPaymentWithSpinner();
+          } else {
+            console.log('[Checkout] ✅ NO PENDING FLAG ON FOCUS - NO CHECK NEEDED');
+          }
         } catch (error) {
-          console.log('[Checkout] Error checking on focus:', error);
+          console.log('[Checkout] ❌ ERROR ON FOCUS:', error);
         }
       };
 
       checkOnFocus();
+<<<<<<< HEAD
     }, [checkPaymentSuccess, checkPaymentWithSpinner, params.payment])
+=======
+    }, [params.orderId, checkPaymentWithSpinner])
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
   );
 
   // 🟢 Lấy danh sách categoryId trong cart
@@ -1038,80 +1156,191 @@ export default function CheckoutScreen() {
     const finalTotal = total - voucherDiscount;
     const orderId = Date.now().toString();
 
-    // Tạo đơn lên backend trước
-    let backendOrderId = null;
-    try {
-      const response = await fetch(`${BASE_URL}/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user._id,
-          customerName: user.name || addressObj.name,
-          customerPhone: addressObj.phone || user.phone,
-          items: cart.map(i => ({
-            productId: i._id || i.productId || i.id,
-            name: i.name,
-            size: i.size,
-            color: i.color,
-            qty: i.qty,
-            price: i.price,
-            image: i.image,
-            discountAmount: i.discountAmount || 0
-          })),
-          total: finalTotal,
-          voucherCode: appliedVoucher?.code || null,
-          discount: voucherDiscount,
-          address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
-          payment,
-          status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        backendOrderId = data?._id || data?.id || null;
+    // 🟢 Kiểm tra nếu đang retry payment (có orderId trong params)
+    let isRetryPayment = !!params.orderId;
+    let backendOrderId = params.orderId || null;
+    let backendOrderCode = null;
+
+    if (isRetryPayment) {
+      // Update đơn hàng cũ thay vì tạo mới
+      try {
+        const updateResponse = await fetch(`${BASE_URL}/orders/${params.orderId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: cart.map(i => ({
+              productId: i._id || i.productId || i.id,
+              name: i.name,
+              size: i.size,
+              color: i.color,
+              qty: i.qty,
+              price: i.price,
+              image: i.image,
+              discountAmount: i.discountAmount || 0
+            })),
+            total: finalTotal,
+            voucherCode: appliedVoucher?.code || null,
+            discount: voucherDiscount,
+            address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+            payment,
+            status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
+          })
+        });
+        if (updateResponse.ok) {
+          const data = await updateResponse.json();
+          backendOrderId = data?._id || data?.id || params.orderId;
+          backendOrderCode = data?.code || null;
+          console.log('[Checkout] Order updated for retry payment:', backendOrderId);
+        } else {
+          console.log('[Checkout] Failed to update order, creating new one');
+          // Nếu update thất bại, tạo đơn mới
+          isRetryPayment = false;
+        }
+      } catch (e) {
+        console.log('[Checkout] Error updating order:', e);
+        // Nếu có lỗi, tạo đơn mới
+        isRetryPayment = false;
       }
-    } catch (e) {
-      console.log('POST /orders failed', e);
     }
 
-    // Chỉ lưu vào AsyncStorage nếu KHÔNG phải ZaloPay
-    // Với ZaloPay, chỉ lưu khi thanh toán thành công (xử lý trong orders.tsx)
-    if (payment !== 'zalopay') {
+    // Tạo đơn mới nếu không phải retry hoặc retry thất bại
+    if (!isRetryPayment) {
+      try {
+        const response = await fetch(`${BASE_URL}/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user._id,
+            customerName: user.name || addressObj.name,
+            customerPhone: addressObj.phone || user.phone,
+            items: cart.map(i => ({
+              productId: i._id || i.productId || i.id,
+              name: i.name,
+              size: i.size,
+              color: i.color,
+              qty: i.qty,
+              price: i.price,
+              image: i.image,
+              discountAmount: i.discountAmount || 0
+            })),
+            total: finalTotal,
+            voucherCode: appliedVoucher?.code || null,
+            discount: voucherDiscount,
+            address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+            payment,
+            status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
+          })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          backendOrderId = data?._id || data?.id || null;
+          backendOrderCode = data?.code || null;
+        }
+      } catch (e) {
+        console.log('POST /orders failed', e);
+      }
+    }
+
+    // 🟢 Xử lý AsyncStorage
+    // Nếu là retry payment: update đơn hàng cũ trong AsyncStorage
+    // Nếu không phải retry và không phải ZaloPay: tạo đơn mới
+    // Với ZaloPay (không retry): chỉ lưu khi thanh toán thành công (xử lý trong orders.tsx)
+    if (isRetryPayment && backendOrderId) {
+      // Update đơn hàng cũ trong AsyncStorage
       const historyKey = `order_history_${user._id}`;
       const historyString = await AsyncStorage.getItem(historyKey);
       let history = historyString ? JSON.parse(historyString) : [];
       history = Array.isArray(history) ? history : [];
 
-      const newOrder = {
-        id: backendOrderId || orderId,
+      // Tìm và update đơn hàng cũ
+      const orderIdStr = String(backendOrderId);
+      const orderIndex = history.findIndex((o: any) =>
+        (o._id && String(o._id) === orderIdStr) ||
+        (o.id && String(o.id) === orderIdStr)
+      );
+
+      const updatedOrder = {
+        id: backendOrderId,
         _id: backendOrderId,
         items: cart,
         total: finalTotal,
         originalTotal: total,
         discount: voucherDiscount,
         voucherCode: appliedVoucher?.code,
+        voucherAppliedAmount: voucherDiscount,
         address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
         payment,
-        status: 'Chờ xác nhận',
-        createdAt: new Date().toISOString()
+        status: payment === 'zalopay' ? 'Chờ thanh toán' : 'Chờ xác nhận',
+        createdAt: history[orderIndex]?.createdAt || new Date().toISOString(), // Giữ nguyên createdAt cũ
+        shippingDate: history[orderIndex]?.shippingDate || null,
+        deliveredDate: history[orderIndex]?.deliveredDate || null,
+        cancelledDate: history[orderIndex]?.cancelledDate || null,
+        voucher: appliedVoucher?.code ? { code: appliedVoucher.code } : undefined
       };
-      history.unshift(newOrder);
+
+      if (orderIndex >= 0) {
+        // Update đơn hàng cũ
+        history[orderIndex] = updatedOrder;
+      } else {
+        // Nếu không tìm thấy, thêm vào đầu danh sách
+        history.unshift(updatedOrder);
+      }
+
       await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+    } else if (payment !== 'zalopay') {
+      // COD: Nếu là retry payment, đã được xử lý ở trên
+      // Nếu không phải retry, tạo đơn mới
+      if (!isRetryPayment) {
+        const historyKey = `order_history_${user._id}`;
+        const historyString = await AsyncStorage.getItem(historyKey);
+        let history = historyString ? JSON.parse(historyString) : [];
+        history = Array.isArray(history) ? history : [];
+
+        const newOrder = {
+          id: backendOrderId || orderId,
+          _id: backendOrderId,
+          items: cart,
+          total: finalTotal,
+          originalTotal: total,
+          discount: voucherDiscount,
+          voucherCode: appliedVoucher?.code,
+          address: `${addressObj.name} - ${addressObj.phone}\n${addressObj.address}`,
+          payment,
+          status: 'Chờ xác nhận',
+          createdAt: new Date().toISOString()
+        };
+        history.unshift(newOrder);
+        await AsyncStorage.setItem(historyKey, JSON.stringify(history));
+      }
+      // Nếu là retry payment COD, đã được update ở trên với status 'Chờ xác nhận'
     }
 
     // Nếu là ZaloPay, mở trình duyệt thanh toán
     if (payment === 'zalopay') {
-      // Lưu flag để kiểm tra khi quay lại (fallback cho LDPlayer)
+      // Lưu flag để kiểm tra khi quay lại
       try {
-        await AsyncStorage.setItem(`zalopay_pending_${user._id}`, JSON.stringify({
+        const pendingFlagData = {
           orderId: backendOrderId || orderId,
-          timestamp: Date.now()
-        }));
-      } catch { }
+          timestamp: Date.now(),
+          isRetryPayment: isRetryPayment // ✅ Đánh dấu nếu là retry payment
+        };
+        console.log('[Checkout] 💾 CREATING PENDING FLAG:', pendingFlagData);
+        await AsyncStorage.setItem(`zalopay_pending_${user._id}`, JSON.stringify(pendingFlagData));
+        console.log('[Checkout] ✅ PENDING FLAG CREATED SUCCESSFULLY');
+      } catch (e) {
+        console.log('[Checkout] ❌ ERROR CREATING PENDING FLAG:', e);
+      }
 
       // Sử dụng backendOrderId nếu có, nếu không dùng orderId local
-      const paymentOrderId = backendOrderId || orderId;
-      const orderDescription = `Thanh toan don hang ${paymentOrderId}`;
+      const paymentOrderId = String(backendOrderId || orderId);
+      // Sử dụng code nếu có, nếu không dùng ID
+      const displayOrderCode = String(backendOrderCode || paymentOrderId);
+      const orderDescription = `Thanh toan don hang ${displayOrderCode}`;
+
+      // ✅ Đánh dấu đã mở ZaloPay
+      hasOpenedZaloPayRef.current = true;
+      console.log('[Checkout] 🚀 MARKED AS OPENED ZALOPAY - Will check payment on return');
+
       await openZaloPay(paymentOrderId, finalTotal, orderDescription);
 
       Alert.alert(
@@ -1378,17 +1607,16 @@ export default function CheckoutScreen() {
                 onPress={async () => {
                   setShowSuccessDialog(false);
 
-                  // ✅ Lưu timestamp khi user đóng dialog VÀ xóa pending flag
+                  // ✅ Xóa pending flag khi đóng dialog
                   try {
                     const userString = await AsyncStorage.getItem('user');
                     const user = userString ? JSON.parse(userString) : null;
                     if (user && user._id) {
-                      await AsyncStorage.setItem(`zalopay_last_dismissed_${user._id}`, Date.now().toString());
                       await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
-                      console.log('✅ Saved dismissal timestamp and cleared pending flag:', new Date().toISOString());
+                      console.log('✅ Cleared pending flag on dialog close');
                     }
                   } catch (e) {
-                    console.error('Error saving timestamp:', e);
+                    console.error('Error clearing pending flag:', e);
                   }
 
                   router.replace('/orders');
@@ -1401,17 +1629,16 @@ export default function CheckoutScreen() {
                 onPress={async () => {
                   setShowSuccessDialog(false);
 
-                  // ✅ Lưu timestamp khi user đóng dialog VÀ xóa pending flag
+                  // ✅ Xóa pending flag khi đóng dialog
                   try {
                     const userString = await AsyncStorage.getItem('user');
                     const user = userString ? JSON.parse(userString) : null;
                     if (user && user._id) {
-                      await AsyncStorage.setItem(`zalopay_last_dismissed_${user._id}`, Date.now().toString());
                       await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
-                      console.log('✅ Saved dismissal timestamp and cleared pending flag:', new Date().toISOString());
+                      console.log('✅ Cleared pending flag on dialog close');
                     }
                   } catch (e) {
-                    console.error('Error saving timestamp:', e);
+                    console.error('Error clearing pending flag:', e);
                   }
 
                   router.replace('/(tabs)/home');
@@ -1435,19 +1662,6 @@ export default function CheckoutScreen() {
                 style={[styles.successButton, { flex: 1, backgroundColor: '#ff4757' }]}
                 onPress={async () => {
                   setShowFailureDialog(false);
-
-                  // ✅ Lưu timestamp khi user đóng dialog
-                  try {
-                    const userString = await AsyncStorage.getItem('user');
-                    const user = userString ? JSON.parse(userString) : null;
-                    if (user && user._id) {
-                      await AsyncStorage.setItem(`zalopay_last_dismissed_${user._id}`, Date.now().toString());
-                      console.log('✅ Saved failure dismissal timestamp:', new Date().toISOString());
-                    }
-                  } catch (e) {
-                    console.error('Error saving timestamp:', e);
-                  }
-
                   // Ở lại màn checkout để user thử lại
                 }}
               >
