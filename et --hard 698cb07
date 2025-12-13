@@ -1,0 +1,61 @@
+[33m0ef9e2b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/NguyenVanHuy/PH52251[m[33m)[m Cập nhật thêm thanh toán ATM cho zalopay. cập nhật lại giao diện quản lý sản phẩm
+[33m54e380e[m Cập nhật thêm thanh toán ATM cho zalopay. cập nhật lại giao diện quản lý sản phẩm
+[33m4cd5f6b[m Resolve conflict after merge main
+[33m698cb07[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Cập nhật lại giao diện bộ lọc
+[33mce890c2[m Cập nhập thêm các tab tất cả, tin nhắn, ưu đãi, đơn hàng cho màn hình thông báo. Cải tiến cho chat AI
+[33m249a9c5[m Cập nhật mã đơn hàng của người dùng phải giống bên quản lý đơn hàng (Admin)
+[33me396e1f[m Cập nhật phương thức thanh toán: cod đổi thành phương thức thanh toán: tiền mặt ở trong chi tiết đơn hàng
+[33m260a000[m Thêm chức năng phát hiện những bình luận đánh giá tiêu cực của quản lý đánh giá, hiện nút xóa với những đánh giá bình luận tiêu cực
+[33m0379860[m Cập nhật thanh toán lại cho đơn hàng thanh toán thất bại
+[33mc7e0339[m Bỏ nút xóa đơn của đơn hàng đã hủy, làm mờ size những biến thể sản phẩm hết hàng
+[33ma0f36e9[m Chỉ hiển thị 1 trạng thái đã hủy, Sửa thanh toán khi nhận hàng (COD) thành thanh toán tiền mặt
+[33mcd4ffe3[m Cập nhật thêm form điền cho zalo pay, check validate đúng số thẻ mới cho thanh toán thành công
+[33mc7b112c[m Ẩn tabs, bỏ giá nhập QLSP, bỏ tổng giá nhập hàng tồn
+[33m7a81c9d[m Cập nhập thêm tính năng load cập nhật màn hình chi tiết đơn hàng
+[33m6e2cb77[m Khắc phục lỗi xung đột.
+[33m86af44a[m Cập nhật thêm load khi thanh toán từ zalo pay trở về thanh toán. Cập nhật lại giao diện trang chủ người dùng
+[33m0125211[m Cập nhật thêm form điền cho zalo pay, check validate đúng số thẻ mới cho thanh toán thành công
+[33m14df6c3[m Cập nhật thêm form điền cho zalo pay, check validate đúng số thẻ mới cho thanh toán thành công
+[33md69c5f3[m Khắc phục lỗi xung đột
+[33m670d6ec[m Cập nhật thêm điều kiện cho Voucher chỉ áp dụng được <= 500000
+[33m927e9c1[m .
+[33mb6031b8[m Sửa lại giao diện bộ lọc
+[33m26bcae0[m Resolve leftover conflict markers
+[33m389f604[m Sửa lại giao diện quản lý sản phẩm
+[33m976e6f2[m khắc phục lỗi xung đột
+[33md733cc9[m Khi ấn dừng bán sản phẩm bên màn chi tiết sản phẩm ấn mua ngay hoặc thêm giỏ hàng sẽ thông báo dừng bán, bên màn thanh toán cũng sẽ thông báo dừng bán
+[33m8e8bc88[m Thêm trạng thái đã hủy để tìm kiếm các đơn đã hủy và thống kê xem bao nhiêu đơn đã hủy của quản lý đơn hàng
+[33m01d0039[m Thêm chức năng lý do hủy đơn hàng trong chi tiết đơn hàng
+[33m209d62e[m Sửa lại check validate cho danh mục trùng tên, cập nhật đánh giá cho từng sản phẩm và hiển thị các đánh giá ở chi tiết đánh giá sản phẩm của quản lý đánh giá
+[33m4f9b7c3[m Cập nhật quản lý danh mục,  quản lý sản phẩm, cập nhật lý do hủy đơn hàng
+[33m47f84b1[m Làm load lại màn hình order để cập nhật đơn hàng, cập nhật lại thanh trạng thái đơn hàng. Giao diện bộ lọc. Cập nhật giao diện và thêm avata cho quản lý tài khoản khách hàng. Làm thêm chức năng xuất file Excel cho thống kê doanh thu
+[33m2644103[m Cập nhật thanh toán zalo pay, sắp xếp lại thời gian đơn hàng sớm nhất
+[33m99a247c[m Cập nhật lại quản lý Voucher và chi tiết đơn hàng
+[33mac4bb34[m Làm Guest cho app, chức năng bộ lọc, sửa lại danh sách yêu thích mỗi tài khoản user phải riêng biệt
+[33m1b54292[m Quản lý danh mục thay nút xóa bằng nút ẩn, quản lý đơn hàng cập nhật lại trạng thái đơn hàng và thời gian, cập nhật lại số lượng sản phẩm giỏ hàng khi tăng số lượng > số lượng tồn kho sẽ báo số lượng tồn không đủ, quản lý tài khoản thay nút xóa bằng nút khóa tài khoản
+[33mf321a39[m Cập nhật quản lý sản phẩm cho mở bán, cập nhật lại voucher bằng giá VND tính tổng tiền đúng
+[33m9a2ef13[m Cập nhật lại chức năng đánh giá lấy đúng tên và số điện thoại của khách hàng ở thông tin địa chỉ nhận hàng
+[33m71257da[m Sửa lại giao diện banner
+[33mfbcff1e[m Cập nhật thông tin cá nhân, thống kê doanh thu
+[33m5553299[m Chức năng thanh toán bằng zalo pay
+[33m3eafa68[m Cập nhật lại thống kê doanh thu, quản lý trạng thái đơn hàng, chat với người dùng, quản lý đánh giá, thông báo
+[33m8cf9a27[m Thống kê doanh thu, cập nhật màn hình tổng quan(Admin)
+[33m1c19e25[m Sửa lại tên màn hình hỗ trợ và chi tiết sản phẩm, thông báo
+[33m7994330[m Chức năng thông báo
+[33m5332533[m Cập nhật chức năng địa chỉ nhận hàng ở màn hình thanh toán
+[33m55c38d7[m Merge pull request #1 from quangteo220105/PhungMinhHuy/ph52365
+[33m0e7898c[m Merge branch 'main' into PhungMinhHuy/ph52365
+[33m4f345d3[m Quản lý voucher, chức năng voucher
+[33m3c888b2[m Quản lý chát(admin),chức năng chat user,quản lý thông tin cá nhân.
+[33m1e70457[m Cập nhật hiển thị thêm đánh giá ở sản phẩm, chi tiết sản phẩm. Cập nhật khi thanh toán đơn hàng, đơn hàng đã giao thì số lượng sản phẩm đó sẽ giảm đi
+[33m400c5f0[m Chức năng đánh giá, quản lý đánh giá sản phẩm
+[33m09cd763[m Màn hình cài đặt, Màn hình và chức năng trạng thái đơn hàng, màn hình chi tiết đơn hàng, giao diện và chức năng quản lý đơn hàng(Admin)
+[33ma7a6864[m Chức năng giỏ hàng, Màn hình thanh toán, chức năng quản lý tài khoản khách hàng
+[33mf4d7fcf[m Initial commit
+[33mfc0b1a5[m Chức năng tìm kiếm
+[33mfe6d756[m Thêm chức năng dừng bán giày
+[33m8ab0d3e[m Màn hình chi tiết sản phẩm, cập nhật đăng ký có avata khi đăng nhập vào home hiện đúng avata và tên đúng tài khoản đăng ký đó
+[33mb5a5816[m Chức năng quản lý Banner, Hiển thị Banner, danh mục, sản phẩm ở màn trang chủ
+[33m482e123[m Giao diện Web quản trị admin, chức năng quản lý sản phẩm, quản lý danh mục
+[33m487f002[m Giao diện web admin, cập nhật lại Login, Register, ForgotPassword, Home
+[33m9c32c63[m Màn chào, đăng ký, đăng nhập, quên mật khẩu, màn hình trang chủ
