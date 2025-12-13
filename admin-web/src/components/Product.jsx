@@ -719,19 +719,15 @@ export default function ManagerDashboard() {
                                                         />
                                                     </div>
 
-                                                    <div style={styles.inputGroup}>
-                                                        <label style={styles.variantLabel}>
-                                                            Giá bán (₫) <span style={styles.required}>*</span>
-                                                        </label>
-                                                        <input
-                                                            style={styles.variantInput}
-                                                            placeholder="Nhập giá bán"
-                                                            type="number"
-                                                            min="0"
-                                                            value={variant.currentPrice}
-                                                            onChange={(e) => updateVariant(index, 'currentPrice', e.target.value)}
-                                                        />
-                                                    </div>
+                                            <div style={styles.inputGroup}>
+                                                <label>Giá bán:</label>
+                                                <input
+                                                    placeholder="Giá bán"
+                                                    type="number"
+                                                    value={variant.currentPrice}
+                                                    onChange={(e) => updateVariant(index, 'currentPrice', e.target.value)}
+                                                />
+                                            </div>
 
                                                     <div style={styles.inputGroup}>
                                                         <label style={styles.variantLabel}>

@@ -1,7 +1,11 @@
 // my-app/config/apiConfig.js
 
 // 🖥️ Chỉ cần đổi dòng IP này khi dùng mạng khác
+<<<<<<< HEAD
+const LOCAL_IP = "192.168.1.7"; // IP máy tính của Quang
+=======
 const LOCAL_IP = "192.168.1.2"; // IP máy tính của Quang
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
 // const LOCAL_IP = "172.20.10.2"; // IP máy iphone 
 // const LOCAL_IP = "192.168.43.229" //IP máy a D
 const PORT = 3000;

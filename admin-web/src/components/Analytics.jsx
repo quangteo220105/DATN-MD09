@@ -6,6 +6,7 @@ export default function Analytics() {
     const [to, setTo] = useState("");
     const [groupBy, setGroupBy] = useState("day");
     const [loading, setLoading] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     const [summary, setSummary] = useState({ revenue: 0, ordersCount: 0, productsSold: 0 });
     const [series, setSeries] = useState([]); // [{period:{year,month,day}, revenue, orders}]
@@ -87,6 +88,67 @@ export default function Analytics() {
 
     const maxRevenue = Math.max(1, ...chartData.map(d => d.revenue));
 
+    const exportRevenueToExcel = async () => {
+        if (exporting) return;
+        try {
+            setExporting(true);
+            const query = buildQuery();
+            const res = await fetch(`http://localhost:3000/api/analytics/export?${query}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const rows = await res.json();
+            if (!Array.isArray(rows) || rows.length === 0) {
+                alert("Không có dữ liệu chi tiết để xuất.");
+                return;
+            }
+
+            const header = [
+                "Ngày bán",
+                "Tên sản phẩm",
+                "Màu sắc",
+                "Size",
+                "Số lượng",
+                "Doanh thu",
+                "Khách hàng",
+                "Số điện thoại"
+            ];
+
+            const formatCell = (value) => {
+                const str = value === undefined || value === null ? "" : String(value);
+                return `"${str.replace(/"/g, '""')}"`;
+            };
+
+            const rowsCsv = rows.map((row) => {
+                const dateLabel = row.date ? new Date(row.date).toLocaleString("vi-VN") : "";
+                return [
+                    dateLabel,
+                    row.productName || "",
+                    row.color || "",
+                    row.size || "",
+                    row.quantity || "",
+                    row.revenue || "",
+                    row.customer || "",
+                    row.phone || ""
+                ].map(formatCell).join(",");
+            });
+
+            const csvContent = [header.map(formatCell).join(","), ...rowsCsv].join("\n");
+            const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `bao-cao-doanh-thu-chi-tiet.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Export failed:", err);
+            alert("Xuất Excel thất bại. Vui lòng thử lại.");
+        } finally {
+            setExporting(false);
+        }
+    };
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <h2>📊 Thống kê doanh thu</h2>
@@ -108,9 +170,32 @@ export default function Analytics() {
                             <option value="year">Năm</option>
                         </select>
                     </div>
-                    <button type="submit" disabled={loading} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#111827", color: "#fff", cursor: "pointer" }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button type="submit" disabled={loading} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#111827", color: "#fff", cursor: "pointer", minWidth: 96 }}>
                         {loading ? 'Đang tải...' : 'Áp dụng'}
-                    </button>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={exportRevenueToExcel}
+                            disabled={exporting}
+                            style={{
+                                padding: "8px 12px",
+                                borderRadius: 6,
+                                border: "1px solid #16a34a",
+                                background: exporting ? "#86efac" : "#16a34a",
+                                color: "#fff",
+                                fontWeight: 600,
+                                cursor: exporting ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                minWidth: 140,
+                                opacity: exporting ? 0.8 : 1
+                            }}
+                        >
+                            {exporting ? "Đang xuất..." : "📥 Xuất Excel"}
+                        </button>
+                    </div>
                 </form>
             </div>
 

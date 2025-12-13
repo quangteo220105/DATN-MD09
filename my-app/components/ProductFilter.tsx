@@ -79,11 +79,15 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
         >
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
+                    <View style={styles.handle} />
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Bộ lọc</Text>
+                        <View>
+                            <Text style={styles.headerTitle}>Bộ lọc sản phẩm</Text>
+                            <Text style={styles.headerSubtitle}>Tinh chỉnh kết quả tìm kiếm của bạn</Text>
+                        </View>
                         <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                            <Ionicons name="close" size={24} color="#333" />
+                            <Ionicons name="close" size={24} color="#111827" />
                         </TouchableOpacity>
                     </View>
                     <View style={styles.summaryRow}>
@@ -97,10 +101,13 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                         ))}
                     </View>
 
-                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
                         {/* Danh mục */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Danh mục</Text>
+                            <View style={styles.sectionHeading}>
+                                <Ionicons name="grid" size={18} color="#475569" />
+                                <Text style={styles.sectionTitle}>Danh mục</Text>
+                            </View>
                             <View style={styles.chipContainer}>
                                 {categoryOptions.map((cat) => (
                                     <TouchableOpacity
@@ -126,7 +133,10 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
 
                         {/* Thương hiệu */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Thương hiệu</Text>
+                            <View style={styles.sectionHeading}>
+                                <Ionicons name="pricetag" size={18} color="#475569" />
+                                <Text style={styles.sectionTitle}>Thương hiệu</Text>
+                            </View>
                             <View style={styles.chipContainer}>
                                 {brandOptions.map((brand) => (
                                     <TouchableOpacity
@@ -152,7 +162,46 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
 
                         {/* Khoảng giá */}
                         <View style={styles.section}>
+<<<<<<< HEAD
+                            <View style={styles.sectionHeading}>
+                                <Ionicons name="cash" size={18} color="#475569" />
+                                <Text style={styles.sectionTitle}>Khoảng giá</Text>
+                            </View>
+                            <Text style={styles.sectionSubtitle}>Nhập mức giá phù hợp với ngân sách của bạn</Text>
+                            <View style={styles.priceInputRow}>
+                                <View style={styles.priceInputWrapper}>
+                                    <Text style={styles.priceLabel}>Từ</Text>
+                                    <TextInput
+                                        style={styles.priceInput}
+                                        value={priceMin === 0 ? '' : priceMin.toLocaleString('vi-VN')}
+                                        onChangeText={(text) => {
+                                            const num = parseInt(text.replace(/\D/g, '')) || 0;
+                                            setPriceMin(num);
+                                        }}
+                                        keyboardType="numeric"
+                                        placeholder="0"
+                                    />
+                                    <Text style={styles.priceCurrency}>đ</Text>
+                                </View>
+                                <Text style={styles.priceSeparator}>-</Text>
+                                <View style={styles.priceInputWrapper}>
+                                    <Text style={styles.priceLabel}>Đến</Text>
+                                    <TextInput
+                                        style={styles.priceInput}
+                                        value={priceMax === 10000000 ? '' : priceMax.toLocaleString('vi-VN')}
+                                        onChangeText={(text) => {
+                                            const num = parseInt(text.replace(/\D/g, '')) || 10000000;
+                                            setPriceMax(num);
+                                        }}
+                                        keyboardType="numeric"
+                                        placeholder="10,000,000"
+                                    />
+                                    <Text style={styles.priceCurrency}>đ</Text>
+                                </View>
+                            </View>
+=======
                             <Text style={styles.sectionTitle}>Khoảng giá</Text>
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
                             {/* Quick price range buttons */}
                             <View style={styles.quickPriceContainer}>
                                 {quickRanges.map((range) => (
@@ -182,7 +231,10 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
 
                         {/* Đánh giá */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Đánh giá</Text>
+                            <View style={styles.sectionHeading}>
+                                <Ionicons name="star" size={18} color="#475569" />
+                                <Text style={styles.sectionTitle}>Đánh giá</Text>
+                            </View>
                             <Text style={styles.sectionSubtitle}>Chọn số sao chính xác</Text>
                             <View style={styles.ratingContainer}>
                                 {[0, 1, 2, 3, 4, 5].map((rating) => (
@@ -211,7 +263,7 @@ export default function ProductFilter({ visible, onClose, onApply, categories, b
                     {/* Footer Actions */}
                     <View style={styles.footer}>
                         <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-                            <Ionicons name="refresh" size={18} color="#666" />
+                            <Ionicons name="refresh" size={18} color="#475569" />
                             <Text style={styles.resetBtnText}>Thiết lập lại</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
@@ -238,8 +290,7 @@ const styles = StyleSheet.create({
         maxHeight: '85%',
         paddingBottom: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.15,
+        shadowOpacity: 0.12,
         shadowRadius: 12,
         elevation: 12,
         overflow: 'hidden',
@@ -267,8 +318,12 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 22,
         fontWeight: '700',
-        color: '#1A1A1A',
-        letterSpacing: 0.3,
+        color: '#0f172a',
+    },
+    headerSubtitle: {
+        fontSize: 13,
+        color: '#64748b',
+        marginTop: 4,
     },
     closeBtn: {
         padding: 6,
@@ -288,9 +343,15 @@ const styles = StyleSheet.create({
     summaryRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
+<<<<<<< HEAD
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+=======
         gap: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
         backgroundColor: '#f1f5f9',
         borderBottomWidth: 1,
         borderBottomColor: '#e2e8f0',
@@ -298,6 +359,26 @@ const styles = StyleSheet.create({
     summaryCard: {
         width: '47%',
         backgroundColor: '#fff',
+<<<<<<< HEAD
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#e3e8ff',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    summaryLabel: {
+        fontSize: 12,
+        color: '#94a3b8',
+        marginBottom: 4,
+    },
+    summaryValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0f172a',
+=======
         borderRadius: 10,
         padding: 8,
         borderWidth: 1,
@@ -318,10 +399,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#0f172a',
         lineHeight: 16,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     content: {
-        paddingHorizontal: 24,
-        paddingTop: 20,
+        paddingHorizontal: 20,
+        paddingTop: 10,
     },
     section: {
         marginBottom: 24,
@@ -342,17 +424,14 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     sectionTitle: {
-        fontSize: 17,
-        fontWeight: '700',
-        color: '#1A1A1A',
-        marginBottom: 6,
-        letterSpacing: 0.2,
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#0f172a',
     },
     sectionSubtitle: {
-        fontSize: 13,
-        color: '#888',
-        marginBottom: 14,
-        fontStyle: 'italic',
+        fontSize: 12,
+        color: '#94a3b8',
+        marginBottom: 12,
     },
     chipContainer: {
         flexDirection: 'row',
@@ -380,19 +459,68 @@ const styles = StyleSheet.create({
     },
     chipText: {
         fontSize: 14,
-        color: '#555',
-        fontWeight: '600',
+        color: '#475569',
+        fontWeight: '500',
     },
     chipTextActive: {
         color: '#FFFFFF',
         fontWeight: '700',
     },
+<<<<<<< HEAD
+    priceInputRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        marginBottom: 16,
+        marginTop: 8,
+    },
+    priceInputWrapper: {
+        flex: 1,
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    priceLabel: {
+        fontSize: 12,
+        color: '#94a3b8',
+        marginBottom: 6,
+    },
+    priceInput: {
+        borderWidth: 0,
+        borderRadius: 8,
+        padding: 0,
+        fontSize: 14,
+        color: '#0f172a',
+    },
+    priceCurrency: {
+        position: 'absolute',
+        right: 20,
+        bottom: 14,
+        fontSize: 14,
+        color: '#94a3b8',
+    },
+    priceSeparator: {
+        marginHorizontal: 12,
+        fontSize: 16,
+        color: '#94a3b8',
+    },
+=======
 
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     quickPriceContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 12,
+<<<<<<< HEAD
+        marginTop: 16,
+=======
         marginTop: 8,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     quickPriceBtn: {
         paddingHorizontal: 12,
@@ -428,33 +556,28 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     ratingChip: {
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 8,
-        backgroundColor: '#FFF9F0',
-        borderWidth: 1.5,
-        borderColor: '#FFE4B5',
-        minWidth: 75,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        minWidth: 70,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
     },
     ratingChipActive: {
-        backgroundColor: '#F59E0B',
-        borderColor: '#F59E0B',
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
+        backgroundColor: '#f97316',
+        borderColor: '#f97316',
+        shadowOpacity: 0.12,
     },
     ratingText: {
-        fontSize: 15,
-        color: '#D97706',
-        fontWeight: '700',
+        fontSize: 14,
+        color: '#475569',
+        fontWeight: '500',
     },
     ratingTextActive: {
         color: '#FFFFFF',
@@ -462,23 +585,49 @@ const styles = StyleSheet.create({
     },
     footer: {
         flexDirection: 'row',
+<<<<<<< HEAD
+        paddingHorizontal: 24,
+        paddingTop: 16,
+        paddingBottom: 16,
+        gap: 14,
+=======
         paddingHorizontal: 16,
         paddingTop: 12,
         paddingBottom: 12,
         gap: 10,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
         backgroundColor: '#f8fafc',
         shadowColor: '#0f172a',
+<<<<<<< HEAD
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 8,
+=======
         shadowOpacity: 0.05,
         shadowRadius: 6,
         elevation: 4,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     resetBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+<<<<<<< HEAD
+        paddingVertical: 14,
+        borderRadius: 10,
+        backgroundColor: '#f8fafc',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    resetBtnText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#475569',
+=======
         paddingVertical: 10,
         borderRadius: 10,
         backgroundColor: '#F5F5F5',
@@ -490,11 +639,21 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#555',
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     applyBtn: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+<<<<<<< HEAD
+        paddingVertical: 14,
+        borderRadius: 10,
+        backgroundColor: '#0f172a',
+        shadowColor: '#0f172a',
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 6,
+=======
         paddingVertical: 10,
         borderRadius: 10,
         backgroundColor: '#FF4757',
@@ -503,6 +662,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 4,
         elevation: 3,
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
     },
     applyBtnText: {
         fontSize: 14,

@@ -65,7 +65,7 @@ export default function HomeScreen() {
     });
     const searchInputRef = useRef<any>(null);
     const isSelectingSuggestionRef = useRef(false);
-    const lockCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lockCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const normalizeText = (text: string) =>
         (text || "")
             .toLowerCase()
@@ -1026,7 +1026,12 @@ export default function HomeScreen() {
                                                 }));
                                             }}
                                         >
-                                            <Text style={[styles.brandText, activeFilters.selectedCategory === category.name && styles.brandTextActive]}>{category.name}</Text>
+                                            <Text
+                                                style={[styles.brandText, activeFilters.selectedCategory === category.name && styles.brandTextActive]}
+                                                numberOfLines={2}
+                                            >
+                                                {category.name}
+                                            </Text>
                                         </TouchableOpacity>
                                     ))}
                                 </ScrollView>

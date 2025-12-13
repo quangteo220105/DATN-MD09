@@ -28,6 +28,23 @@ export default function UserManager() {
         return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
     };
 
+    const resolveAvatarUrl = (user) => {
+        const raw = user?.avatar || user?.photo || user?.profileImage || user?.avatarUrl;
+        if (!raw) return null;
+        if (/^https?:\/\//i.test(raw)) return raw;
+        const normalizedBase = BASE_URL.replace(/\/api\/?$/, "");
+        const sanitizedPath = raw.startsWith("/") ? raw : `/${raw}`;
+        return `${normalizedBase}${sanitizedPath}`;
+    };
+
+    const getInitials = (user) => {
+        const name = (user?.name || user?.fullName || "").trim();
+        if (!name) return "👤";
+        const parts = name.split(/\s+/);
+        if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    };
+
     useEffect(() => {
         fetchList();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,6 +164,7 @@ export default function UserManager() {
                         ) : (
                             users.map((u, idx) => {
                                 const isLocked = u.isLocked === true;
+
                                 const avatarUrl = u.avatar || u.avatarUrl || u.profilePicture || u.image;
                                 return (
                                     <tr key={u._id || u.id || idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fbfdff' }}>

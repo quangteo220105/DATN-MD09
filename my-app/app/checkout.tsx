@@ -49,7 +49,10 @@ export default function CheckoutScreen() {
   const [showFailureDialog, setShowFailureDialog] = useState(false);
   const [showPaymentLoading, setShowPaymentLoading] = useState(false);
   const hasCheckedPaymentRef = useRef(false); // Tránh check nhiều lần trong cùng một session
+<<<<<<< HEAD
+=======
   const hasOpenedZaloPayRef = useRef(false); // Đánh dấu đã mở ZaloPay
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
   const voucherEligible = total <= VOUCHER_MAX_ORDER_AMOUNT;
 
   useEffect(() => {
@@ -283,6 +286,21 @@ export default function CheckoutScreen() {
       return false;
     }
   }, [params.payment, handlePaymentSuccess, handlePaymentFailure]);
+
+  const checkPaymentWithSpinner = React.useCallback(async () => {
+    const MIN_SPINNER_TIME = 2000;
+    const MAX_SPINNER_TIME = 3000;
+    const start = Date.now();
+    setShowPaymentLoading(true);
+    try {
+      return await checkPaymentSuccess();
+    } finally {
+      const elapsed = Date.now() - start;
+      const intended = Math.max(MIN_SPINNER_TIME, Math.min(MAX_SPINNER_TIME, elapsed + 500));
+      const remaining = Math.max(0, intended - elapsed);
+      setTimeout(() => setShowPaymentLoading(false), remaining);
+    }
+  }, [checkPaymentSuccess]);
 
   const checkPaymentWithSpinner = React.useCallback(async () => {
     const MIN_SPINNER_TIME = 2000;
@@ -666,18 +684,92 @@ export default function CheckoutScreen() {
           console.log('[Checkout] Found pending payment on mount, checking...');
           checkPaymentWithSpinner();
         }
+<<<<<<< HEAD
+
+        // Kiểm tra thời gian của pending flag - chỉ check nếu trong vòng 15 phút
+        try {
+          const pendingData = JSON.parse(pendingFlagStr);
+          const timeSincePending = Date.now() - (pendingData.timestamp || 0);
+          const minutesAgo = Math.round(timeSincePending / (1000 * 60));
+
+          console.log('[Checkout] Pending payment age:', minutesAgo, 'minutes');
+
+          // Nếu pending flag quá 15 phút, xóa nó đi và không check
+          if (timeSincePending > 15 * 60 * 1000) {
+            console.log('[Checkout] Pending flag too old, removing...');
+            await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
+            return;
+          }
+        } catch (e) {
+          // Nếu không parse được, xóa flag
+          console.log('[Checkout] Invalid pending flag, removing...');
+          await AsyncStorage.removeItem(`zalopay_pending_${user._id}`);
+          return;
+        }
+
+        console.log('[Checkout] Valid pending payment detected, checking payment success...');
+        // Kiểm tra ngay khi mount (có loading)
+        checkPaymentWithSpinner();
+
+        // Kiểm tra lại sau các khoảng thời gian để đảm bảo backend đã cập nhật
+        const timeouts = [
+          setTimeout(() => {
+            console.log('[Checkout] Retry check after 1s...');
+            checkPaymentWithSpinner();
+          }, 1000),
+          setTimeout(() => {
+            console.log('[Checkout] Retry check after 2s...');
+            checkPaymentWithSpinner();
+          }, 2000),
+          setTimeout(() => {
+            console.log('[Checkout] Retry check after 5s...');
+            checkPaymentWithSpinner();
+          }, 5000),
+          setTimeout(() => {
+            console.log('[Checkout] Retry check after 8s...');
+            checkPaymentWithSpinner();
+          }, 8000)
+        ];
+
+        return () => {
+          timeouts.forEach(timeout => clearTimeout(timeout));
+        };
+=======
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
       } catch (error) {
         console.log('[Checkout] Error checking pending on mount:', error);
       }
     };
 
+    checkIfPendingPayment();
+  }, [checkPaymentSuccess, checkPaymentWithSpinner]);
+=======
     checkPendingOnMount();
   }, [params.orderId, params.payment, checkPaymentWithSpinner]);
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
 
   // 🟢 Lắng nghe AppState - LUÔN CHECK PENDING FLAG KHI APP ACTIVE
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
+<<<<<<< HEAD
+        console.log('[Checkout] App became active, checking payment success...');
+        setTimeout(async () => {
+          try {
+            if (!userId) {
+              await checkPaymentSuccess();
+              return;
+            }
+            const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${userId}`);
+            const shouldShowLoading = !!pendingFlagStr || params.payment === 'success';
+            if (shouldShowLoading) {
+              await checkPaymentWithSpinner();
+            } else {
+              await checkPaymentSuccess();
+            }
+          } catch (error) {
+            console.log('[Checkout] Error checking payment on app active:', error);
+=======
         console.log('[Checkout] 🔄 APP BECAME ACTIVE - CHECKING FOR PENDING PAYMENTS');
         setTimeout(async () => {
           try {
@@ -708,13 +800,21 @@ export default function CheckoutScreen() {
             }
           } catch (error) {
             console.log('[Checkout] ❌ ERROR ON APP ACTIVE:', error);
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
           }
         }, 500);
       }
     });
 
+<<<<<<< HEAD
+    return () => {
+      subscription.remove();
+    };
+  }, [checkPaymentSuccess, checkPaymentWithSpinner, params.payment, userId]);
+=======
     return () => subscription.remove();
   }, [userId, params.orderId, checkPaymentWithSpinner]);
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
 
   // 🟢 Kiểm tra khi focus - LUÔN CHECK PENDING FLAG
   useFocusEffect(
@@ -728,6 +828,25 @@ export default function CheckoutScreen() {
             return;
           }
 
+<<<<<<< HEAD
+          console.log('[Checkout] Screen focused - Pending payment detected, checking...');
+          const shouldShowLoading = !!pendingFlagStr || hasPaymentParam;
+          const runCheck = shouldShowLoading ? checkPaymentWithSpinner : checkPaymentSuccess;
+          runCheck();
+
+          // Kiểm tra lại sau các khoảng thời gian
+          const timeouts = [
+            setTimeout(() => {
+              runCheck();
+            }, 1000),
+            setTimeout(() => {
+              runCheck();
+            }, 2000),
+            setTimeout(() => {
+              runCheck();
+            }, 5000)
+          ];
+=======
           // ✅ CHỈ skip nếu đang retry payment NHƯNG chưa mở ZaloPay
           if (params.orderId && !hasOpenedZaloPayRef.current) {
             console.log('[Checkout] 🔍 FOCUS - Retry payment in progress (not opened ZaloPay yet), skipping auto-check');
@@ -737,6 +856,7 @@ export default function CheckoutScreen() {
           if (params.orderId && hasOpenedZaloPayRef.current) {
             console.log('[Checkout] 🔍 FOCUS - Retry payment + ZaloPay opened - CHECKING PAYMENT STATUS');
           }
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
 
           // ✅ LUÔN kiểm tra pending flag khi focus (không cần shouldCheckPayment)
           const pendingFlagStr = await AsyncStorage.getItem(`zalopay_pending_${user._id}`);
@@ -754,7 +874,11 @@ export default function CheckoutScreen() {
       };
 
       checkOnFocus();
+<<<<<<< HEAD
+    }, [checkPaymentSuccess, checkPaymentWithSpinner, params.payment])
+=======
     }, [params.orderId, checkPaymentWithSpinner])
+>>>>>>> 698cb07305b5e089552a507f3cce18c7838b4bf0
   );
 
   // 🟢 Lấy danh sách categoryId trong cart

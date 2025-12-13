@@ -27,6 +27,7 @@ const STATUS_INFO: Record<string, { emoji: string; color: string }> = {
     'Đã xác nhận': { emoji: '📦', color: '#22c55e' },
     'Đang giao hàng': { emoji: '🚚', color: '#f59e0b' },
     'Đã giao hàng': { emoji: '✅', color: '#16a34a' },
+
     'Đã hủy': { emoji: '❌', color: '#ef4444' },
 };
 
@@ -239,6 +240,15 @@ export default function OrdersScreen() {
 
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
     useFocusEffect(React.useCallback(() => { fetchOrders(); }, [fetchOrders]));
+
+    const handleRefresh = React.useCallback(async () => {
+        try {
+            setRefreshing(true);
+            await fetchOrders();
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchOrders]);
 
     // Xử lý deep linking khi nhận được từ ZaloPay
     useEffect(() => {
@@ -752,6 +762,10 @@ export default function OrdersScreen() {
                     contentContainerStyle={{ paddingBottom: 80 }}
                     ListFooterComponent={<View style={{ height: 12 }} />}
                     showsVerticalScrollIndicator={false}
+
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
