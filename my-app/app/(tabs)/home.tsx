@@ -55,7 +55,6 @@ export default function HomeScreen() {
     const bannerRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showOutOfStockDialog, setShowOutOfStockDialog] = useState(false);
-    const [showLockedDialog, setShowLockedDialog] = useState(false);
     const [showFilter, setShowFilter] = useState(false);
     const [activeFilters, setActiveFilters] = useState<FilterState>({
         selectedCategory: 'Tất cả',
@@ -222,19 +221,7 @@ export default function HomeScreen() {
                         throw new Error('User missing');
                     }
 
-                    // Kiểm tra tài khoản có bị khóa không
-                    if (res.data.isLocked === true) {
-                        console.log('Tài khoản đã bị khóa.');
-                        // ✅ Hiển thị dialog ngay lập tức nếu chưa hiển thị
-                        if (!showLockedDialog && !stop) {
-                            setShowLockedDialog(true);
-                        }
-                    } else {
-                        // ✅ Nếu tài khoản không bị khóa, ẩn dialog nếu đang hiển thị
-                        if (showLockedDialog && !stop) {
-                            setShowLockedDialog(false);
-                        }
-                    }
+
                 } catch (err: any) {
                     if (stop) return;
                     if (err?.response?.status === 404) {
@@ -256,7 +243,7 @@ export default function HomeScreen() {
                 stop = true;
                 clearInterval(intervalId);
             };
-        }, [user?._id, showLockedDialog])
+        }, [user?._id])
     );
 
     // Debounce query input for smarter searching
@@ -1074,29 +1061,7 @@ export default function HomeScreen() {
                 </View>
             )}
 
-            {/* Account Locked Dialog */}
-            {showLockedDialog && (
-                <View style={styles.dialogOverlay}>
-                    <View style={styles.dialogContainer}>
-                        <View style={styles.dialogIcon}>
-                            <Ionicons name="lock-closed" size={48} color="#ef4444" />
-                        </View>
-                        <Text style={styles.dialogTitle}>Tài khoản đã bị khóa</Text>
-                        <Text style={styles.dialogMessage}>
-                            Tài khoản của bạn đã bị khóa bởi quản trị viên. Vui lòng liên hệ với bộ phận hỗ trợ để được giải quyết.
-                        </Text>
-                        <TouchableOpacity
-                            style={styles.dialogButton}
-                            onPress={async () => {
-                                setShowLockedDialog(false);
-                                await forceLogout();
-                            }}
-                        >
-                            <Text style={styles.dialogButtonText}>Xác nhận</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
+
             {/* Product Filter Modal */}
             <ProductFilter
                 visible={showFilter}
