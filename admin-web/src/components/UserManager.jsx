@@ -8,6 +8,11 @@ export default function UserManager() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [debugInfo, setDebugInfo] = useState("");
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+    const [showErrorDialog, setShowErrorDialog] = useState(false);
+    const [dialogMessage, setDialogMessage] = useState("");
+    const [pendingAction, setPendingAction] = useState(null);
 
     const getRegistrationDate = (user) => {
         return (
@@ -96,9 +101,19 @@ export default function UserManager() {
         }
     };
 
-    const handleToggleLock = async (id, currentLockStatus) => {
+    const handleToggleLock = (id, currentLockStatus) => {
         const action = currentLockStatus ? "mở khóa" : "khóa";
-        if (!window.confirm(`Bạn chắc chắn muốn ${action} tài khoản này?`)) return;
+        setDialogMessage(`Bạn chắc chắn muốn ${action} tài khoản này?`);
+        setPendingAction({ id, currentLockStatus, action });
+        setShowConfirmDialog(true);
+    };
+
+    const executeToggleLock = async () => {
+        if (!pendingAction) return;
+
+        const { id, currentLockStatus, action } = pendingAction;
+        setShowConfirmDialog(false);
+
         try {
             const token = localStorage.getItem("token");
             const res = await fetch(`${BASE_URL}/api/users/${id}/toggle-lock`, {
@@ -107,10 +122,21 @@ export default function UserManager() {
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             await fetchList();
-            alert(`${action === "khóa" ? "Khóa" : "Mở khóa"} tài khoản thành công!`);
+            setDialogMessage(`${action === "khóa" ? "Khóa" : "Mở khóa"} tài khoản thành công!`);
+            setShowSuccessDialog(true);
         } catch (e) {
-            alert(`${action === "khóa" ? "Khóa" : "Mở khóa"} thất bại, vui lòng thử lại!`);
+            setDialogMessage(`${action === "khóa" ? "Khóa" : "Mở khóa"} thất bại, vui lòng thử lại!`);
+            setShowErrorDialog(true);
+        } finally {
+            setPendingAction(null);
         }
+    };
+
+    const closeAllDialogs = () => {
+        setShowConfirmDialog(false);
+        setShowSuccessDialog(false);
+        setShowErrorDialog(false);
+        setPendingAction(null);
     };
 
     return (
@@ -231,6 +257,150 @@ export default function UserManager() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Custom Dialogs */}
+            {showConfirmDialog && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        backgroundColor: '#fff',
+                        borderRadius: 12,
+                        padding: 24,
+                        minWidth: 320,
+                        maxWidth: 400,
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+                    }}>
+                        <h3 style={{ margin: '0 0 16px 0', color: '#333', fontSize: 18 }}>Xác nhận</h3>
+                        <p style={{ margin: '0 0 20px 0', color: '#666', lineHeight: 1.5 }}>{dialogMessage}</p>
+                        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={closeAllDialogs}
+                                style={{
+                                    padding: '8px 16px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: 6,
+                                    backgroundColor: '#f8f9fa',
+                                    color: '#666',
+                                    cursor: 'pointer',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={executeToggleLock}
+                                style={{
+                                    padding: '8px 16px',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    backgroundColor: '#dc3545',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Xác nhận
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showSuccessDialog && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        backgroundColor: '#fff',
+                        borderRadius: 12,
+                        padding: 24,
+                        minWidth: 320,
+                        maxWidth: 400,
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+                    }}>
+                        <h3 style={{ margin: '0 0 16px 0', color: '#22c55e', fontSize: 18 }}>Thành công</h3>
+                        <p style={{ margin: '0 0 20px 0', color: '#666', lineHeight: 1.5 }}>{dialogMessage}</p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={closeAllDialogs}
+                                style={{
+                                    padding: '8px 16px',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    backgroundColor: '#22c55e',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showErrorDialog && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        backgroundColor: '#fff',
+                        borderRadius: 12,
+                        padding: 24,
+                        minWidth: 320,
+                        maxWidth: 400,
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+                    }}>
+                        <h3 style={{ margin: '0 0 16px 0', color: '#ef4444', fontSize: 18 }}>Lỗi</h3>
+                        <p style={{ margin: '0 0 20px 0', color: '#666', lineHeight: 1.5 }}>{dialogMessage}</p>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={closeAllDialogs}
+                                style={{
+                                    padding: '8px 16px',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    backgroundColor: '#ef4444',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

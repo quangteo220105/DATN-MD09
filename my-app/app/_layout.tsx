@@ -34,12 +34,15 @@ export default function RootLayout() {
           const userData = await response.json();
           if (userData.isLocked === true) {
             console.log('Account is locked, showing dialog...');
-            setShowLockedDialog(true);
-
-            // Dừng interval
-            if (checkInterval) {
-              clearInterval(checkInterval);
-              checkInterval = null;
+            // Chỉ hiển thị dialog nếu chưa hiển thị
+            if (!showLockedDialog) {
+              setShowLockedDialog(true);
+            }
+            // ✅ Không dừng interval để có thể kiểm tra liên tục
+          } else {
+            // ✅ Nếu tài khoản không bị khóa, ẩn dialog nếu đang hiển thị
+            if (showLockedDialog) {
+              setShowLockedDialog(false);
             }
           }
         } else if (response.status === 404) {
@@ -71,7 +74,7 @@ export default function RootLayout() {
         clearInterval(checkInterval);
       }
     };
-  }, [router]);
+  }, [router, showLockedDialog]);
 
   // 🟢 Kiểm tra thanh toán thành công khi app được mở lại (global check)
   useEffect(() => {

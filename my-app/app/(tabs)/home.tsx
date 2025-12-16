@@ -65,7 +65,6 @@ export default function HomeScreen() {
     });
     const searchInputRef = useRef<any>(null);
     const isSelectingSuggestionRef = useRef(false);
-    const lockCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const normalizeText = (text: string) =>
         (text || "")
             .toLowerCase()
@@ -225,22 +224,15 @@ export default function HomeScreen() {
 
                     // Kiểm tra tài khoản có bị khóa không
                     if (res.data.isLocked === true) {
-                        console.log('Tài khoản đã bị khóa. Sẽ hiển thị dialog sau 3 giây...');
-                        // Hủy timeout cũ nếu có
-                        if (lockCheckTimeoutRef.current) {
-                            clearTimeout(lockCheckTimeoutRef.current);
+                        console.log('Tài khoản đã bị khóa.');
+                        // ✅ Hiển thị dialog ngay lập tức nếu chưa hiển thị
+                        if (!showLockedDialog && !stop) {
+                            setShowLockedDialog(true);
                         }
-                        // Đặt timeout 3 giây để hiển thị dialog
-                        lockCheckTimeoutRef.current = setTimeout(() => {
-                            if (!stop) {
-                                setShowLockedDialog(true);
-                            }
-                        }, 3000);
                     } else {
-                        // Nếu tài khoản không bị khóa, hủy timeout nếu có
-                        if (lockCheckTimeoutRef.current) {
-                            clearTimeout(lockCheckTimeoutRef.current);
-                            lockCheckTimeoutRef.current = null;
+                        // ✅ Nếu tài khoản không bị khóa, ẩn dialog nếu đang hiển thị
+                        if (showLockedDialog && !stop) {
+                            setShowLockedDialog(false);
                         }
                     }
                 } catch (err: any) {
@@ -263,13 +255,8 @@ export default function HomeScreen() {
             return () => {
                 stop = true;
                 clearInterval(intervalId);
-                // Hủy timeout khi component unmount
-                if (lockCheckTimeoutRef.current) {
-                    clearTimeout(lockCheckTimeoutRef.current);
-                    lockCheckTimeoutRef.current = null;
-                }
             };
-        }, [user?._id])
+        }, [user?._id, showLockedDialog])
     );
 
     // Debounce query input for smarter searching

@@ -681,12 +681,12 @@
             <!-- Tab Thanh toán Visa -->
             <div id="visaTab" class="tab-content active">
                 <div class="card-form">
-                    <h3>Thông tin thẻ ngân hàng</h3>
-                    
+                    <h3>Thông tin thẻ Visa</h3>
+
                     <div style="margin-bottom: 16px;">
                         <label class="card-label" for="cardNumberInput">Số thẻ</label>
-                        <input type="text" id="cardNumberInput" class="card-input" inputmode="numeric" autocomplete="cc-number"
-                            placeholder="#### #### #### ####" maxlength="19">
+                        <input type="text" id="cardNumberInput" class="card-input" inputmode="numeric"
+                            autocomplete="cc-number" placeholder="#### #### #### ####" maxlength="19">
                         <div class="card-error" id="cardNumberError"></div>
                     </div>
 
@@ -700,23 +700,26 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                         <div>
                             <label class="card-label" for="cardExpiryInput">Ngày hết hạn</label>
-                            <input type="text" id="cardExpiryInput" class="card-input" inputmode="numeric" autocomplete="cc-exp"
-                                placeholder="MM/YY" maxlength="5">
+                            <input type="text" id="cardExpiryInput" class="card-input" inputmode="numeric"
+                                autocomplete="cc-exp" placeholder="MM/YY" maxlength="5">
                             <div class="card-error" id="cardExpiryError"></div>
                         </div>
                         <div>
                             <label class="card-label" for="cardCvvInput">Mã CVV</label>
-                            <input type="text" id="cardCvvInput" class="card-input" inputmode="numeric" autocomplete="cc-csc"
-                                placeholder="123" maxlength="4">
+                            <input type="text" id="cardCvvInput" class="card-input" inputmode="numeric"
+                                autocomplete="cc-csc" placeholder="123" maxlength="4">
                             <div class="card-error" id="cardCvvError"></div>
                         </div>
                     </div>
 
                     <p class="card-hint" style="margin-top: 8px; font-size: 11px; line-height: 1.5;">
                         <strong>Thẻ test hợp lệ:</strong><br>
-                        Visa/Master/JCB: <strong>4111 1111 1111 1111</strong> (Tên: NGUYEN VAN A, Hạn: 01/25, CVV: 123)<br>
-                        ATM: <strong>9704 5400 0000 0062</strong>, <strong>9704 5400 0000 0070</strong>, <strong>9704 5400 0000 0088</strong>, 
-                        <strong>9704 5400 0000 0096</strong>, <strong>9704 5410 0000 0094</strong>, <strong>9704 5410 0000 0078</strong>
+                        Visa/Master/JCB: <strong>4111 1111 1111 1111</strong> (Tên: NGUYEN VAN A, Hạn: 01/25, CVV:
+                        123)<br>
+                        ATM: <strong>9704 5400 0000 0062</strong>, <strong>9704 5400 0000 0070</strong>, <strong>9704
+                            5400 0000 0088</strong>,
+                        <strong>9704 5400 0000 0096</strong>, <strong>9704 5410 0000 0094</strong>, <strong>9704 5410
+                            0000 0078</strong>
                     </p>
                 </div>
 
@@ -734,11 +737,11 @@
             <div id="atmTab" class="tab-content">
                 <div class="card-form">
                     <h3>Thông tin thẻ ATM</h3>
-                    
+
                     <div style="margin-bottom: 16px;">
                         <label class="card-label" for="atmCardNumberInput">Số thẻ</label>
-                        <input type="text" id="atmCardNumberInput" class="card-input" inputmode="numeric" autocomplete="cc-number"
-                            placeholder="#### #### #### ####" maxlength="19">
+                        <input type="text" id="atmCardNumberInput" class="card-input" inputmode="numeric"
+                            autocomplete="cc-number" placeholder="#### #### #### ####" maxlength="19">
                         <div class="card-error" id="atmCardNumberError"></div>
                     </div>
 
@@ -792,12 +795,12 @@
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
             });
-            
+
             // Xóa active class từ tất cả tabs
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Hiển thị tab được chọn
             if (tabName === 'visa') {
                 document.getElementById('visaTab').classList.add('active');
@@ -948,14 +951,14 @@
             errorEl.classList.add('show');
             errorEl.textContent = message;
         }
-        
+
         if (cardInput) {
             cardInput.addEventListener('input', (event) => {
                 const target = event.target;
                 const digitsOnly = target.value.replace(/\D/g, '').slice(0, 16);
                 const groups = digitsOnly.match(/.{1,4}/g) || [];
                 target.value = groups.join(' ');
-                
+
                 // Validate số thẻ
                 if (digitsOnly.length === 16) {
                     if (isValidTestCard(digitsOnly)) {
@@ -1028,7 +1031,7 @@
                 const digitsOnly = target.value.replace(/\D/g, '').slice(0, 16);
                 const groups = digitsOnly.match(/.{1,4}/g) || [];
                 target.value = groups.join(' ');
-                
+
                 // Validate số thẻ ATM (chỉ chấp nhận 9704540000000062)
                 if (digitsOnly.length === 16) {
                     if (isValidATMCard(digitsOnly)) {
@@ -1119,7 +1122,7 @@
                 let cardNumberInput, cardNumberErrorEl, cardNameInput, cardNameErrorEl;
                 let cardExpiryInput, cardExpiryErrorEl, cardCvvInput, cardCvvErrorEl;
                 let atmCardIssueDateInput, atmCardIssueDateErrorEl;
-                
+
                 if (type === 'visa') {
                     cardNumberInput = document.getElementById('cardNumberInput');
                     cardNumberErrorEl = document.getElementById('cardNumberError');
@@ -1137,13 +1140,13 @@
                     cardNameErrorEl = document.getElementById('atmCardNameError');
                     atmCardIssueDateErrorEl = document.getElementById('atmCardIssueDateError');
                 }
-                
+
                 const cardNumber = cardNumberInput.value.replace(/\D/g, '');
                 const cardName = cardNameInput.value.trim().toUpperCase();
                 const cardExpiry = type === 'visa' ? cardExpiryInput.value.trim() : null;
                 const cardCvv = type === 'visa' ? cardCvvInput.value.trim() : null;
                 const atmIssueDate = type === 'atm' ? atmCardIssueDateInput.value.trim() : null;
-                
+
                 // Reset error states
                 clearFieldError(cardNumberInput, cardNumberErrorEl);
                 clearFieldError(cardNameInput, cardNameErrorEl);
@@ -1153,12 +1156,12 @@
                 } else if (type === 'atm') {
                     clearFieldError(atmCardIssueDateInput, atmCardIssueDateErrorEl);
                 }
-                
+
                 // Validate số thẻ
                 if (!cardNumber || cardNumber.length < 16) {
                     toggleButtons(false);
                     setFieldError(cardNumberInput, cardNumberErrorEl, 'Vui lòng nhập đầy đủ số thẻ (16 chữ số)');
-                    
+
                     message = '❌ Vui lòng nhập đầy đủ số thẻ (16 chữ số)';
                     statusClass = 'status-failure';
                     statusMessage.textContent = message;
